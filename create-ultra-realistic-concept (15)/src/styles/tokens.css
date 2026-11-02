@@ -1,0 +1,101 @@
+/*
+  Jetons du design system AIME / ATLAS, repris à l'identique (mêmes noms, mêmes valeurs) pour que ROSACE
+  puisse rejoindre ATLAS sans traduction. Les ajouts propres à ROSACE sont regroupés en fin de bloc.
+*/
+:root {
+  --encre: #0b0b0c; --encre-2: #3a3a3f; --encre-3: #55555a;
+  --fond: #f6f6f4; --carte: #ffffff; --doux: #f1f1ee; --papier: #ecece8; --cadre: #e9e9e5;
+  --trait: #e2e2de; --trait-2: #cfcfcb; --trait-champ: #bdbdb8;
+  --dock: #1b1b1a; --dock-trait: #3a3a38; --dock-survol: #2a2a28;
+  --blanc: #ffffff; --blanc-2: rgba(255,255,255,.75); --blanc-3: rgba(255,255,255,.6);
+  --erreur: #a3122a; --libre: #4fd69a;
+  --nacre: radial-gradient(circle at 32% 30%, #ffffff 0%, #d9e8ff 22%, #c9b8ff 48%, #ffd6ec 72%, #b9f0e4 100%);
+  --nacre-rose: #ffd6ec; --orbe-lecture-1: #4f7bff; --orbe-ecoute: #a46bff;
+  --ombre-dock: 0 14px 36px rgba(11,11,12,.12);
+  --ombre-menu: 0 24px 60px rgba(11,11,12,.2);
+  --ombre-ecran: 0 40px 100px rgba(11,11,12,.14);
+  --ombre-bascule: 0 1px 3px rgba(0,0,0,.12);
+
+  --espace-3: 14px; --espace-5: 24px; --espace-7: 48px; --espace-section: 140px;
+  --marge: clamp(16px, 4vw, 56px);
+  --rayon-sm: 10px; --rayon-champ: 12px; --rayon-bouton: 13px; --rayon-dock: 16px; --rayon-carte: 20px; --rayon-xl: 24px; --rayon-pilule: 999px;
+  --font-sans: "Inter Tight", system-ui, sans-serif;
+
+  /* Propres à ROSACE */
+  --serif: "Bodoni Moda", "Didot", "Bodoni 72", Georgia, serif;
+  --plum: #6f3f62;
+  --dim-structure: #6f3f62;
+  --dim-trace: #8a72a6;
+  --dim-density: #6f8c5c;
+  --dim-scale: #b98443;
+  --dim-paletteShift: #b05672;
+  color-scheme: light;
+}
+
+/* La Nuit : les mêmes jetons, retournés (comme dans ATLAS). */
+html[data-mode="nuit"] {
+  --fond: #0b0b0c; --carte: #161618; --doux: #1e1e21; --papier: #1a1a1c;
+  --trait: #2a2a2e; --trait-2: #3a3a3f; --trait-champ: #4a4a50;
+  --encre: #f3f3f1; --encre-2: rgba(243,243,241,.78); --encre-3: rgba(243,243,241,.58);
+  --dock: #161618; --dock-trait: #2e2e32; --dock-survol: #232326;
+  --ombre-dock: 0 14px 36px rgba(0,0,0,.5);
+  --ombre-menu: 0 24px 60px rgba(0,0,0,.6);
+  --ombre-ecran: 0 40px 100px rgba(0,0,0,.5);
+  --plum: #d3a9c6;
+  --dim-structure: #c58fb4; --dim-trace: #b3a0d0; --dim-density: #9bb887; --dim-scale: #dcab6a; --dim-paletteShift: #d98aa4;
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+html, body { height: 100%; }
+#root { height: 100%; }
+body {
+  margin: 0; min-width: 320px; overflow: hidden;
+  font-family: var(--font-sans); color: var(--encre); background: var(--fond);
+  -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; font-synthesis: none;
+}
+button, a, input { font: inherit; }
+button { color: inherit; }
+button:not(:disabled), a { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .4; }
+a { color: inherit; text-decoration: none; }
+canvas { display: block; }
+::selection { color: var(--fond); background: var(--encre); }
+:focus-visible { outline: 2px solid var(--encre); outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+.lien-evitement { position: absolute; left: 12px; top: -64px; z-index: 100; padding: 12px 16px; border-radius: var(--rayon-sm); background: var(--encre); color: var(--fond); font-weight: 600; }
+.lien-evitement:focus { top: 12px; }
+
+/* Typographie : la hiérarchie d'ATLAS */
+.surtitre, .eyebrow { margin: 0 0 14px; font-size: 13px; line-height: 1.3; font-weight: 600; letter-spacing: .14em; text-transform: uppercase; color: var(--encre-3); }
+.signature { margin: 0; font-family: var(--font-sans); font-size: clamp(52px, 11vw, 196px); line-height: .86; font-weight: 900; letter-spacing: -0.035em; text-transform: uppercase; }
+.titre-monumental { margin: 0; font-size: clamp(52px, 8.4vw, 136px); line-height: .92; font-weight: 600; letter-spacing: -0.045em; text-wrap: balance; }
+.titre-serif { margin: 0; font-family: var(--serif); font-style: italic; font-weight: 400; font-size: clamp(40px, 4.2vw, 64px); line-height: 1.02; letter-spacing: -.02em; }
+.serif-it { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: -.03em; }
+.chapeau { margin: 28px 0 0; max-width: 44ch; font-size: clamp(19px, 1.7vw, 23px); line-height: 1.45; color: var(--encre-2); }
+.marque { font-size: 18px; line-height: 1; font-weight: 800; letter-spacing: -0.02em; }
+.orbe { flex: none; width: 30px; height: 30px; border-radius: 50%; background: var(--nacre); box-shadow: inset 0 0 0 1px rgba(11,11,12,.12); }
+
+/* Composants communs */
+.bouton { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 52px; padding: 0 22px; border-radius: var(--rayon-bouton); border: 1px solid var(--encre); background: var(--carte); color: var(--encre); font-size: 16px; font-weight: 600; line-height: 1; white-space: nowrap; transition: opacity .15s, background .15s; }
+.bouton:hover:not(:disabled) { background: var(--doux); }
+.bouton.noir { background: var(--encre); color: var(--fond); }
+.bouton.noir:hover:not(:disabled) { background: var(--encre); opacity: .88; }
+.bouton-petit { height: 44px; padding: 0 16px; font-size: 14px; border-color: var(--trait-2); }
+.bouton-petit.noir { border-color: var(--encre); }
+.bouton-large { width: 100%; }
+.bouton small { font-size: 12px; font-weight: 500; opacity: .75; }
+.lien-souligne { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; padding: 0; border: 0; background: none; color: var(--encre); font-size: 15px; font-weight: 600; text-decoration: underline; text-decoration-thickness: 1.5px; text-underline-offset: 6px; }
+.lien-souligne:hover { color: var(--encre-3); }
+.icone, .icon-button { display: inline-grid; flex: none; width: 44px; height: 44px; padding: 0; place-items: center; border: 1px solid var(--trait-2); border-radius: 50%; background: var(--carte); color: var(--encre); transition: background .15s; }
+.icone:hover:not(:disabled), .icon-button:hover { background: var(--doux); }
+.filet { display: block; width: 52px; height: 1.5px; margin-top: 22px; background: var(--plum); }
+.vide { display: flex; min-height: 280px; flex-direction: column; align-items: center; justify-content: center; padding: 28px; text-align: center; color: var(--encre-3); }
+.vide h3 { margin: 16px 0 8px; font-size: 26px; font-weight: 600; letter-spacing: -0.03em; color: var(--encre); }
+.vide p { max-width: 36ch; margin: 0 0 22px; font-size: 16px; line-height: 1.5; }
+
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }
+}

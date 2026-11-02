@@ -1,0 +1,163 @@
+import { getThread } from "../data/dmc";
+import { paintPattern } from "./paint";
+import { chartRegions, type ChartRegion } from "./chart";
+import { patternFingerprint, shortFingerprint } from "./pattern-id";
+import { FABRIC_COLORS, SYMBOLS, formatDuration, getPatternName, type RosacePattern } from "./rosace";
+
+function safeName(pattern: RosacePattern) {
+  return `rosace-${String(pattern.config.seed).padStart(3, "0")}-${shortFingerprint(patternFingerprint(pattern))}`;
+}
+
+function xml(value: string) {
+  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+function withoutXmlDeclaration(svg: string) {
+  return svg.replace(/^<\?xml[^>]*>\s*/, "");
+}
+
+function chartInk(hex: string) {
+  const value = Number.parseInt(hex.replace("#", ""), 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  const luminance = r * 0.2126 + g * 0.7152 + b * 0.0722;
+  if (luminance <= 160) return hex;
+  const amount = luminance > 205 ? 0.72 : 0.42;
+  const channel = (v: number) => Math.round(v * (1 - amount)).toString(16).padStart(2, "0");
+  return `#${channel(r)}${channel(g)}${channel(b)}`;
+}
+
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  anchor.remove();
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/**
+ * Rendu SVG. `region` est un rectangle de la grille, pas un carré : la découpe PDF
+ * couvre ainsi exactement toutes les cases, y compris sur les grilles impaires.
+ */
+export function patternToSvg(pattern: RosacePattern, chart = false, region?: ChartRegion) {
+  const regionX = region?.x ?? 0;
+  const regionY = region?.y ?? 0;
+  const width = region?.width ?? pattern.size;
+  const height = region?.height ?? pattern.size;
+  const cell = 12;
+  const margin = chart ? 36 : 24;
+  const sideW = width * cell + margin * 2;
+  const sideH = height * cell + margin * 2;
+  const palette = pattern.config.palette;
+  const stitches = pattern.stitches.filter((stitch) => stitch.x >= regionX && stitch.x < regionX + width && stitch.y >= regionY && stitch.y < regionY + height);
+  const paths = palette.map(() => ({ under: [] as string[], over: [] as string[] }));
+  const symbols = palette.map(() => [] as string[]);
+  stitches.forEach((stitch) => {
+    const x = margin + (stitch.x - regionX) * cell;
+    const y = margin + (stitch.y - regionY) * cell;
+    if (chart) symbols[stitch.color].push(`<text x="${x}" y="${y + 0.5}">${SYMBOLS[stitch.color]}</text>`);
+    else {
+      const radius = cell * 0.36;
+      paths[stitch.color].under.push(`M${x - radius},${y - radius}L${x + radius},${y + radius}`);
+      paths[stitch.color].over.push(`M${x - radius},${y + radius}L${x + radius},${y - radius}`);
+    }
+  });
+
+  let grid = "";
+  let coordinates = "";
+  if (chart) {
+    const major: string[] = [];
+    const labels: string[] = [];
+    const startX = margin - cell / 2;
+    const startY = margin - cell / 2;
+    const endX = startX + width * cell;
+    const endY = startY + height * cell;
+    for (let i = 0; i <= width; i += 10) {
+      const position = startX + i * cell;
+      major.push(`M${position},${startY}V${endY}`);
+    }
+    for (let i = 0; i <= height; i += 10) {
+      const position = startY + i * cell;
+      major.push(`M${startX},${position}H${endX}`);
+    }
+    for (let i = 0; i < width; i += 10) labels.push(`<text x="${margin + i * cell}" y="${margin - 17}">${regionX + i + 1}</text>`);
+    for (let i = 0; i < height; i += 10) labels.push(`<text x="${margin - 19}" y="${margin + i * cell + 2}">${regionY + i + 1}</text>`);
+    grid = `<defs><pattern id="smallGrid" width="${cell}" height="${cell}" patternUnits="userSpaceOnUse"><path d="M${cell} 0L0 0 0 ${cell}" fill="none" stroke="#6f5966" stroke-opacity=".17" stroke-width=".65"/></pattern></defs><rect x="${startX}" y="${startY}" width="${width * cell}" height="${height * cell}" fill="url(#smallGrid)"/><path d="${major.join("")}" fill="none" stroke="#6f5966" stroke-opacity=".48" stroke-width="1.1"/>`;
+    coordinates = `<g fill="#766c72" font-family="Arial,sans-serif" font-size="7" text-anchor="middle">${labels.join("")}</g>`;
+  } else {
+    grid = `<defs><pattern id="weave" width="${cell}" height="${cell}" patternUnits="userSpaceOnUse"><path d="M0 0V${cell}M0 0H${cell}" stroke="${FABRIC_COLORS[pattern.config.fabric].warp}" stroke-opacity=".18" stroke-width=".8"/><path d="M1 0V${cell}M0 1H${cell}" stroke="#fff" stroke-opacity=".3" stroke-width=".6"/></pattern></defs><rect width="100%" height="100%" fill="url(#weave)"/>`;
+  }
+
+  const artwork = chart
+    ? symbols.map((entries, index) => `<g fill="${chartInk(getThread(palette[index]).hex)}" font-family="Arial,sans-serif" font-size="10.5" font-weight="600" text-anchor="middle" dominant-baseline="central">${entries.join("")}</g>`).join("")
+    : paths.map((path, index) => `<g fill="none" stroke="${getThread(palette[index]).hex}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="${path.under.join("")}"/><path d="${path.over.join("")}"/></g>`).join("");
+  const regionCopy = region ? ` Planche colonnes ${region.x + 1}–${region.x + region.width}, lignes ${region.y + 1}–${region.y + region.height}.` : "";
+  const description = `${pattern.stitches.length} croix. ${getPatternName(pattern.config)}. Fils ${palette.map((code) => `DMC ${code}`).join(", ")}.${regionCopy}`;
+  return `<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="${sideW}" height="${sideH}" viewBox="0 0 ${sideW} ${sideH}">
+<title>${xml(`Rosace n° ${pattern.config.seed} · empreinte ${patternFingerprint(pattern)}`)}</title><desc>${xml(description)}</desc>
+<rect width="100%" height="100%" fill="${chart ? "#fffefa" : FABRIC_COLORS[pattern.config.fabric].base}"/>${grid}${coordinates}${artwork}
+<metadata>Symboles et géométrie calculés par ROSACE. Couleurs écran indicatives ; références DMC Mouliné. Données de référence couleur : MakeBead craft-color-codes, CC BY 4.0.</metadata></svg>`;
+}
+
+export function exportSvg(pattern: RosacePattern, chart: boolean) {
+  const blob = new Blob([patternToSvg(pattern, chart)], { type: "image/svg+xml;charset=utf-8" });
+  downloadBlob(blob, `${safeName(pattern)}-${chart ? "grille" : "motif"}.svg`);
+}
+
+export function exportPng(pattern: RosacePattern, chart: boolean) {
+  return new Promise<void>((resolve, reject) => {
+    const canvas = document.createElement("canvas");
+    paintPattern(canvas, pattern, chart ? "chart" : "fabric", 1600);
+    canvas.toBlob((blob) => {
+      if (!blob) {
+        reject(new Error("L'image n'a pas pu être créée."));
+        return;
+      }
+      downloadBlob(blob, `${safeName(pattern)}-${chart ? "grille" : "toile"}.png`);
+      resolve();
+    }, "image/png");
+  });
+}
+
+export function exportThreadCsv(pattern: RosacePattern) {
+  const rows = [
+    ["Symbole", "Référence DMC", "Nom", "Croix", "Longueur de brins (m)", `Longueur aiguille ${pattern.config.strands} brins (m)`, "Échevettes commerciales"],
+    ...pattern.usage.filter((usage) => usage.count > 0).map((usage) => [
+      usage.symbol,
+      usage.code,
+      getThread(usage.code).name,
+      usage.count,
+      String(usage.strandMeters).replace(".", ","),
+      String(usage.meters).replace(".", ","),
+      usage.skeins,
+    ]),
+    ["Total", "", "Toutes références", pattern.stitches.length, String(pattern.totalStrandMeters).replace(".", ","), String(pattern.totalNeedleMeters).replace(".", ","), pattern.totalSkeins],
+  ];
+  const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n")}`;
+  downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeName(pattern)}-fils.csv`);
+}
+
+export function printWorksheet(pattern: RosacePattern) {
+  const printWindow = window.open("", "_blank", "width=1000,height=800");
+  if (!printWindow) return false;
+  printWindow.opener = null;
+  const fingerprint = patternFingerprint(pattern);
+  const rows = pattern.usage.filter((usage) => usage.count > 0).map((usage) => {
+    const thread = getThread(usage.code);
+    return `<tr><td class="symbol">${usage.symbol}</td><td><span class="color" style="background:${thread.hex}"></span></td><td><strong>${usage.code}</strong><br><small>${thread.name}</small></td><td>${usage.count.toLocaleString("fr-FR")}</td><td>${String(usage.strandMeters).replace(".", ",")} m</td><td>${String(usage.meters).replace(".", ",")} m</td><td>${usage.skeins}</td></tr>`;
+  }).join("");
+  const regions = chartRegions(pattern.size);
+  const tiles = regions.map((region, index) => `<section class="tile-page"><div class="tile-head"><div><span>ROSACE · ${fingerprint.slice(0, 8)}</span><h1>Patron · planche ${index + 1} / ${regions.length}</h1></div><div><strong>Colonnes ${region.x + 1}–${region.x + region.width}</strong><br>Lignes ${region.y + 1}–${region.y + region.height}<br>${region.width} × ${region.height} cases</div></div><div class="chart">${withoutXmlDeclaration(patternToSvg(pattern, true, region))}</div><p class="tile-note">1 case = 1 croix · Repères lourds toutes les 10 cases · Cette planche couvre exactement ses colonnes et lignes, sans recouvrement.</p></section>`).join("");
+  const preview = withoutXmlDeclaration(patternToSvg(pattern, false));
+  const pageCount = 1 + regions.length;
+  printWindow.document.write(`<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fiche Rosace ${pattern.config.seed}</title><style>
+  @page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#241f22;margin:0;font-size:11px}header,.tile-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #bbb;padding-bottom:12px}h1{font-family:Georgia,serif;font-weight:400;font-size:29px;margin:4px 0}h2{font-size:12px;text-transform:uppercase;letter-spacing:1.3px;margin:16px 0 9px}.meta,.tile-head>div:last-child{text-align:right;line-height:1.65}.cover{display:grid;grid-template-columns:.78fr 1.22fr;gap:10mm;margin-top:15px}.preview svg,.chart svg{display:block;width:100%;height:auto}.preview{border:1px solid #ddd}.notes{line-height:1.6;color:#5f565b}table{border-collapse:collapse;width:100%}td,th{padding:5px 4px;border-bottom:1px solid #e5e0dc;text-align:left}th{font-size:8px;text-transform:uppercase;letter-spacing:.5px}.symbol{font-size:17px}.color{display:block;width:17px;height:17px;border-radius:50%;border:1px solid #ddd}.print{position:fixed;right:20px;bottom:20px;background:#693c60;color:white;border:0;border-radius:30px;padding:13px 20px;cursor:pointer}.tile-page{break-before:page;page-break-before:always}.tile-head h1{font-size:24px}.tile-head span{font-size:8px;letter-spacing:1px}.tile-page .chart{margin-top:12px}.tile-note{font-size:8px;color:#6f6269;text-align:center}.print-hint{margin-top:14px;padding:9px;border:1px solid #ddd;line-height:1.5}@media print{.print{display:none}.cover{grid-template-columns:.78fr 1.22fr}header{padding-bottom:8px}h2{margin-top:10px}td,th{padding:4px 3px}}
+  </style></head><body><button class="print" onclick="window.print()">Imprimer / PDF · ${pageCount} pages</button><section><header><div><div>ROSACE · ATELIER</div><h1>Rosace n° ${pattern.config.seed}</h1><div>${getPatternName(pattern.config)}</div></div><div class="meta"><strong>${pattern.stitches.length} croix</strong><br>${pattern.size} × ${pattern.size} points<br>Aïda ${pattern.config.aida} · ${FABRIC_COLORS[pattern.config.fabric].name}<br>Motif ${String(pattern.motifWidthCm).replace(".", ",")} × ${String(pattern.motifHeightCm).replace(".", ",")} cm<br>2 brins par défaut · ${pattern.config.strands} brins choisis<br>Empreinte ${fingerprint}</div></header><div class="cover"><div><h2>Aperçu du motif</h2><div class="preview">${preview}</div><p class="notes">Le patron est divisé en ${regions.length} planches rectangulaires qui couvrent exactement la grille. Chaque planche reprend les coordonnées du motif complet.</p></div><div><h2>Fils et fournitures</h2><table><thead><tr><th>Symb.</th><th>Fil</th><th>DMC</th><th>Croix</th><th>Brins</th><th>Aiguille</th><th>Éch.</th></tr></thead><tbody>${rows}</tbody></table><h2>Hypothèses textiles</h2><p class="notes">Métrage « brins » = somme des brins individuels, marge ${pattern.config.wastePercent} %. Métrage « aiguille » = longueur du faisceau enfilé. Une échevette DMC Mouliné = 8 m à 6 brins (48 m de brins). Base de calcul 2,5 cm par croix pour 2 brins sur Aïda 14, ajustée au comptage Aïda et au nombre de brins. Estimation, non mesure : la tension et les arrêts varient.</p><p class="notes">Temps indicatif ${formatDuration(pattern.minutes)} (${pattern.timeEstimate.assumedRate}). Couleurs écran approximatives, vérifier les échevettes à la lumière naturelle. Source couleur : MakeBead craft-color-codes, CC BY 4.0.</p><div class="print-hint"><strong>Recette exacte</strong><br>Empreinte ${fingerprint}<br>Structure ${pattern.config.structure} · Tracé ${pattern.config.trace} · Densité ${pattern.config.density} · Échelle ${pattern.config.scale} · Tourbillon ${pattern.config.twist} · Ondulation ${pattern.config.wave}<br>Toile ${pattern.config.fabric} · Aïda ${pattern.config.aida} · ${pattern.config.strands} brins · marge ${pattern.config.wastePercent} %</div></div></div></section>${tiles}</body></html>`);
+  printWindow.document.close();
+  return true;
+}

@@ -1,0 +1,47 @@
+/* Barre supérieure, logo, fenêtres et notifications. L'application tient dans l'écran. */
+
+.topbar { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; border-bottom: 1px solid var(--trait); background: var(--carte); z-index: 40; }
+.topbar-marque { display: flex; align-items: center; gap: 10px; min-height: 44px; padding: 2px 8px 2px 2px; border-radius: 12px; }
+.topbar-marque:hover { background: var(--doux); }
+.rosace-logo { display: grid; flex: none; place-items: center; padding: 7px; border-radius: 30%; background: #141214; box-shadow: inset 0 0 0 1px rgba(255,255,255,.14); }
+.topbar-nom { font-size: 20px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+.topbar-nom sup { font-size: .38em; font-weight: 400; vertical-align: .95em; margin-left: .05em; }
+.topbar-actions { display: flex; align-items: center; gap: 2px; }
+.separateur { flex: none; width: 1px; height: 26px; margin: 0 4px; background: var(--trait); }
+.outil { position: relative; display: flex; align-items: center; justify-content: center; gap: 8px; height: 44px; padding: 0 12px; border: 0; border-radius: 11px; background: transparent; color: var(--encre); font-size: 14px; font-weight: 500; }
+.outil:hover:not(:disabled) { background: var(--doux); }
+.outil-icone { width: 44px; padding: 0; }
+.outil-icone.is-saved { color: #a34f74; }
+html[data-mode="nuit"] .outil-icone.is-saved { color: #d98aa4; }
+.outil-compte { position: absolute; top: 2px; right: 0; display: grid; min-width: 16px; height: 16px; padding: 0 4px; place-items: center; border-radius: 9px; background: var(--encre); color: var(--fond); font-size: 10px; font-weight: 800; }
+
+/* ---------- Fenêtres ---------- */
+.modal-backdrop { position: fixed; z-index: 100; inset: 0; display: flex; align-items: center; justify-content: center; padding: 24px; background: rgba(11,11,12,.42); backdrop-filter: blur(6px); }
+.modal-backdrop--drawer { justify-content: flex-end; padding: 0; }
+.modal-card { display: flex; width: min(100%, 640px); max-height: min(90dvh, 860px); flex-direction: column; overflow: hidden; border: 1px solid var(--trait); border-radius: var(--rayon-xl); background: var(--carte); color: var(--encre); box-shadow: var(--ombre-menu); }
+.modal-card--wide { width: min(100%, 1040px); }
+.modal-card--drawer { width: min(100%, 520px); height: 100dvh; max-height: 100dvh; border-radius: var(--rayon-xl) 0 0 var(--rayon-xl); }
+.modal-header { display: flex; flex: none; align-items: center; justify-content: space-between; gap: 20px; padding: 22px 24px; border-bottom: 1px solid var(--trait); }
+.modal-header .eyebrow { margin-bottom: 6px; }
+.modal-header h2 { margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; }
+.modal-content { padding: 22px 24px 26px; overflow: auto; overscroll-behavior: contain; }
+
+.toast-stack { position: fixed; z-index: 200; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); display: flex; width: min(360px, calc(100vw - 32px)); flex-direction: column; gap: 8px; pointer-events: none; }
+.toast { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border: 1px solid #2a2a2e; border-radius: 14px; background: #0b0b0c; color: #fff; box-shadow: var(--ombre-menu); }
+.toast-check { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border-radius: 50%; background: #fff; color: #0b0b0c; }
+.toast strong { display: block; font-size: 14px; font-weight: 600; }
+.toast p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: rgba(255,255,255,.72); }
+
+@media (max-width: 760px) {
+  .modal-backdrop { padding: 10px; }
+  .modal-card { max-height: 94dvh; border-radius: 20px; }
+  .modal-card--drawer { border-radius: 20px 0 0 20px; }
+  .modal-header { padding: 18px; }
+  .modal-header h2 { font-size: 27px; }
+  .modal-content { padding: 18px; }
+  .toast-stack { right: 12px; }
+}
+@media (max-width: 400px) {
+  .topbar-nom { font-size: 18px; }
+  .outil-icone { width: 40px; }
+}
