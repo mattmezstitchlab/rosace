@@ -5,7 +5,7 @@ import { computeMaterials, estimateTime, perStitchNeedleMeters, SKEIN_STRAND_MET
 import { chartRegions, countRegionStitches } from "../src/lib/chart";
 import { readFileSync } from "node:fs";
 import { patternFingerprint, workFingerprint } from "../src/lib/pattern-id";
-import { fromImport, fromRosace, workIndex, type ImportedGrid } from "../src/lib/work";
+import { decodeCells, encodeCells, fromImport, fromRosace, restoreImportedWork, serializeImportedWork, workIndex, type ImportedGrid } from "../src/lib/work";
 
 const REFERENCE = JSON.parse(readFileSync(new URL("./empreintes-reference.json", import.meta.url), "utf8")) as Record<string, { fingerprint: string; stitches: number; size: number; cleaned: number }>;
 import { patternToSvg, printWorksheet } from "../src/lib/exporters";
@@ -700,6 +700,124 @@ test("fromImport : refuse un code DMC inconnu, un index hors palette, une grille
   assert.equal(mismatch.ok, false);
   const duplicate = fromImport(base({ colors: [{ code: "310", symbol: "×", fromLegend: true }, { code: "310", symbol: "+", fromLegend: true }] }));
   assert.equal(duplicate.ok, false);
+});
+
+function importedSample() {
+  const width = 9;
+  const height = 5;
+  const cells = new Int16Array(width * height).fill(-1);
+  for (let x = 0; x < width; x += 1) cells[2 * width + x] = x % 2;
+  cells[0] = 2;
+  cells[width * height - 1] = 2;
+  const grid: ImportedGrid = {
+    width,
+    height,
+    cells,
+    colors: [
+      { code: "310", symbol: "◆", fromLegend: true },
+      { code: "BLANC", symbol: "○", fromLegend: true },
+      { code: "321", symbol: "▲", fromLegend: false },
+    ],
+    provenance: { file: "patron.pdf", title: "Petit patron", pages: 3, mode: "glyphes" },
+    montage: { tiles: [{ page: 1, x: 0, y: 0, width, height }], overlaps: 0, holes: 0, scaled: false },
+    lost: { halfStitches: 0, quarterStitches: 0, backstitches: 12, knots: 0, blends: 1, unresolved: 0 },
+    declaredSize: { w: 9, h: 5 },
+  };
+  const outcome = fromImport(grid);
+  if (!outcome.ok) throw new Error(outcome.error);
+  return outcome.work;
+}
+
+test("rendu : un patron importé rectangulaire est peint avec ses propres symboles, centré dans le canevas carré", () => {
+  const work = importedSample();
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const saved = { document: scope.document, Path2D: scope.Path2D };
+  const symbols: Array<{ text: string; x: number; y: number }> = [];
+  const makeCanvas = () => {
+    const ctx: Record<string, unknown> = {};
+    const canvas = { width: 0, height: 0, getContext: () => ctx };
+    Object.assign(ctx, {
+      canvas, clearRect: () => {}, fillRect: () => {}, strokeRect: () => {}, save: () => {}, restore: () => {},
+      beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, arc: () => {}, fill: () => {}, stroke: () => {},
+      createPattern: () => null, createRadialGradient: () => ({ addColorStop: () => {} }),
+      createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: () => {},
+      fillText: (text: unknown, x: number, y: number) => { symbols.push({ text: String(text), x, y }); },
+    });
+    return canvas;
+  };
+  scope.Path2D = class { addPath() {} moveTo() {} lineTo() {} };
+  scope.document = { createElement: () => makeCanvas() };
+  try {
+    paintPattern(makeCanvas() as unknown as HTMLCanvasElement, work, "chart", 900);
+  } finally {
+    scope.document = saved.document;
+    scope.Path2D = saved.Path2D;
+  }
+  const geometry = chartGeometry(900, 9, 5, "chart");
+  assert.ok(geometry.originY > geometry.originX, "la grille basse est centrée verticalement");
+  assert.equal(geometry.originX, geometry.origin, "la largeur occupe toute la zone de tracé");
+  const painted = symbols.filter((entry) => ["◆", "○", "▲"].includes(entry.text));
+  assert.equal(painted.length, work.stitches.length, "chaque croix peinte une fois avec un symbole de la palette importée");
+  const first = painted.find((entry) => entry.text === "▲" && Math.abs(entry.x - geometry.originX) < 1e-6);
+  assert.ok(first, "la croix (0,0) est au coin de la grille");
+  const last = painted.find((entry) => entry.text === "▲" && Math.abs(entry.x - (geometry.originX + 8 * geometry.cell)) < 1e-6);
+  assert.ok(last && Math.abs(last.y - (geometry.originY + 4 * geometry.cell + geometry.cell * 0.04)) < 1e-6, "la croix (8,4) est au coin opposé");
+  const square = chartGeometry(1800, 101, "chart");
+  assert.equal(square.originX, square.origin);
+  assert.equal(square.originY, square.origin);
+});
+
+test("projet v3 : un patron importé fait l'aller-retour avec sa matrice, sa palette et sa progression", () => {
+  const work = importedSample();
+  const done = [stitchIndex(work.width, 0, 0), stitchIndex(work.width, 3, 2), stitchIndex(work.width, 8, 4)];
+  const progress = { ...emptyProgress(work), completedRuns: serializeRuns(done), selectedCode: "321", journal: [{ index: done[1], added: true }] };
+  const project = buildProject(work, progress);
+  assert.equal(project.version, 3);
+  assert.equal(project.format, PROJECT_FORMAT);
+  if (project.version !== 3) return;
+  assert.equal(project.origin, "pdf");
+  assert.equal(project.work.width, 9);
+  assert.deepEqual(project.work.palette.map((entry) => entry.code), ["310", "BLANC", "321"]);
+  const roundTrip = importProject(JSON.parse(JSON.stringify(project)));
+  assert.equal(roundTrip.ok, true, roundTrip.ok ? "" : roundTrip.error);
+  if (!roundTrip.ok) return;
+  assert.equal(roundTrip.config, null, "un patron importé ne reçoit aucune recette");
+  assert.equal(roundTrip.work.origin.kind, "pdf");
+  assert.deepEqual([...roundTrip.work.cells], [...work.cells]);
+  assert.equal(roundTrip.work.fingerprint, work.fingerprint);
+  assert.deepEqual(roundTrip.work.palette, work.palette);
+  assert.equal(roundTrip.progress.completedRuns, serializeRuns(done));
+  assert.equal(roundTrip.progress.selectedCode, "321");
+  assert.equal(roundTrip.work.origin.kind === "pdf" ? roundTrip.work.origin.lost.blends : -1, 1, "les pertes voyagent avec le projet");
+  const tampered = JSON.parse(JSON.stringify(project));
+  tampered.work.cells = tampered.work.cells.slice(0, -4) + "AAA=";
+  assert.equal(importProject(tampered).ok, false, "matrice altérée → empreinte différente → refus");
+  const outside = JSON.parse(JSON.stringify(project));
+  outside.progress.completedRuns = "1";
+  assert.equal(importProject(outside).ok, false, "case vide refusée");
+  // Une rosace reste exportée en version 2, lisible par les versions antérieures.
+  const rosaceProject = buildProject(pattern, emptyProgress(pattern));
+  assert.equal(rosaceProject.version, 2);
+  const reread = importProject(rosaceProject);
+  assert.equal(reread.ok && reread.config !== null && reread.work.origin.kind === "rosace", true);
+});
+
+test("StitchWork : sérialisation locale d'un ouvrage importé (base64) stable et vérifiée", () => {
+  const work = importedSample();
+  const record = serializeImportedWork(work);
+  assert.ok(record);
+  assert.equal(decodeCells(record.cells, 45)?.length, 45);
+  assert.equal(decodeCells(record.cells, 44), null, "longueur incohérente refusée");
+  const restored = restoreImportedWork(JSON.parse(JSON.stringify(record)));
+  assert.equal(restored.ok, true, restored.ok ? "" : restored.error);
+  if (restored.ok) {
+    assert.equal(restored.work.fingerprint, work.fingerprint);
+    assert.equal(restored.work.origin.kind === "pdf" ? restored.work.origin.importedAt : "", work.origin.kind === "pdf" ? work.origin.importedAt : "x");
+  }
+  assert.equal(restoreImportedWork(null).ok, false);
+  assert.equal(serializeImportedWork(fromRosace(pattern)), null, "une rosace n'est jamais sérialisée comme un import");
+  const big = new Int16Array(1000 * 1000).fill(3);
+  assert.equal(decodeCells(encodeCells(big), 1_000_000)?.[999_999], 3, "un million de cases passent");
 });
 
 console.log(`\n${checks} tests réussis.`);

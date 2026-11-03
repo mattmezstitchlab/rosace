@@ -164,6 +164,94 @@ export function fromImport(grid: ImportedGrid, textile: WorkTextile = DEFAULT_IM
   };
 }
 
+/** Accepte indifféremment un patron généré ou un ouvrage : les couches de rendu et de progression ne voient que `StitchWork`. */
+export function toWork(source: RosacePattern | StitchWork): StitchWork {
+  return "origin" in source ? source : fromRosace(source);
+}
+
+/** Matrice → texte base64 (2 octets par case, petit-boutiste), pour le projet v3 et le stockage local. */
+export function encodeCells(cells: Int16Array): string {
+  const bytes = new Uint8Array(cells.buffer, cells.byteOffset, cells.byteLength);
+  let binary = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return btoa(binary);
+}
+
+export function decodeCells(encoded: string, expectedLength: number): Int16Array | null {
+  try {
+    const binary = atob(encoded);
+    if (binary.length !== expectedLength * 2) return null;
+    const bytes = Uint8Array.from(binary, (character) => character.charCodeAt(0));
+    return new Int16Array(bytes.buffer, 0, expectedLength);
+  } catch {
+    return null;
+  }
+}
+
+/** Forme sérialisable d'un ouvrage importé : tout ce qu'il faut pour le reconstruire sans recette. */
+export interface ImportedWorkRecord {
+  width: number;
+  height: number;
+  cells: string;
+  palette: WorkColor[];
+  textile: WorkTextile;
+  provenance: ImportProvenance;
+  montage: ImportMontage;
+  lost: ImportLosses;
+  importedAt: string;
+  declaredSize?: { w: number; h: number };
+}
+
+export function serializeImportedWork(work: StitchWork): ImportedWorkRecord | null {
+  if (work.origin.kind !== "pdf") return null;
+  return {
+    width: work.width,
+    height: work.height,
+    cells: encodeCells(work.cells),
+    palette: work.palette.map((entry) => ({ ...entry })),
+    textile: { ...work.textile },
+    provenance: work.origin.provenance,
+    montage: work.origin.montage,
+    lost: work.origin.lost,
+    importedAt: work.origin.importedAt,
+    declaredSize: work.origin.declaredSize,
+  };
+}
+
+/** Reconstruit un ouvrage importé depuis sa forme sérialisée, par le même validateur que l'import. */
+export function restoreImportedWork(record: unknown): ImportOutcome {
+  const source = record as Partial<ImportedWorkRecord> | null;
+  if (!source || typeof source !== "object" || typeof source.cells !== "string" || !Array.isArray(source.palette)) {
+    return { ok: false, error: "L'ouvrage importé enregistré est illisible." };
+  }
+  const width = Number(source.width);
+  const height = Number(source.height);
+  if (!Number.isInteger(width) || !Number.isInteger(height) || width < 1 || height < 1) {
+    return { ok: false, error: "Dimensions de l'ouvrage importé invalides." };
+  }
+  const cells = decodeCells(source.cells, width * height);
+  if (!cells) return { ok: false, error: "La matrice de l'ouvrage importé est corrompue." };
+  const textile: WorkTextile = {
+    fabric: ["naturel", "craie", "brume"].includes(source.textile?.fabric ?? "") ? source.textile!.fabric : DEFAULT_IMPORT_TEXTILE.fabric,
+    aida: [14, 16, 18].includes(Number(source.textile?.aida)) ? (Number(source.textile!.aida) as AidaCount) : DEFAULT_IMPORT_TEXTILE.aida,
+    strands: Math.max(1, Math.min(6, Math.round(Number(source.textile?.strands) || DEFAULT_IMPORT_TEXTILE.strands))),
+    wastePercent: Math.max(0, Math.min(50, Math.round(Number(source.textile?.wastePercent ?? DEFAULT_IMPORT_TEXTILE.wastePercent)))),
+  };
+  const outcome = fromImport({
+    width,
+    height,
+    cells,
+    colors: source.palette.map((entry) => ({ code: String(entry?.code ?? ""), symbol: String(entry?.symbol ?? ""), fromLegend: false })),
+    provenance: source.provenance ?? { file: "inconnu", pages: 0, mode: "auto" },
+    montage: source.montage ?? { tiles: [], overlaps: 0, holes: 0, scaled: false },
+    lost: source.lost ?? { halfStitches: 0, quarterStitches: 0, backstitches: 0, knots: 0, blends: 0, unresolved: 0 },
+    declaredSize: source.declaredSize,
+  }, textile);
+  if (!outcome.ok) return outcome;
+  if (outcome.work.origin.kind === "pdf" && typeof source.importedAt === "string") outcome.work.origin.importedAt = source.importedAt;
+  return outcome;
+}
+
 /** Index linéaire d'une case : la primitive partagée par la progression et le mode Broder. */
 export const workIndex = (work: Pick<StitchWork, "width">, x: number, y: number) => y * work.width + x;
 

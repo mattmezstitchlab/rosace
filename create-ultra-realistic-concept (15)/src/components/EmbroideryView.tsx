@@ -2,14 +2,14 @@ import { ChevronLeft, Download, FolderOpen, Grid3X3, ListChecks, Minus, Plus, Re
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DMC_ALL_THREADS, getThread } from "../data/dmc";
 import { chartGeometry, paintPattern } from "../lib/paint";
-import { patternFingerprint, shortFingerprint } from "../lib/pattern-id";
-import { SYMBOLS } from "../lib/rosace";
+import { shortFingerprint } from "../lib/pattern-id";
+import { workTitle } from "../lib/exporters";
 import {
   MAX_ZOOM, MIN_ZOOM, clampViewport, emptyProgress, loadPatternProgress, parseRuns, progressPercent,
   progressStorageKey, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
   type EmbroideryProgress, type Viewport,
 } from "../lib/progress";
-import { formatSeed, useRosaceApi } from "../state/rosace-store";
+import { useRosaceApi } from "../state/rosace-store";
 
 const BASE = 1800;
 
@@ -23,8 +23,12 @@ interface Tap { startX: number; startY: number; moved: boolean; pointerId: numbe
  * séparément sous l'empreinte exacte du patron.
  */
 export function EmbroideryView() {
-  const { pattern, config, embroideryOpen, setEmbroideryOpen, progressRevision, notify, exportActions } = useRosaceApi();
-  const fingerprint = useMemo(() => patternFingerprint(pattern), [pattern]);
+  const { work: pattern, embroideryOpen, setEmbroideryOpen, progressRevision, notify, exportActions } = useRosaceApi();
+  const fingerprint = pattern.fingerprint;
+  /** Codes DMC de l'ouvrage, dans l'ordre de la palette (rosace : 3 à 6 fils ; patron importé : autant que nécessaire). */
+  const paletteCodes = useMemo(() => pattern.palette.map((entry) => entry.code), [pattern]);
+  const config = useMemo(() => ({ palette: paletteCodes, ...pattern.textile }), [paletteCodes, pattern.textile]);
+  const symbolOf = (index: number) => pattern.palette[index]?.symbol ?? "·";
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const baseRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -222,8 +226,8 @@ export function EmbroideryView() {
     fit: Math.min(size.w, size.h) * 0.985 / BASE,
     centerX: size.w / 2,
     centerY: size.h / 2,
-    chart: chartGeometry(BASE, pattern.size, "chart"),
-  }), [pattern.size, size]);
+    chart: chartGeometry(BASE, pattern.width, pattern.height, "chart"),
+  }), [pattern.width, pattern.height, size]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -244,7 +248,7 @@ export function EmbroideryView() {
     ctx.scale(scale, scale);
     ctx.drawImage(base, -BASE / 2, -BASE / 2);
 
-    const toBase = (x: number, y: number) => ({ bx: -BASE / 2 + chart.origin + x * chart.cell, by: -BASE / 2 + chart.origin + y * chart.cell });
+    const toBase = (x: number, y: number) => ({ bx: -BASE / 2 + chart.originX + x * chart.cell, by: -BASE / 2 + chart.originY + y * chart.cell });
     const cell = chart.cell;
     const selectedIndex = selectedCode ? config.palette.indexOf(selectedCode) : -1;
 
@@ -261,7 +265,7 @@ export function EmbroideryView() {
       for (const stitch of pattern.stitches) {
         if (stitch.color !== selectedIndex) continue;
         const { bx, by } = toBase(stitch.x, stitch.y);
-        const index = stitchIndex(pattern.size, stitch.x, stitch.y);
+        const index = stitchIndex(pattern.width, stitch.x, stitch.y);
         if (completed.has(index)) continue;
         ctx.fillStyle = getThread(config.palette[selectedIndex]).hex;
         ctx.fillRect(bx - cell / 2, by - cell / 2, cell + 0.35, cell + 0.35);
@@ -269,14 +273,14 @@ export function EmbroideryView() {
         ctx.font = `${Math.round(cell * 0.8)}px "Inter Tight", Arial, sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(SYMBOLS[selectedIndex], bx, by + 0.5);
+        ctx.fillText(symbolOf(selectedIndex), bx, by + 0.5);
       }
     }
 
     // Croix brodées : remplissage couleur du fil, symbole masqué.
     for (const index of completed) {
-      const x = index % pattern.size;
-      const y = Math.floor(index / pattern.size);
+      const x = index % pattern.width;
+      const y = Math.floor(index / pattern.width);
       const paletteIndex = pattern.cells[index];
       if (paletteIndex < 0) continue;
       const { bx, by } = toBase(x, y);
@@ -315,14 +319,14 @@ export function EmbroideryView() {
     const py = clientY - rect.top;
     const bx = (px - centerX - view.x) / scale + BASE / 2;
     const by = (py - centerY - view.y) / scale + BASE / 2;
-    const x = Math.round((bx - chart.origin) / chart.cell);
-    const y = Math.round((by - chart.origin) / chart.cell);
-    if (x < 0 || y < 0 || x >= pattern.size || y >= pattern.size) return null;
+    const x = Math.round((bx - chart.originX) / chart.cell);
+    const y = Math.round((by - chart.originY) / chart.cell);
+    if (x < 0 || y < 0 || x >= pattern.width || y >= pattern.height) return null;
     return { x, y };
-  }, [geometry, pattern.size, view.k, view.x, view.y]);
+  }, [geometry, pattern.width, pattern.height, view.k, view.x, view.y]);
 
   const toggleAt = useCallback((x: number, y: number) => {
-    const index = stitchIndex(pattern.size, x, y);
+    const index = stitchIndex(pattern.width, x, y);
     if (pattern.cells[index] < 0) {
       setAnnounce(`Colonne ${x + 1}, ligne ${y + 1} : case vide, rien à broder.`);
       return;
@@ -442,12 +446,12 @@ export function EmbroideryView() {
     else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
       handled();
       setCursor((current) => {
-        const base = current ?? { x: Math.floor(pattern.size / 2), y: Math.floor(pattern.size / 2) };
+        const base = current ?? { x: Math.floor(pattern.width / 2), y: Math.floor(pattern.height / 2) };
         const next = {
-          x: Math.max(0, Math.min(pattern.size - 1, base.x + (event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0))),
-          y: Math.max(0, Math.min(pattern.size - 1, base.y + (event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0))),
+          x: Math.max(0, Math.min(pattern.width - 1, base.x + (event.key === "ArrowRight" ? 1 : event.key === "ArrowLeft" ? -1 : 0))),
+          y: Math.max(0, Math.min(pattern.height - 1, base.y + (event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0))),
         };
-        const index = stitchIndex(pattern.size, next.x, next.y);
+        const index = stitchIndex(pattern.width, next.x, next.y);
         const paletteIndex = pattern.cells[index];
         setAnnounce(paletteIndex >= 0
           ? `Colonne ${next.x + 1}, ligne ${next.y + 1}, DMC ${config.palette[paletteIndex]}, ${completed.has(index) ? "brodée" : "restante"}.`
@@ -456,7 +460,7 @@ export function EmbroideryView() {
       });
     } else if (event.key === " " || event.key === "Enter") {
       handled();
-      const current = cursor ?? { x: Math.floor(pattern.size / 2), y: Math.floor(pattern.size / 2) };
+      const current = cursor ?? { x: Math.floor(pattern.width / 2), y: Math.floor(pattern.height / 2) };
       toggleAt(current.x, current.y);
     }
   };
@@ -468,9 +472,9 @@ export function EmbroideryView() {
   };
 
   const selectedLine = selectedRemaining;
-  const colorsUsed = pattern.config.palette.map((code, index) => ({
+  const colorsUsed = pattern.palette.map(({ code, symbol }, index) => ({
     code,
-    symbol: SYMBOLS[index],
+    symbol,
     total: pattern.usage[index]?.count ?? 0,
     remaining: remaining[index]?.remaining ?? 0,
   })).filter((line) => line.total > 0);
@@ -494,13 +498,13 @@ export function EmbroideryView() {
   if (!embroideryOpen) return null;
 
   return (
-    <section className="broder" role="dialog" aria-modal="true" aria-label={`Mode broderie, rosace n° ${formatSeed(config.seed)}`}>
+    <section className="broder" role="dialog" aria-modal="true" aria-label={`Mode broderie, ${workTitle(pattern)}`}>
       <header className="broder-tete">
         <button ref={closeRef} className="outil outil-icone" onClick={close} aria-label="Fermer le mode broderie et enregistrer la progression">
           <ChevronLeft size={21} aria-hidden="true" />
         </button>
         <div className="broder-titre">
-          <strong>Rosace n° {formatSeed(config.seed)}</strong>
+          <strong>{workTitle(pattern)}</strong>
           <span>{progress.done.toLocaleString("fr-FR")} / {progress.total.toLocaleString("fr-FR")} · {progress.percent} %</span>
         </div>
         <div className="broder-actions">
@@ -517,7 +521,7 @@ export function EmbroideryView() {
             className="broder-canvas"
             tabIndex={0}
             role="application"
-            aria-label={`Grille de broderie, ${pattern.size} par ${pattern.size} points. Flèches pour déplacer le curseur, Espace ou Entrée pour cocher, plus et moins pour zoomer.`}
+            aria-label={`Grille de broderie, ${pattern.width} par ${pattern.height} points. Flèches pour déplacer le curseur, Espace ou Entrée pour cocher, plus et moins pour zoomer.`}
             aria-describedby="broder-aide"
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}

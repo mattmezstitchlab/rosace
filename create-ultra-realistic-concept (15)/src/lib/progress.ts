@@ -1,6 +1,12 @@
 import { resolveThreadCode } from "../data/dmc";
 import { generateRosace, normalizeConfig, type RosaceConfig, type RosacePattern } from "./rosace";
-import { patternFingerprint } from "./pattern-id";
+import {
+  fromRosace, restoreImportedWork, serializeImportedWork, toWork,
+  type ImportedWorkRecord, type StitchWork,
+} from "./work";
+
+/** La progression et les projets acceptent un patron généré ou un ouvrage importé : tout passe par `StitchWork`. */
+type WorkLike = RosacePattern | StitchWork;
 
 /**
  * Progression de broderie : elle vit à côté du patron, indexée par son empreinte.
@@ -15,7 +21,10 @@ export const LEGACY_PROGRESS_STORAGE_PREFIXES = [
   "rosace-progress-v1:",
 ] as const;
 export const PROJECT_FORMAT = "rosace-project";
+/** Version écrite pour une rosace générée : inchangée, lisible par les versions antérieures de ROSACE. */
 export const PROJECT_VERSION = 2;
+/** Version écrite pour un ouvrage importé : la matrice est embarquée, il n'y a pas de recette. */
+export const IMPORTED_PROJECT_VERSION = 3;
 export const LEGACY_PROJECT_VERSION = 1;
 export const MIN_ZOOM = 0.8;
 export const MAX_ZOOM = 8;
@@ -39,18 +48,31 @@ export interface EmbroideryProgress {
   updatedAt: string;
 }
 
+export interface ProjectProgress {
+  completedRuns: string;
+  selectedCode: string | null;
+  viewport: Viewport;
+  journal: Array<{ index: number; added: boolean }>;
+  updatedAt: string;
+}
+
+/** Projet v2 : une rosace générée, régénérée depuis sa recette au réimport. */
 export interface ProjectFile {
   format: typeof PROJECT_FORMAT;
   version: typeof PROJECT_VERSION;
   fingerprint: string;
   config: RosaceConfig;
-  progress: {
-    completedRuns: string;
-    selectedCode: string | null;
-    viewport: Viewport;
-    journal: Array<{ index: number; added: boolean }>;
-    updatedAt: string;
-  };
+  progress: ProjectProgress;
+}
+
+/** Projet v3 : un ouvrage importé, reconstruit depuis sa matrice embarquée. */
+export interface ImportedProjectFile {
+  format: typeof PROJECT_FORMAT;
+  version: typeof IMPORTED_PROJECT_VERSION;
+  fingerprint: string;
+  origin: "pdf";
+  work: ImportedWorkRecord;
+  progress: ProjectProgress;
 }
 
 type JournalEntry = { index: number; added: boolean };
@@ -89,11 +111,13 @@ export function clampViewport(view: Partial<Viewport> | null | undefined): Viewp
 }
 
 /** Seules les cases réellement brodées du patron peuvent appartenir à une progression. */
-function isStitchIndex(pattern: RosacePattern, index: number) {
+function isStitchIndex(pattern: WorkLike, index: number) {
   return Number.isInteger(index) && index >= 0 && index < pattern.cells.length && pattern.cells[index] >= 0;
 }
 
-function sanitizeJournal(pattern: RosacePattern, journal: unknown): JournalEntry[] {
+const paletteCodes = (pattern: WorkLike) => toWork(pattern).palette.map((entry) => entry.code);
+
+function sanitizeJournal(pattern: WorkLike, journal: unknown): JournalEntry[] {
   if (!Array.isArray(journal)) return [];
   return journal
     .filter((entry): entry is JournalEntry =>
@@ -119,12 +143,13 @@ function mergeJournals(existing: unknown, incoming: unknown): JournalEntry[] {
 }
 
 /** Une progression vide, au format canonique, pour un patron donné. */
-export function emptyProgress(pattern: RosacePattern): EmbroideryProgress {
+export function emptyProgress(pattern: WorkLike): EmbroideryProgress {
+  const work = toWork(pattern);
   return {
     version: 2,
-    fingerprint: patternFingerprint(pattern),
+    fingerprint: work.fingerprint,
     completedRuns: "",
-    selectedCode: pattern.config.palette[0] ?? null,
+    selectedCode: work.palette[0]?.code ?? null,
     viewport: { k: 1, x: 0, y: 0 },
     journal: [],
     updatedAt: new Date().toISOString(),
@@ -164,7 +189,8 @@ export function parseRuns(runs: string): Set<number> {
   return set;
 }
 
-export const stitchIndex = (size: number, x: number, y: number) => y * size + x;
+/** Index linéaire d'une case : `width` est la largeur de la grille (pour une rosace, sa taille). */
+export const stitchIndex = (width: number, x: number, y: number) => y * width + x;
 
 /**
  * Fusion à trois états pour éviter les écrasements silencieux entre onglets.
@@ -196,7 +222,7 @@ function canonicalSelection(code: unknown, palette: string[]): string | null {
 }
 
 /** Migration explicite d'un enregistrement de progression v1 vers le format v2. */
-export function migrateLegacyProgressRecord(raw: unknown, pattern: RosacePattern): { progress: EmbroideryProgress; warning?: string } | null {
+export function migrateLegacyProgressRecord(raw: unknown, pattern: WorkLike): { progress: EmbroideryProgress; warning?: string } | null {
   if (!raw || typeof raw !== "object") return null;
   const source = raw as LegacyProgressLike;
   let runs = "";
@@ -209,13 +235,14 @@ export function migrateLegacyProgressRecord(raw: unknown, pattern: RosacePattern
   const parsed = [...parseRuns(runs)];
   const valid = parsed.filter((index) => isStitchIndex(pattern, index));
   const dropped = parsed.length - valid.length;
-  const fingerprint = patternFingerprint(pattern);
+  const codes = paletteCodes(pattern);
+  const fingerprint = toWork(pattern).fingerprint;
   return {
     progress: {
       version: 2,
       fingerprint,
       completedRuns: serializeRuns(valid),
-      selectedCode: canonicalSelection(source.selectedCode, pattern.config.palette) ?? pattern.config.palette[0] ?? null,
+      selectedCode: canonicalSelection(source.selectedCode, codes) ?? codes[0] ?? null,
       viewport: clampViewport(source.viewport as Partial<Viewport> | null | undefined),
       journal: sanitizeJournal(pattern, source.journal),
       updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date().toISOString(),
@@ -245,8 +272,8 @@ export function loadProgress(fingerprint: string): EmbroideryProgress | null {
 }
 
 /** Recherche et migration automatique d'une ancienne clé locale v1, sans supprimer la source. */
-function loadLegacyProgress(pattern: RosacePattern): EmbroideryProgress | null {
-  const fingerprint = patternFingerprint(pattern);
+function loadLegacyProgress(pattern: WorkLike): EmbroideryProgress | null {
+  const fingerprint = toWork(pattern).fingerprint;
   for (const prefix of LEGACY_PROGRESS_STORAGE_PREFIXES) {
     try {
       const raw = window.localStorage.getItem(`${prefix}${fingerprint}`);
@@ -261,17 +288,19 @@ function loadLegacyProgress(pattern: RosacePattern): EmbroideryProgress | null {
 }
 
 /** Chargement validé : progression v2 nettoyée, sinon ancienne progression v1 migrée. */
-export function loadPatternProgress(pattern: RosacePattern): EmbroideryProgress | null {
-  const fingerprint = patternFingerprint(pattern);
+export function loadPatternProgress(pattern: WorkLike): EmbroideryProgress | null {
+  const work = toWork(pattern);
+  const fingerprint = work.fingerprint;
   const saved = loadProgress(fingerprint);
-  const source = saved ?? loadLegacyProgress(pattern);
+  const source = saved ?? loadLegacyProgress(work);
   if (!source) return null;
-  const completed = [...parseRuns(String(source.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
+  const completed = [...parseRuns(String(source.completedRuns ?? ""))].filter((index) => isStitchIndex(work, index));
+  const codes = paletteCodes(work);
   return {
     version: 2,
     fingerprint,
     completedRuns: serializeRuns(completed),
-    selectedCode: canonicalSelection(source.selectedCode, pattern.config.palette) ?? pattern.config.palette[0] ?? null,
+    selectedCode: canonicalSelection(source.selectedCode, codes) ?? codes[0] ?? null,
     viewport: clampViewport(source.viewport),
     journal: sanitizeJournal(pattern, source.journal),
     updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date().toISOString(),
@@ -297,29 +326,34 @@ export function deleteProgress(fingerprint: string) {
   window.localStorage.removeItem(progressStorageKey(fingerprint));
 }
 
-/** Unique constructeur de fichier projet : recette exacte + progression nettoyée contre la matrice. */
-export function buildProject(pattern: RosacePattern, progress: EmbroideryProgress): ProjectFile {
-  const fingerprint = patternFingerprint(pattern);
+/**
+ * Unique constructeur de fichier projet : progression nettoyée contre la matrice, plus
+ * la recette exacte (rosace, v2) ou la matrice embarquée (ouvrage importé, v3).
+ */
+export function buildProject(pattern: WorkLike, progress: EmbroideryProgress): ProjectFile | ImportedProjectFile {
+  const work = toWork(pattern);
+  const fingerprint = work.fingerprint;
   if (progress.fingerprint !== fingerprint) throw new Error("La progression ne correspond pas au patron.");
-  const completed = [...parseRuns(String(progress.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
-  const selectedCode = canonicalSelection(progress.selectedCode, pattern.config.palette);
-  return {
-    format: PROJECT_FORMAT,
-    version: PROJECT_VERSION,
-    fingerprint,
-    config: { ...pattern.config, palette: [...pattern.config.palette] },
-    progress: {
-      completedRuns: serializeRuns(completed),
-      selectedCode,
-      viewport: clampViewport(progress.viewport),
-      journal: sanitizeJournal(pattern, progress.journal),
-      updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
-    },
+  const completed = [...parseRuns(String(progress.completedRuns ?? ""))].filter((index) => isStitchIndex(work, index));
+  const selectedCode = canonicalSelection(progress.selectedCode, paletteCodes(work));
+  const cleaned: ProjectProgress = {
+    completedRuns: serializeRuns(completed),
+    selectedCode,
+    viewport: clampViewport(progress.viewport),
+    journal: sanitizeJournal(work, progress.journal),
+    updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
   };
+  if (work.origin.kind === "rosace") {
+    const config = work.origin.config;
+    return { format: PROJECT_FORMAT, version: PROJECT_VERSION, fingerprint, config: { ...config, palette: [...config.palette] }, progress: cleaned };
+  }
+  const record = serializeImportedWork(work);
+  if (!record) throw new Error("Ouvrage importé incomplet : projet non construit.");
+  return { format: PROJECT_FORMAT, version: IMPORTED_PROJECT_VERSION, fingerprint, origin: "pdf", work: record, progress: cleaned };
 }
 
 export type ImportResult =
-  | { ok: true; config: RosaceConfig; progress: EmbroideryProgress; migratedFrom?: 1; warning?: string }
+  | { ok: true; work: StitchWork; config: RosaceConfig | null; progress: EmbroideryProgress; migratedFrom?: 1; warning?: string }
   | { ok: false; error: string };
 
 /** Migration d'un projet version 1 : recette régénérée, ancienne empreinte recalculée. */
@@ -336,8 +370,8 @@ function migrateProjectV1(raw: unknown): ImportResult {
   }
   try {
     const config = normalizeConfig(project.config as RosaceConfig);
-    const regenerated = generateRosace(config);
-    const fingerprint = patternFingerprint(regenerated);
+    const regenerated = fromRosace(generateRosace(config));
+    const fingerprint = regenerated.fingerprint;
     const migrated = migrateLegacyProgressRecord(project.progress ?? project, regenerated);
     if (!migrated) {
       return { ok: false, error: "Projet ROSACE version 1 détecté, mais la progression est dans un format inconnu : migration impossible." };
@@ -345,13 +379,50 @@ function migrateProjectV1(raw: unknown): ImportResult {
     const notes = ["Projet version 1 migré au format version 2."];
     if (typeof project.fingerprint === "string" && project.fingerprint !== fingerprint) notes.push("L'ancienne empreinte a été recalculée à partir de la recette.");
     if (migrated.warning) notes.push(migrated.warning);
-    return { ok: true, config, progress: migrated.progress, migratedFrom: 1, warning: notes.join(" ") };
+    return { ok: true, work: regenerated, config, progress: migrated.progress, migratedFrom: 1, warning: notes.join(" ") };
   } catch {
     return { ok: false, error: "Projet ROSACE version 1 détecté, mais la recette est invalide : migration impossible." };
   }
 }
 
-/** Unique validateur de projet : v2 strict, v1 migré explicitement, sinon message clair. */
+/** Projet v3 : l'ouvrage importé est reconstruit depuis sa matrice, puis son empreinte est vérifiée. */
+function importProjectV3(raw: unknown): ImportResult {
+  const project = raw as Partial<ImportedProjectFile>;
+  if (project.origin !== "pdf" || !project.work || typeof project.fingerprint !== "string" || !project.progress) {
+    return { ok: false, error: "Le fichier projet version 3 est incomplet." };
+  }
+  const restored = restoreImportedWork(project.work);
+  if (!restored.ok) return { ok: false, error: `Ouvrage importé illisible : ${restored.error}` };
+  const work = restored.work;
+  if (work.fingerprint !== project.fingerprint) {
+    return { ok: false, error: "L'empreinte de l'ouvrage ne correspond pas à sa matrice : import refusé." };
+  }
+  return validatedProgress(work, project.progress, null);
+}
+
+function validatedProgress(work: StitchWork, progress: Partial<ProjectProgress>, config: RosaceConfig | null): ImportResult {
+  const completed = [...parseRuns(String(progress.completedRuns ?? ""))];
+  if (completed.some((index) => !isStitchIndex(work, index))) {
+    return { ok: false, error: "La progression contient des cases vides ou hors de la grille : import refusé." };
+  }
+  const selectedCode = canonicalSelection(progress.selectedCode, paletteCodes(work));
+  return {
+    ok: true,
+    work,
+    config,
+    progress: {
+      version: 2,
+      fingerprint: work.fingerprint,
+      completedRuns: serializeRuns(completed),
+      selectedCode,
+      viewport: clampViewport(progress.viewport),
+      journal: sanitizeJournal(work, progress.journal),
+      updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
+    },
+  };
+}
+
+/** Unique validateur de projet : v2 strict (rosace), v3 strict (ouvrage importé), v1 migré explicitement, sinon message clair. */
 export function importProject(raw: unknown): ImportResult {
   try {
     const probe = raw as { version?: unknown; format?: unknown } | null;
@@ -359,54 +430,39 @@ export function importProject(raw: unknown): ImportResult {
       return { ok: false, error: "Le fichier n'est pas un projet ROSACE lisible." };
     }
     if (probe.version === LEGACY_PROJECT_VERSION) return migrateProjectV1(raw);
+    if (probe.format === PROJECT_FORMAT && probe.version === IMPORTED_PROJECT_VERSION) return importProjectV3(raw);
     const project = raw as Partial<ProjectFile>;
     if (project.format !== PROJECT_FORMAT || project.version !== PROJECT_VERSION) {
-      return { ok: false, error: "Ce fichier n'est pas un projet ROSACE version 2. Les projets version 1 sont migrés automatiquement." };
+      return { ok: false, error: "Ce fichier n'est pas un projet ROSACE version 2 ou 3. Les projets version 1 sont migrés automatiquement." };
     }
     if (!project.config || typeof project.fingerprint !== "string" || !project.progress) {
       return { ok: false, error: "Le fichier projet est incomplet." };
     }
     const config = normalizeConfig(project.config);
-    const regenerated = generateRosace(config);
-    const fingerprint = patternFingerprint(regenerated);
-    if (fingerprint !== project.fingerprint) {
+    const regenerated = fromRosace(generateRosace(config));
+    if (regenerated.fingerprint !== project.fingerprint) {
       return { ok: false, error: "L'empreinte du patron ne correspond pas à sa recette : import refusé." };
     }
-    const completed = [...parseRuns(String(project.progress.completedRuns ?? ""))];
-    if (completed.some((index) => !isStitchIndex(regenerated, index))) {
-      return { ok: false, error: "La progression contient des cases vides ou hors de la grille : import refusé." };
-    }
-    const selectedCode = canonicalSelection(project.progress.selectedCode, config.palette);
-    return {
-      ok: true,
-      config,
-      progress: {
-        version: 2,
-        fingerprint,
-        completedRuns: serializeRuns(completed),
-        selectedCode,
-        viewport: clampViewport(project.progress.viewport),
-        journal: sanitizeJournal(regenerated, project.progress.journal),
-        updatedAt: typeof project.progress.updatedAt === "string" ? project.progress.updatedAt : new Date().toISOString(),
-      },
-    };
+    return validatedProgress(regenerated, project.progress, config);
   } catch {
     return { ok: false, error: "Fichier illisible ou JSON invalide." };
   }
 }
 
-export function remainingByColor(pattern: RosacePattern, completed: Set<number>) {
-  const remaining = pattern.config.palette.map((code) => ({ code, total: 0, remaining: 0 }));
-  for (const stitch of pattern.stitches) {
+export function remainingByColor(pattern: WorkLike, completed: Set<number>) {
+  const work = toWork(pattern);
+  const remaining = work.palette.map((entry) => ({ code: entry.code, total: 0, remaining: 0 }));
+  for (const stitch of work.stitches) {
     const line = remaining[stitch.color];
     if (!line) continue;
     line.total += 1;
-    if (!completed.has(stitchIndex(pattern.size, stitch.x, stitch.y))) line.remaining += 1;
+    if (!completed.has(stitchIndex(work.width, stitch.x, stitch.y))) line.remaining += 1;
   }
   return remaining;
 }
 
-export function progressPercent(pattern: RosacePattern, completed: Set<number>) {
-  const done = pattern.stitches.reduce((total, stitch) => total + (completed.has(stitchIndex(pattern.size, stitch.x, stitch.y)) ? 1 : 0), 0);
-  return { done, total: pattern.stitches.length, percent: pattern.stitches.length ? Math.round((done / pattern.stitches.length) * 1000) / 10 : 0 };
+export function progressPercent(pattern: WorkLike, completed: Set<number>) {
+  const work = toWork(pattern);
+  const done = work.stitches.reduce((total, stitch) => total + (completed.has(stitchIndex(work.width, stitch.x, stitch.y)) ? 1 : 0), 0);
+  return { done, total: work.stitches.length, percent: work.stitches.length ? Math.round((done / work.stitches.length) * 1000) / 10 : 0 };
 }

@@ -1,9 +1,10 @@
 import { useEffect, useRef, type CSSProperties } from "react";
 import { paintPattern, type CanvasMode } from "../lib/paint";
 import type { RosacePattern } from "../lib/rosace";
+import { toWork, type StitchWork } from "../lib/work";
 
 interface RosaceCanvasProps {
-  pattern: RosacePattern;
+  pattern: RosacePattern | StitchWork;
   mode?: CanvasMode;
   resolution?: number;
   className?: string;
@@ -16,6 +17,7 @@ interface RosaceCanvasProps {
 /** Lecture visuelle d'un ouvrage calculé. Ne calcule rien : peint exactement les croix du pattern reçu. */
 export function RosaceCanvas({ pattern, mode = "fabric", resolution = 1200, className, style, label, onPointerMove, onPointerLeave }: RosaceCanvasProps) {
   const ref = useRef<HTMLCanvasElement>(null);
+  const work = toWork(pattern);
 
   useEffect(() => {
     if (ref.current) paintPattern(ref.current, pattern, mode, resolution);
@@ -27,7 +29,7 @@ export function RosaceCanvas({ pattern, mode = "fabric", resolution = 1200, clas
       className={className}
       style={style}
       role="img"
-      aria-label={label ?? `${mode === "chart" ? "Grille" : "Broderie"} de ${pattern.stitches.length} croix, ${pattern.size} par ${pattern.size} points`}
+      aria-label={label ?? `${mode === "chart" ? "Grille" : "Broderie"} de ${work.stitches.length} croix, ${work.width} par ${work.height} points`}
       onPointerMove={onPointerMove}
       onPointerLeave={onPointerLeave}
     />
@@ -35,7 +37,7 @@ export function RosaceCanvas({ pattern, mode = "fabric", resolution = 1200, clas
 }
 
 /** Le tambour : cadre de bois, vis de laiton et toile. C'est l'unique tambour de l'application. */
-export function EmbroideryHoop({ pattern }: { pattern: RosacePattern }) {
+export function EmbroideryHoop({ pattern }: { pattern: RosacePattern | StitchWork }) {
   return (
     <div className="hoop">
       <div className="hoop-clasp" aria-hidden="true">
