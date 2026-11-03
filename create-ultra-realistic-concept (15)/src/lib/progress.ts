@@ -9,6 +9,8 @@ import { patternFingerprint } from "./pattern-id";
 export const PROGRESS_STORAGE_PREFIX = "aime-rosace-progress-v2:";
 export const PROJECT_FORMAT = "rosace-project";
 export const PROJECT_VERSION = 2;
+export const MIN_ZOOM = 0.8;
+export const MAX_ZOOM = 8;
 
 export interface Viewport {
   k: number;
@@ -38,6 +40,49 @@ export interface ProjectFile {
     viewport: Viewport;
     journal: Array<{ index: number; added: boolean }>;
     updatedAt: string;
+  };
+}
+
+const finite = (value: unknown, fallback: number) => {
+  const number = Number(value);
+  return Number.isFinite(number) ? number : fallback;
+};
+
+/** Unique bornage de la vue Broderie, partagé par la sauvegarde locale et l'import de projet. */
+export function clampViewport(view: Partial<Viewport> | null | undefined): Viewport {
+  const k = Math.min(MAX_ZOOM, Math.max(MIN_ZOOM, finite(view?.k, 1)));
+  const limit = 900 * k;
+  return {
+    k,
+    x: Math.max(-limit, Math.min(limit, finite(view?.x, 0))),
+    y: Math.max(-limit, Math.min(limit, finite(view?.y, 0))),
+  };
+}
+
+/** Seules les cases réellement brodées du patron peuvent appartenir à une progression. */
+function isStitchIndex(pattern: RosacePattern, index: number) {
+  return Number.isInteger(index) && index >= 0 && index < pattern.cells.length && pattern.cells[index] >= 0;
+}
+
+function sanitizeJournal(pattern: RosacePattern, journal: unknown): Array<{ index: number; added: boolean }> {
+  if (!Array.isArray(journal)) return [];
+  return journal
+    .filter((entry): entry is { index: number; added: boolean } =>
+      Boolean(entry) && isStitchIndex(pattern, Number(entry.index)) && typeof entry.added === "boolean")
+    .map((entry) => ({ index: Number(entry.index), added: entry.added }))
+    .slice(-100);
+}
+
+/** Une progression vide, au format canonique, pour un patron donné. */
+export function emptyProgress(pattern: RosacePattern): EmbroideryProgress {
+  return {
+    version: 2,
+    fingerprint: patternFingerprint(pattern),
+    completedRuns: "",
+    selectedCode: pattern.config.palette[0] ?? null,
+    viewport: { k: 1, x: 0, y: 0 },
+    journal: [],
+    updatedAt: new Date().toISOString(),
   };
 }
 
@@ -88,6 +133,23 @@ export function loadProgress(fingerprint: string): EmbroideryProgress | null {
   }
 }
 
+/** Chargement validé : la progression locale est nettoyée contre la matrice canonique du patron. */
+export function loadPatternProgress(pattern: RosacePattern): EmbroideryProgress | null {
+  const fingerprint = patternFingerprint(pattern);
+  const saved = loadProgress(fingerprint);
+  if (!saved) return null;
+  const completed = [...parseRuns(String(saved.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
+  return {
+    version: 2,
+    fingerprint,
+    completedRuns: serializeRuns(completed),
+    selectedCode: saved.selectedCode && pattern.config.palette.includes(saved.selectedCode) ? saved.selectedCode : pattern.config.palette[0] ?? null,
+    viewport: clampViewport(saved.viewport),
+    journal: sanitizeJournal(pattern, saved.journal),
+    updatedAt: typeof saved.updatedAt === "string" ? saved.updatedAt : new Date().toISOString(),
+  };
+}
+
 export function saveProgress(progress: EmbroideryProgress) {
   window.localStorage.setItem(`${PROGRESS_STORAGE_PREFIX}${progress.fingerprint}`, JSON.stringify(progress));
 }
@@ -96,18 +158,25 @@ export function deleteProgress(fingerprint: string) {
   window.localStorage.removeItem(`${PROGRESS_STORAGE_PREFIX}${fingerprint}`);
 }
 
+/** Unique constructeur de fichier projet : recette exacte + progression nettoyée contre la matrice. */
 export function buildProject(pattern: RosacePattern, progress: EmbroideryProgress): ProjectFile {
+  const fingerprint = patternFingerprint(pattern);
+  if (progress.fingerprint !== fingerprint) throw new Error("La progression ne correspond pas au patron.");
+  const completed = [...parseRuns(String(progress.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
+  const selectedCode = progress.selectedCode && pattern.config.palette.includes(progress.selectedCode)
+    ? progress.selectedCode
+    : null;
   return {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
-    fingerprint: patternFingerprint(pattern),
+    fingerprint,
     config: { ...pattern.config, palette: [...pattern.config.palette] },
     progress: {
-      completedRuns: progress.completedRuns,
-      selectedCode: progress.selectedCode,
-      viewport: progress.viewport,
-      journal: progress.journal ?? [],
-      updatedAt: progress.updatedAt,
+      completedRuns: serializeRuns(completed),
+      selectedCode,
+      viewport: clampViewport(progress.viewport),
+      journal: sanitizeJournal(pattern, progress.journal),
+      updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
     },
   };
 }
@@ -116,6 +185,7 @@ export type ImportResult =
   | { ok: true; config: RosaceConfig; progress: EmbroideryProgress }
   | { ok: false; error: string };
 
+/** Unique validateur de projet : recette régénérée, empreinte, cases et journal vérifiés. */
 export function importProject(raw: unknown): ImportResult {
   try {
     const project = raw as Partial<ProjectFile>;
@@ -131,10 +201,13 @@ export function importProject(raw: unknown): ImportResult {
     if (fingerprint !== project.fingerprint) {
       return { ok: false, error: "L'empreinte du patron ne correspond pas à sa recette : import refusé." };
     }
-    const completed = parseRuns(String(project.progress.completedRuns ?? ""));
-    if ([...completed].some((index) => index < 0 || index >= regenerated.cells.length)) {
-      return { ok: false, error: "La progression contient des cases hors de la grille : import refusé." };
+    const completed = [...parseRuns(String(project.progress.completedRuns ?? ""))];
+    if (completed.some((index) => !isStitchIndex(regenerated, index))) {
+      return { ok: false, error: "La progression contient des cases vides ou hors de la grille : import refusé." };
     }
+    const selectedCode = typeof project.progress.selectedCode === "string" && config.palette.includes(project.progress.selectedCode)
+      ? project.progress.selectedCode
+      : null;
     return {
       ok: true,
       config,
@@ -142,13 +215,9 @@ export function importProject(raw: unknown): ImportResult {
         version: 2,
         fingerprint,
         completedRuns: serializeRuns(completed),
-        selectedCode: typeof project.progress.selectedCode === "string" ? project.progress.selectedCode : null,
-        viewport: {
-          k: Math.min(8, Math.max(1, Number(project.progress.viewport?.k) || 1)),
-          x: Number(project.progress.viewport?.x) || 0,
-          y: Number(project.progress.viewport?.y) || 0,
-        },
-        journal: Array.isArray(project.progress.journal) ? project.progress.journal.filter((entry) => entry && Number.isInteger(entry.index) && typeof entry.added === "boolean").slice(-100) : [],
+        selectedCode,
+        viewport: clampViewport(project.progress.viewport),
+        journal: sanitizeJournal(regenerated, project.progress.journal),
         updatedAt: typeof project.progress.updatedAt === "string" ? project.progress.updatedAt : new Date().toISOString(),
       },
     };

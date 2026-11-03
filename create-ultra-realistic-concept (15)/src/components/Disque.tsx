@@ -6,7 +6,7 @@ import { useRosaceApi } from "../state/rosace-store";
 import { EmbroideryHoop } from "./RosaceCanvas";
 
 /**
- * Le Disque ROSACE, minimal : le tambour occupe le centre, la couronne des 161 fils DMC l'entoure.
+ * Le Disque ROSACE, minimal : le tambour occupe le centre, la couronne des 489 fils DMC l'entoure.
  * Un clic sur une couleur recolore immédiatement la rosace avec sa complémentaire et ses analogues.
  * Aucune bague : les transformations se règlent par les curseurs sous le tambour.
  */
@@ -35,7 +35,6 @@ function crownPath(index: number, count: number, inner: number, outer: number, g
 const CROWN_PATHS = CROWN_THREADS.map((thread, index) => ({
   thread,
   d: crownPath(index, CROWN_THREADS.length, CROWN_IN, CROWN_OUT),
-  middle: CROWN_START + (index + 0.5) * (CROWN_SWEEP / CROWN_THREADS.length),
 }));
 
 export function Disque() {

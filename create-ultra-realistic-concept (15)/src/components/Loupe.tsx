@@ -82,7 +82,7 @@ export function Loupe() {
           })}
         </ul>
         <p className="loupe-note">
-          {pattern.stitches.length.toLocaleString("fr-FR")} croix à deux brins · toile {FABRIC_COLORS[config.fabric].name.toLowerCase()} aïda {config.aida} ·
+          {pattern.stitches.length.toLocaleString("fr-FR")} croix à {config.strands} brin{config.strands > 1 ? "s" : ""} · toile {FABRIC_COLORS[config.fabric].name.toLowerCase()} aïda {config.aida} ·
           les trous sont au centre de chaque case, le brin supérieur croise toujours dans le même sens.
         </p>
       </footer>

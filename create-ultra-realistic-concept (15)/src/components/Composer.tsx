@@ -49,6 +49,8 @@ export function Composer() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Le mode Broderie est plein écran : ses touches ne doivent pas ouvrir un panneau derrière lui.
+      if (embroideryOpen) return;
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
       const index = ["1", "2", "3", "4", "5", "6"].indexOf(event.key);
@@ -61,7 +63,7 @@ export function Composer() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [choose, panel, setPanel]);
+  }, [choose, panel, setPanel, embroideryOpen]);
 
   const PanelBody = panel ? PANEL_COMPONENTS[panel] : null;
 
@@ -122,15 +124,15 @@ export function Composer() {
         {CATEGORIES.map((category, index) => {
           const Icon = category.icon;
           const isPanel = category.id === panel;
-          const isGrid = category.id === "broder" && embroideryOpen;
+          const isBroder = category.id === "broder" && embroideryOpen;
           const hasAlert = category.id === "couleurs" && warnings.length > 0;
           return (
             <button
               key={category.id}
               id={category.id === "broder" ? "dock-broder" : undefined}
               type="button"
-              className={`dock-categorie ${isPanel || isGrid ? "is-active" : ""}`}
-              aria-pressed={isPanel || isGrid}
+              className={`dock-categorie ${isPanel || isBroder ? "is-active" : ""}`}
+              aria-pressed={isPanel || isBroder}
               aria-label={`${category.label}${hasAlert ? " (contraste à vérifier)" : ""}`}
               onClick={() => choose(category.id)}
             >

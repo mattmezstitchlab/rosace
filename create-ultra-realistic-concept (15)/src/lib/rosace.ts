@@ -1,4 +1,4 @@
-import { DEFAULT_PALETTE, THREAD_BY_CODE } from "../data/dmc";
+import { DEFAULT_PALETTE, resolveThreadCode } from "../data/dmc";
 import { computeMaterials, estimateTime } from "./materials";
 
 export type FabricTone = "naturel" | "craie" | "brume";
@@ -135,9 +135,10 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
 export function normalizeConfig(value: Partial<RosaceConfig> | null | undefined): RosaceConfig {
   const source = value ?? {};
   const palette = Array.isArray(source.palette)
-    ? source.palette.filter((code): code is string => typeof code === "string" && THREAD_BY_CODE.has(code)).slice(0, 6)
+    ? source.palette.map((code) => resolveThreadCode(code)).filter((code): code is string => code !== null).slice(0, 6)
     : [...DEFAULT_CONFIG.palette];
   const aida = [14, 16, 18].includes(Number(source.aida)) ? (Number(source.aida) as AidaCount) : 14;
+  const wasteValue = Number(source.wastePercent ?? 15);
   const fabric = ["naturel", "craie", "brume"].includes(source.fabric ?? "")
     ? (source.fabric as FabricTone)
     : "naturel";
@@ -154,7 +155,7 @@ export function normalizeConfig(value: Partial<RosaceConfig> | null | undefined)
     fabric,
     aida,
     strands: clampInt(source.strands, 1, 6, 2),
-    wastePercent: Math.max(0, Math.min(50, Math.round(Number(source.wastePercent ?? 15) / 5) * 5)),
+    wastePercent: Number.isFinite(wasteValue) ? Math.max(0, Math.min(50, Math.round(wasteValue / 5) * 5)) : 15,
   };
 }
 

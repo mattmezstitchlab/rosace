@@ -1,12 +1,9 @@
 import { Check, Copy, Dices, Download, FileCode2, FileImage, FileText, Plus, RotateCcw, Search, Table2, TriangleAlert, X } from "lucide-react";
 import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from "react";
-import { DMC_ALL_THREADS } from "../data/dmc";
-import { downloadBlob } from "../lib/exporters";
+import { DMC_ALL_THREADS, getThread } from "../data/dmc";
 import { patternFingerprint, shortFingerprint } from "../lib/pattern-id";
-import { buildProject, importProject, loadProgress, saveProgress } from "../lib/progress";
-import { getThread } from "../data/dmc";
 import { HARMONY_HINT, HARMONY_LABELS, ROLE_LABELS, type Harmony } from "../lib/harmony";
-import { FABRIC_COLORS, SYMBOLS, type AidaCount, type FabricTone } from "../lib/rosace";
+import { DIMENSION_NAMES, FABRIC_COLORS, SYMBOLS, type AidaCount, type FabricTone } from "../lib/rosace";
 import { THEME_LABELS, THEME_ORDER, readThemeChoice, saveThemeChoice, type ThemeChoice } from "../lib/theme";
 import { formatSeed, useRosaceApi, type PanelId } from "../state/rosace-store";
 
@@ -25,10 +22,7 @@ const FORM_SLIDERS = [
 ] as const;
 
 const FORM_NAMES: Record<string, string[]> = {
-  structure: ["Sceau", "Étoile", "Rosace", "Vitrail", "Soleil"],
-  trace: ["Corolle", "Gothique", "Courbe", "Herbier", "Céleste"],
-  density: ["Ajourée", "Légère", "Équilibrée", "Riche", "Tapisserie"],
-  scale: ["Miniature", "Fin", "Moyen", "Ample", "Monumental"],
+  ...DIMENSION_NAMES,
   twist: ["Immobile", "Léger", "Tournant", "Spiralé", "Vertigineux"],
   wave: ["Stricte", "Douce", "Souple", "Ondoyante", "Éventail"],
 };
@@ -193,19 +187,32 @@ export function SettingsPanel() {
       <div className="panneau-groupe">
         <p className="panneau-label">Fils et métrage · {pattern.config.strands} brins, marge {config.wastePercent} %</p>
         <div className="options" role="group" aria-label="Nombre de brins">
-          {[1, 2, 3, 4, 6].map((value) => (
+          {[1, 2, 3, 4, 5, 6].map((value) => (
             <button key={value} className={`option ${config.strands === value ? "is-active" : ""}`} aria-pressed={config.strands === value} onClick={() => api.commit({ ...config, strands: value })}>
               {value} brin{value > 1 ? "s" : ""}
             </button>
           ))}
         </div>
-        <div className="options" role="group" aria-label="Marge de sécurité textile">
-          {[0, 10, 15, 20, 25].map((value) => (
-            <button key={value} className={`option ${config.wastePercent === value ? "is-active" : ""}`} aria-pressed={config.wastePercent === value} onClick={() => api.commit({ ...config, wastePercent: value })}>
-              {value === 0 ? "Sans marge" : `+ ${value} %`}
-            </button>
-          ))}
-        </div>
+        <label className="curseur" style={{ marginTop: 10 }}>
+          <span className="curseur-tete">
+            <span className="curseur-nom">Marge de sécurité textile</span>
+            <span className="curseur-valeur">{config.wastePercent === 0 ? "Sans marge" : `+ ${config.wastePercent} %`}</span>
+          </span>
+          <input
+            type="range"
+            min="0"
+            max="50"
+            step="5"
+            value={config.wastePercent}
+            style={{ "--curseur": `${(config.wastePercent / 50) * 100}%` } as CSSProperties}
+            onChange={(event) => api.commit({ ...config, wastePercent: Number(event.target.value) })}
+            onPointerDown={api.beginGesture}
+            onPointerUp={api.endGesture}
+            onPointerCancel={api.endGesture}
+            aria-label="Marge de sécurité textile, de 0 à 50 %"
+            aria-valuetext={config.wastePercent === 0 ? "Sans marge" : `+ ${config.wastePercent} %`}
+          />
+        </label>
         <p className="panneau-aide">
           Motif {String(pattern.motifWidthCm).replace(".", ",")} × {String(pattern.motifHeightCm).replace(".", ",")} cm ·
           {" "}{pattern.totalNeedleMeters.toFixed(1).replace(".", ",")} m de faisceau ({pattern.totalStrandMeters.toFixed(1).replace(".", ",")} m de brins) ·
@@ -234,7 +241,7 @@ export function SettingsPanel() {
           <button className="bouton bouton-petit" onClick={api.reset} disabled={api.isDefault}><RotateCcw size={15} aria-hidden="true" /> Réinitialiser la rosace</button>
         </div>
         <p className="panneau-aide panneau-raccourcis">
-          Raccourcis : Ctrl Z annuler · Ctrl Maj Z rétablir · 1 à 6 catégories · Échap fermer. En mode Broder : flèches, Espace, + / −, 0.
+          Raccourcis : Ctrl Z annuler · Ctrl Maj Z rétablir · 1 à 6 catégories · Échap fermer. En mode Broder : Ctrl Z / Ctrl Y pour les croix, flèches, Espace, + / −, 0.
           Vos recettes restent sur cet appareil ; les couleurs écran sont indicatives.
         </p>
       </div>
@@ -247,38 +254,16 @@ export function ExportPanel() {
   const actions = api.exportActions;
   const fileRef = useRef<HTMLInputElement>(null);
   const fingerprint = patternFingerprint(api.pattern);
-  const exportProject = () => {
-    const saved = loadProgress(fingerprint);
-    const progress = saved ?? {
-      version: 2 as const,
-      fingerprint,
-      completedRuns: "",
-      selectedCode: api.pattern.config.palette[0] ?? null,
-      viewport: { k: 1, x: 0, y: 0 },
-      updatedAt: new Date().toISOString(),
-    };
-    downloadBlob(new Blob([JSON.stringify(buildProject(api.pattern, progress), null, 2)], { type: "application/json" }), `rosace-${formatSeed(api.config.seed)}-${shortFingerprint(fingerprint)}.rosace.json`);
-    api.notify("Projet exporté", "Recette et progression, liées à l'empreinte du patron");
-  };
-  const importProjectFile = async (file: File) => {
-    try {
-      const result = importProject(JSON.parse(await file.text()));
-      if (!result.ok) { api.notify("Projet refusé", result.error); return; }
-      saveProgress(result.progress);
-      api.commit(result.config);
-      api.notify("Projet importé", `Recette et progression restaurées · ${shortFingerprint(result.progress.fingerprint)}`);
-    } catch { api.notify("Projet illisible", "Le fichier n'est pas un JSON valide."); }
-  };
   return (
     <div className="panneau-export">
       <div className="panneau-groupe">
         <p className="panneau-label">Projet ROSACE · empreinte {shortFingerprint(fingerprint)}</p>
         <div className="panneau-rangee">
-          <button className="bouton bouton-petit" onClick={exportProject}><FileCode2 size={15} aria-hidden="true" /> Exporter le projet</button>
+          <button className="bouton bouton-petit" onClick={() => actions.project()}><FileCode2 size={15} aria-hidden="true" /> Exporter le projet</button>
           <button className="bouton bouton-petit" onClick={() => fileRef.current?.click()}><FileText size={15} aria-hidden="true" /> Importer un projet</button>
-          <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Importer un projet ROSACE" onChange={(event) => { const file = event.target.files?.[0]; if (file) void importProjectFile(file); event.target.value = ""; }} />
+          <input ref={fileRef} type="file" accept="application/json,.json" className="sr-only" aria-label="Importer un projet ROSACE" onChange={(event) => { const file = event.target.files?.[0]; if (file) void actions.projectImport(file); event.target.value = ""; }} />
         </div>
-        <p className="panneau-aide">Le projet contient la recette exacte et la progression. L'import est refusé si l'empreinte du patron ne correspond pas.</p>
+        <p className="panneau-aide">Le projet contient la recette exacte, la progression et son journal d'annulation. L'import est refusé si l'empreinte du patron ne correspond pas.</p>
       </div>
       <div className="export-liste">
         <button onClick={() => actions.png(false)}><FileImage size={20} aria-hidden="true" /><span><strong>PNG · toile</strong><small>1600 × 1600 px</small></span><Download size={14} aria-hidden="true" /></button>

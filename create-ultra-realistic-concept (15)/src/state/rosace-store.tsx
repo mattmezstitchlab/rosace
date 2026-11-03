@@ -3,7 +3,12 @@ import { getThread, type ThreadFamily } from "../data/dmc";
 import type { ToastMessage } from "../components/Overlays";
 import { auditPalette } from "../lib/color";
 import { harmonyCodes, type Harmony } from "../lib/harmony";
-import { exportPng, exportSvg, exportThreadCsv, printWorksheet } from "../lib/exporters";
+import { downloadBlob, exportPng, exportSvg, exportThreadCsv, printWorksheet } from "../lib/exporters";
+import { patternFingerprint, shortFingerprint } from "../lib/pattern-id";
+import {
+  buildProject, emptyProgress, importProject as parseProjectFile, loadPatternProgress, saveProgress,
+  type EmbroideryProgress,
+} from "../lib/progress";
 import {
   DEFAULT_CONFIG, FABRIC_COLORS, decodeConfig, encodeConfig, generateRosace, normalizeConfig, sameRecipe,
   type AidaCount, type DimensionKey, type FabricTone, type RosaceConfig, type SavedRosace,
@@ -84,6 +89,8 @@ function useRosaceState() {
   const [activeDimension, setActiveDimension] = useState<DimensionKey>("structure");
   const [favorites, setFavorites] = useState<SavedRosace[]>(readFavorites);
   const [embroideryOpen, setEmbroideryOpen] = useState(false);
+  /** Incrémenté après un import : force le mode Broderie à relire la progression canonique. */
+  const [progressRevision, setProgressRevision] = useState(0);
   const [panel, setPanel] = useState<PanelId | null>(null);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [loupeOpen, setLoupeOpen] = useState(false);
@@ -177,6 +184,8 @@ function useRosaceState() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      // En mode Broderie, Ctrl Z / Ctrl Y appartiennent aux croix, pas à la recette.
+      if (embroideryOpen) return;
       const target = event.target as HTMLElement;
       if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "z") {
@@ -191,7 +200,7 @@ function useRosaceState() {
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [undo]);
+  }, [undo, redo, embroideryOpen]);
 
   const generateVariation = useCallback(() => {
     const seed = nextSeed(configRef.current.seed);
@@ -322,7 +331,7 @@ function useRosaceState() {
       stitches: pattern.stitches.length,
     };
     setFavorites((list) => [entry, ...list]);
-    notify("Recette enregistrée dans votre collection", "Retrouvez-la dans Outils et dans Explorer");
+    notify("Recette enregistrée dans votre collection", "Retrouvez-la dans la catégorie Collection du dock");
   }, [favorites, notify, pattern.stitches.length]);
 
   const deleteFavorite = useCallback((id: string) => {
@@ -330,7 +339,40 @@ function useRosaceState() {
     notify("Rosace supprimée de la collection");
   }, [notify]);
 
+  /**
+   * Un seul service de projet JSON, utilisé par le panneau Export ET par le mode Broderie.
+   * Le mode Broderie fournit son instantané courant ; le panneau relit la progression sauvegardée.
+   */
   const exportActions = useMemo(() => ({
+    project: (snapshot?: EmbroideryProgress) => {
+      try {
+        const fingerprint = patternFingerprint(pattern);
+        if (snapshot && snapshot.fingerprint !== fingerprint) {
+          notify("Projet non exporté", "La progression ne correspond plus au patron affiché.");
+          return;
+        }
+        const progress = snapshot ?? loadPatternProgress(pattern) ?? emptyProgress(pattern);
+        const payload = buildProject(pattern, progress);
+        const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
+        downloadBlob(blob, `rosace-${formatSeed(pattern.config.seed)}-${shortFingerprint(fingerprint)}.rosace.json`);
+        notify("Projet exporté", "Recette, progression et journal, liés à l'empreinte du patron");
+      } catch (error) {
+        notify("Export du projet impossible", error instanceof Error ? error.message : "Réessayez dans un instant");
+      }
+    },
+    projectImport: async (file: File) => {
+      let raw: unknown;
+      try { raw = JSON.parse(await file.text()); }
+      catch { notify("Projet illisible", "Le fichier n'est pas un JSON valide."); return; }
+      const result = parseProjectFile(raw);
+      if (!result.ok) { notify("Projet refusé", result.error); return; }
+      try { saveProgress(result.progress); }
+      catch { notify("Progression non enregistrée", "Le stockage du navigateur est plein ou indisponible."); return; }
+      commit(result.config);
+      setEmbroideryOpen(false);
+      setProgressRevision((value) => value + 1);
+      notify("Projet importé", `Recette et progression restaurées · ${shortFingerprint(result.progress.fingerprint)}`);
+    },
     print: () => {
       if (!printWorksheet(pattern)) notify("La fenêtre d'impression est bloquée", "Autorisez les fenêtres pop-up pour créer la fiche PDF");
       else notify("Fiche technique ouverte", "Utilisez « Imprimer / PDF » dans la nouvelle fenêtre");
@@ -366,13 +408,13 @@ function useRosaceState() {
         notify("Lien de partage copié", "La signature, la palette et tous les réglages sont inclus");
       } catch { notify("Copie automatique impossible", "Sélectionnez manuellement le lien affiché dans Outils"); }
     },
-  }), [pattern, notify, shareUrl]);
+  }), [pattern, notify, shareUrl, commit]);
 
   return {
     config, pattern, warnings, history, future, isDefault, shareUrl,
     activeIndex, inspectedCode, activeDimension, setActiveDimension,
     favorites, savedCurrent, toasts,
-    embroideryOpen, setEmbroideryOpen, collectionOpen, setCollectionOpen, loupeOpen, setLoupeOpen,
+    embroideryOpen, setEmbroideryOpen, progressRevision, collectionOpen, setCollectionOpen, loupeOpen, setLoupeOpen,
     panel, setPanel,
     harmony, changeHarmony, applyColor, baseCode, paletteStops,
     catalog, openCatalog, closeCatalog,
