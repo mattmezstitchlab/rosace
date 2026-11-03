@@ -171,7 +171,7 @@ export function Composer() {
 /** Un patron importé n'a ni recette ni couleurs à régler : les panneaux le disent plutôt que de montrer des curseurs inertes. */
 function ImportedNotice() {
   const { work, clearImportedWork, openImport, setEmbroideryOpen } = useRosaceApi();
-  if (work.origin.kind !== "pdf") return null;
+  if (work.origin.kind === "rosace") return null;
   const { provenance, montage, importedAt } = work.origin;
   return (
     <div className="panneau-import">

@@ -47,9 +47,21 @@ export interface ImportLosses {
   unresolved: number;
 }
 
+/** Origines importées : un patron PDF recomposé, ou un texte brodé (même matrice, même progression, pas de recette). */
+export type ImportedKind = "pdf" | "text";
+export interface ImportedOrigin {
+  kind: ImportedKind;
+  provenance: ImportProvenance;
+  montage: ImportMontage;
+  lost: ImportLosses;
+  importedAt: string;
+  declaredSize?: { w: number; h: number };
+  /** Pour `text` : la phrase brodée, telle que saisie. */
+  text?: string;
+}
 export type WorkOrigin =
   | { kind: "rosace"; config: RosaceConfig }
-  | { kind: "pdf"; provenance: ImportProvenance; montage: ImportMontage; lost: ImportLosses; importedAt: string; declaredSize?: { w: number; h: number } };
+  | ImportedOrigin;
 
 export interface WorkTextile {
   fabric: FabricTone;
@@ -71,6 +83,9 @@ export interface StitchWork extends WorkStats {
 
 /** Grille produite par le puzzle PDF : neutre, sans dépendance à ROSACE ni à Point Zéro. */
 export interface ImportedGrid {
+  /** `pdf` par défaut ; `text` pour un texte brodé. */
+  kind?: ImportedKind;
+  text?: string;
   width: number;
   height: number;
   cells: Int16Array;
@@ -146,12 +161,13 @@ export function fromImport(grid: ImportedGrid, textile: WorkTextile = DEFAULT_IM
     ok: true,
     work: {
       origin: {
-        kind: "pdf",
+        kind: grid.kind ?? "pdf",
         provenance: grid.provenance,
         montage: grid.montage,
         lost: grid.lost,
         importedAt: new Date().toISOString(),
         declaredSize: grid.declaredSize,
+        text: grid.text,
       },
       width,
       height,
@@ -190,6 +206,8 @@ export function decodeCells(encoded: string, expectedLength: number): Int16Array
 
 /** Forme sérialisable d'un ouvrage importé : tout ce qu'il faut pour le reconstruire sans recette. */
 export interface ImportedWorkRecord {
+  kind?: ImportedKind;
+  text?: string;
   width: number;
   height: number;
   cells: string;
@@ -203,8 +221,10 @@ export interface ImportedWorkRecord {
 }
 
 export function serializeImportedWork(work: StitchWork): ImportedWorkRecord | null {
-  if (work.origin.kind !== "pdf") return null;
+  if (work.origin.kind === "rosace") return null;
   return {
+    kind: work.origin.kind,
+    text: work.origin.text,
     width: work.width,
     height: work.height,
     cells: encodeCells(work.cells),
@@ -238,6 +258,8 @@ export function restoreImportedWork(record: unknown): ImportOutcome {
     wastePercent: Math.max(0, Math.min(50, Math.round(Number(source.textile?.wastePercent ?? DEFAULT_IMPORT_TEXTILE.wastePercent)))),
   };
   const outcome = fromImport({
+    kind: source.kind === "text" ? "text" : "pdf",
+    text: typeof source.text === "string" ? source.text : undefined,
     width,
     height,
     cells,
@@ -248,7 +270,7 @@ export function restoreImportedWork(record: unknown): ImportOutcome {
     declaredSize: source.declaredSize,
   }, textile);
   if (!outcome.ok) return outcome;
-  if (outcome.work.origin.kind === "pdf" && typeof source.importedAt === "string") outcome.work.origin.importedAt = source.importedAt;
+  if (outcome.work.origin.kind !== "rosace" && typeof source.importedAt === "string") outcome.work.origin.importedAt = source.importedAt;
   return outcome;
 }
 

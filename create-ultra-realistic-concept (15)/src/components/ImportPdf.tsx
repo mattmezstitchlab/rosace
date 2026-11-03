@@ -61,7 +61,7 @@ export function ImportPdf() {
   if (!importOpen) return null;
   return importFile
     ? <ImportWorkbench key={`${importFile.name}-${importFile.size}-${importFile.lastModified}`} file={importFile} onClose={closeImport} onUse={(work) => { loadImportedWork(work); notify("Patron prêt à broder", `${work.width} × ${work.height} points · ${work.palette.length} fils · empreinte ${work.fingerprint.slice(0, 8)}`); }} />
-    : <DropZone onFile={setImportFile} onClose={closeImport} activeTitle={activeWork.origin.kind === "pdf" ? activeWork.origin.provenance.file : null} />;
+    : <DropZone onFile={setImportFile} onClose={closeImport} activeTitle={activeWork.origin.kind !== "rosace" ? activeWork.origin.provenance.file : null} />;
 }
 
 function DropZone({ onFile, onClose, activeTitle }: { onFile: (file: File) => void; onClose: () => void; activeTitle: string | null }) {

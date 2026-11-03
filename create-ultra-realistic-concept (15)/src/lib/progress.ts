@@ -4,6 +4,7 @@ import {
   fromRosace, restoreImportedWork, serializeImportedWork, toWork,
   type ImportedWorkRecord, type StitchWork,
 } from "./work";
+import { sanitizeSessions, type StitchSession } from "./sessions";
 
 /** La progression et les projets acceptent un patron généré ou un ouvrage importé : tout passe par `StitchWork`. */
 type WorkLike = RosacePattern | StitchWork;
@@ -45,6 +46,8 @@ export interface EmbroideryProgress {
   viewport: Viewport;
   /** Journal des dernières opérations (ajout/retrait) pour restaurer Annuler. */
   journal?: Array<{ index: number; added: boolean }>;
+  /** Séances de broderie : le rythme réel, pour l'estimation « à votre rythme ». Facultatif, compatible v2. */
+  sessions?: StitchSession[];
   updatedAt: string;
 }
 
@@ -53,6 +56,7 @@ export interface ProjectProgress {
   selectedCode: string | null;
   viewport: Viewport;
   journal: Array<{ index: number; added: boolean }>;
+  sessions?: StitchSession[];
   updatedAt: string;
 }
 
@@ -70,7 +74,7 @@ export interface ImportedProjectFile {
   format: typeof PROJECT_FORMAT;
   version: typeof IMPORTED_PROJECT_VERSION;
   fingerprint: string;
-  origin: "pdf";
+  origin: "pdf" | "text";
   work: ImportedWorkRecord;
   progress: ProjectProgress;
 }
@@ -152,6 +156,7 @@ export function emptyProgress(pattern: WorkLike): EmbroideryProgress {
     selectedCode: work.palette[0]?.code ?? null,
     viewport: { k: 1, x: 0, y: 0 },
     journal: [],
+    sessions: [],
     updatedAt: new Date().toISOString(),
   };
 }
@@ -211,8 +216,19 @@ export function reconcileProgress(
     ...incoming,
     completedRuns: serializeRuns(merged),
     journal: mergeJournals(existing.journal, incoming.journal),
+    sessions: mergeSessions(existing.sessions, incoming.sessions),
     updatedAt: newest(existing.updatedAt, incoming.updatedAt),
   };
+}
+
+/** Les séances des deux côtés, dédoublonnées par début, triées. */
+function mergeSessions(existing: unknown, incoming: unknown): StitchSession[] {
+  const byStart = new Map<string, StitchSession>();
+  for (const session of [...sanitizeSessions(existing), ...sanitizeSessions(incoming)]) {
+    const previous = byStart.get(session.start);
+    if (!previous || Date.parse(session.end) >= Date.parse(previous.end)) byStart.set(session.start, session);
+  }
+  return [...byStart.values()].sort((a, b) => Date.parse(a.start) - Date.parse(b.start)).slice(-400);
 }
 
 function canonicalSelection(code: unknown, palette: string[]): string | null {
@@ -264,6 +280,7 @@ export function loadProgress(fingerprint: string): EmbroideryProgress | null {
       selectedCode: typeof parsed.selectedCode === "string" ? parsed.selectedCode : null,
       viewport: clampViewport(parsed.viewport),
       journal: Array.isArray(parsed.journal) ? parsed.journal : [],
+      sessions: sanitizeSessions(parsed.sessions),
       updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
     };
   } catch {
@@ -303,6 +320,7 @@ export function loadPatternProgress(pattern: WorkLike): EmbroideryProgress | nul
     selectedCode: canonicalSelection(source.selectedCode, codes) ?? codes[0] ?? null,
     viewport: clampViewport(source.viewport),
     journal: sanitizeJournal(pattern, source.journal),
+    sessions: sanitizeSessions(source.sessions),
     updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date().toISOString(),
   };
 }
@@ -341,6 +359,7 @@ export function buildProject(pattern: WorkLike, progress: EmbroideryProgress): P
     selectedCode,
     viewport: clampViewport(progress.viewport),
     journal: sanitizeJournal(work, progress.journal),
+    sessions: sanitizeSessions(progress.sessions),
     updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
   };
   if (work.origin.kind === "rosace") {
@@ -349,7 +368,7 @@ export function buildProject(pattern: WorkLike, progress: EmbroideryProgress): P
   }
   const record = serializeImportedWork(work);
   if (!record) throw new Error("Ouvrage importé incomplet : projet non construit.");
-  return { format: PROJECT_FORMAT, version: IMPORTED_PROJECT_VERSION, fingerprint, origin: "pdf", work: record, progress: cleaned };
+  return { format: PROJECT_FORMAT, version: IMPORTED_PROJECT_VERSION, fingerprint, origin: work.origin.kind, work: record, progress: cleaned };
 }
 
 export type ImportResult =
@@ -388,7 +407,7 @@ function migrateProjectV1(raw: unknown): ImportResult {
 /** Projet v3 : l'ouvrage importé est reconstruit depuis sa matrice, puis son empreinte est vérifiée. */
 function importProjectV3(raw: unknown): ImportResult {
   const project = raw as Partial<ImportedProjectFile>;
-  if (project.origin !== "pdf" || !project.work || typeof project.fingerprint !== "string" || !project.progress) {
+  if ((project.origin !== "pdf" && project.origin !== "text") || !project.work || typeof project.fingerprint !== "string" || !project.progress) {
     return { ok: false, error: "Le fichier projet version 3 est incomplet." };
   }
   const restored = restoreImportedWork(project.work);
@@ -417,9 +436,28 @@ function validatedProgress(work: StitchWork, progress: Partial<ProjectProgress>,
       selectedCode,
       viewport: clampViewport(progress.viewport),
       journal: sanitizeJournal(work, progress.journal),
+      sessions: sanitizeSessions(progress.sessions),
       updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
     },
   };
+}
+
+/**
+ * Broder ensemble : la progression d'une autre brodeuse sur le même ouvrage, lue dans son
+ * projet exporté. Elle n'est acceptée que si l'empreinte correspond exactement ; elle ne
+ * touche jamais à la progression locale, elle s'affiche en calque.
+ */
+export type PeerResult =
+  | { ok: true; completed: Set<number>; updatedAt: string; sessions: StitchSession[] }
+  | { ok: false; error: string };
+
+export function readPeerProgress(raw: unknown, work: StitchWork): PeerResult {
+  const result = importProject(raw);
+  if (!result.ok) return { ok: false, error: result.error };
+  if (result.work.fingerprint !== work.fingerprint) {
+    return { ok: false, error: "Ce projet n'est pas le même ouvrage : les empreintes diffèrent. Pour broder ensemble, partagez le même patron." };
+  }
+  return { ok: true, completed: parseRuns(result.progress.completedRuns), updatedAt: result.progress.updatedAt, sessions: result.progress.sessions ?? [] };
 }
 
 /** Unique validateur de projet : v2 strict (rosace), v3 strict (ouvrage importé), v1 migré explicitement, sinon message clair. */

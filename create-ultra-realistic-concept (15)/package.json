@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "tsx tests/verify.ts && tsx tests/import-pdf.ts",
+    "test": "tsx tests/verify.ts && tsx tests/import-pdf.ts && tsx tests/innovations.ts",
     "typecheck": "tsc --noEmit",
     "test:browser": "tsx tests/parcours-navigateur.ts && tsx tests/import-navigateur.ts",
     "test:preview": "tsx tests/preview-smoke.ts",
