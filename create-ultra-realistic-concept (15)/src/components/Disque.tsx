@@ -6,7 +6,7 @@ import { useRosaceApi } from "../state/rosace-store";
 import { EmbroideryHoop } from "./RosaceCanvas";
 
 /**
- * Le Disque ROSACE, minimal : le tambour occupe le centre, la couronne des 161 fils DMC l'entoure.
+ * Le Disque ROSACE, minimal : le tambour occupe le centre, la couronne des 489 fils DMC l'entoure.
  * Un clic sur une couleur recolore immédiatement la rosace avec sa complémentaire et ses analogues.
  * Aucune bague : les transformations se règlent par les curseurs sous le tambour.
  */
@@ -35,7 +35,6 @@ function crownPath(index: number, count: number, inner: number, outer: number, g
 const CROWN_PATHS = CROWN_THREADS.map((thread, index) => ({
   thread,
   d: crownPath(index, CROWN_THREADS.length, CROWN_IN, CROWN_OUT),
-  middle: CROWN_START + (index + 0.5) * (CROWN_SWEEP / CROWN_THREADS.length),
 }));
 
 export function Disque() {
@@ -108,7 +107,7 @@ export function Disque() {
 
         <motion.div
           className="disque-hoop"
-          key={`${config.seed}-${config.structure}-${config.trace}-${config.density}-${config.scale}-${config.twist}-${config.wave}`}
+          key={`${config.seed}-${config.structure}-${config.trace}-${config.density}-${config.scale}-${config.paletteShift}-${config.geometry}-${config.twist}-${config.wave}`}
           initial={reduceMotion ? { opacity: 0.5 } : { opacity: 0.4, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}

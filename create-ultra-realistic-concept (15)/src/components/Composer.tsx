@@ -49,19 +49,27 @@ export function Composer() {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Le mode Broderie est plein écran : ses touches ne doivent pas ouvrir un panneau derrière lui.
+      if (embroideryOpen) return;
+      // Échap ferme le panneau même si un curseur, une recherche ou un champ a le focus.
+      if (event.key === "Escape") {
+        if (panel) {
+          event.preventDefault();
+          setPanel(null);
+        }
+        return;
+      }
       const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
       const index = ["1", "2", "3", "4", "5", "6"].indexOf(event.key);
       if (index >= 0 && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
         choose(CATEGORIES[index].id);
-      } else if (event.key === "Escape") {
-        if (panel) setPanel(null);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [choose, panel, setPanel]);
+  }, [choose, panel, setPanel, embroideryOpen]);
 
   const PanelBody = panel ? PANEL_COMPONENTS[panel] : null;
 
@@ -118,26 +126,27 @@ export function Composer() {
         </section>
       )}
 
+      <span id="dock-alerte-aide" className="sr-only">Contraste à vérifier dans les couleurs</span>
       <nav className="studio-dock" aria-label="Catégories d'outils">
         {CATEGORIES.map((category, index) => {
           const Icon = category.icon;
           const isPanel = category.id === panel;
-          const isGrid = category.id === "broder" && embroideryOpen;
+          const isBroder = category.id === "broder" && embroideryOpen;
           const hasAlert = category.id === "couleurs" && warnings.length > 0;
           return (
             <button
               key={category.id}
               id={category.id === "broder" ? "dock-broder" : undefined}
               type="button"
-              className={`dock-categorie ${isPanel || isGrid ? "is-active" : ""}`}
-              aria-pressed={isPanel || isGrid}
-              aria-label={`${category.label}${hasAlert ? " (contraste à vérifier)" : ""}`}
+              className={`dock-categorie ${isPanel || isBroder ? "is-active" : ""}`}
+              aria-pressed={isPanel || isBroder}
+              aria-describedby={hasAlert ? "dock-alerte-aide" : undefined}
               onClick={() => choose(category.id)}
             >
               <Icon size={21} strokeWidth={1.7} aria-hidden="true" />
               <span>{category.label}</span>
               {hasAlert && <span className="dock-alerte" aria-hidden="true" />}
-              <kbd aria-hidden="true">{index + 1}</kbd>
+              <kbd>{index + 1}</kbd>
             </button>
           );
         })}

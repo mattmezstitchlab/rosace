@@ -8,13 +8,14 @@ export type ThreadFamily = "roses" | "violets" | "verts" | "jaunes" | "bleus" | 
  *   et valeurs d'écran : aucune appellation ni teinte existante n'est remplacée.
  * - Les références manquantes sont ajoutées depuis la source ouverte MakeBead
  *   (craft-color-codes, CC BY 4.0), avec leur nom anglais et leur valeur d'écran.
- * - Les deux valeurs sont des approximations : DMC ne publie pas de table RGB officielle
- *   et une échevette réelle varie selon le bain et la lumière. Voir DMC-SOURCES.md.
+ * - Les valeurs hexadécimales sont des approximations : DMC ne publie pas de table RGB
+ *   officielle et une échevette réelle varie selon le bain et la lumière. Voir le rapport unique.
  */
 export const DMC_CATALOG_META = {
   historicalCount: 161,
   referenceCount: referenceCatalog.count,
-  source: "MakeBead craft-color-codes, data/json/dmc-floss.json",
+  source: "makebead/craft-color-codes, data/json/dmc-floss.json",
+  attribution: "Color data: craft-color-codes by MakeBead, https://makebead.com",
   license: "CC BY 4.0",
   note: "Hex écran approximatifs, non mesures sur fil.",
 } as const;
@@ -245,8 +246,20 @@ export const DMC_ADDED_THREADS = additions;
 export const DMC_ALL_THREADS: DmcThread[] = [...DMC_THREADS, ...additions];
 export const THREAD_BY_CODE = new Map(DMC_ALL_THREADS.map((thread) => [thread.code, thread]));
 
+/**
+ * Compatibilité des anciennes recettes : un code est résolu sans tenir compte de la casse.
+ * La valeur canonique du catalogue est retournée, sans inventer ni réécrire de référence.
+ * Les codes réellement inconnus retournent null : ils ne sont jamais remplacés en silence.
+ */
+const THREAD_BY_UPPER_CODE = new Map(DMC_ALL_THREADS.map((thread) => [thread.code.toUpperCase(), thread]));
+export function resolveThreadCode(code: unknown): string | null {
+  if (typeof code !== "string") return null;
+  return THREAD_BY_UPPER_CODE.get(code.toUpperCase())?.code ?? null;
+}
+
 export const DEFAULT_PALETTE = ["902", "3607", "3608", "907", "677"];
 
 export function getThread(code: string): DmcThread {
-  return THREAD_BY_CODE.get(code) ?? DMC_ALL_THREADS[0];
+  const canonical = resolveThreadCode(code);
+  return (canonical ? THREAD_BY_CODE.get(canonical) : undefined) ?? DMC_ALL_THREADS[0];
 }

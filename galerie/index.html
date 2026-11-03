@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ROSACE — galerie des six géométries</title>
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 24px; background: #f6f6f4; color: #241f22; font-family: system-ui, sans-serif; line-height: 1.5; }
+    main { max-width: 1100px; margin: 0 auto; }
+    h1 { font-size: clamp(28px, 4vw, 44px); margin: 0 0 8px; }
+    .intro { color: #55555a; margin: 0 0 24px; }
+    .params { width: 100%; border-collapse: collapse; margin: 0 0 28px; background: #fff; border: 1px solid #e2e2de; }
+    .params th, .params td { padding: 9px 12px; text-align: left; border-bottom: 1px solid #e9e9e5; font-size: 14px; }
+    .params th { width: 190px; color: #55555a; font-weight: 600; }
+    .grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px; }
+    figure { margin: 0; background: #fff; border: 1px solid #e2e2de; border-radius: 14px; overflow: hidden; }
+    figure img { display: block; width: 100%; height: auto; }
+    figcaption { padding: 12px 14px 16px; }
+    figcaption h2 { margin: 0 0 4px; font-size: 18px; }
+    figcaption p { margin: 0; color: #55555a; font-size: 13px; }
+    footer { margin-top: 28px; color: #55555a; font-size: 13px; }
+    a { color: #6f3f62; }
+    @media (max-width: 720px) { .grille { grid-template-columns: 1fr; } body { padding: 16px; } }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>ROSACE — galerie des six géométries</h1>
+    <p class="intro">Comparaison à paramètres strictement identiques : seule la valeur du curseur <strong>Géométrie</strong> change. Captures réelles du tambour, produites par le parcours navigateur Chromium — aucune image générée, aucune septième famille.</p>
+
+    <table class="params">
+      <caption>Paramètres communs aux six vues</caption>
+      <tbody>
+        <tr><th scope="row">Signature</th><td>7</td></tr>
+        <tr><th scope="row">Structure / pétales</th><td>2 · 8 pétales</td></tr>
+        <tr><th scope="row">Tracé</th><td>3 · courbe</td></tr>
+        <tr><th scope="row">Densité</th><td>3 · équilibrée</td></tr>
+        <tr><th scope="row">Échelle / grille</th><td>3 · 101 × 101</td></tr>
+        <tr><th scope="row">Palette</th><td>DMC 902, 3607, 3608, 907, 677</td></tr>
+        <tr><th scope="row">Tourbillon / ondulation</th><td>1 / 1</td></tr>
+        <tr><th scope="row">Toile</th><td>Lin naturel, aïda 14, 2 brins</td></tr>
+      </tbody>
+    </table>
+
+    <div class="grille">
+      <figure>
+        <img src="geometrie-1.png" alt="Corolle classique : pétales grenat et veinures vert perroquet">
+        <figcaption><h2>1 · Corolle</h2><p>3 381 croix · empreinte 353C357F12EC80D5 · recette d'origine bit à bit préservée.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="geometrie-2.png" alt="Mandala : anneaux concentriques et losanges">
+        <figcaption><h2>2 · Mandala</h2><p>6 193 croix · anneaux concentriques, rayons et losanges.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="geometrie-3.png" alt="Arabesque : ogives entrecroisées et festons">
+        <figcaption><h2>3 · Arabesque</h2><p>5 145 croix · ogives entrecroisées et festons.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="geometrie-4.png" alt="Kaléidoscope : miroirs en coins et facettes">
+        <figcaption><h2>4 · Kaléidoscope</h2><p>5 697 croix · miroirs en coins, facettes et losanges.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="geometrie-5.png" alt="Entrelacs : trame tissée et nœuds réguliers">
+        <figcaption><h2>5 · Entrelacs</h2><p>4 621 croix · trame tissée et nœuds réguliers.</p></figcaption>
+      </figure>
+      <figure>
+        <img src="geometrie-6.png" alt="Fractale : étoile emboîtée à plusieurs échelles">
+        <figcaption><h2>6 · Fractale</h2><p>1 465 croix · étoile emboîtée à plusieurs échelles.</p></figcaption>
+      </figure>
+    </div>
+
+    <footer>Rapport unique : <a href="../create-ultra-realistic-concept (15)/RAPPORT-CONSOLIDATION-FINALE.md">RAPPORT-CONSOLIDATION-FINALE.md</a> · Contrôles exécutés / prévus : <a href="../create-ultra-realistic-concept (15)/QUALITE-PRODUIT.md">QUALITE-PRODUIT.md</a>.</footer>
+  </main>
+</body>
+</html>

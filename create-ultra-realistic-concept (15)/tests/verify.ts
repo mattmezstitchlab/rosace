@@ -1,13 +1,19 @@
 import assert from "node:assert/strict";
-import { DMC_ALL_THREADS, DMC_THREADS, getThread } from "../src/data/dmc";
+import { DMC_ADDED_THREADS, DMC_ALL_THREADS, DMC_THREADS, getThread, resolveThreadCode } from "../src/data/dmc";
+import { CROWN_THREADS } from "../src/data/crown";
 import { computeMaterials, estimateTime, perStitchNeedleMeters, SKEIN_STRAND_METERS } from "../src/lib/materials";
 import { chartRegions, countRegionStitches } from "../src/lib/chart";
 import { patternFingerprint } from "../src/lib/pattern-id";
+import { patternToSvg, printWorksheet } from "../src/lib/exporters";
+import { chartGeometry, paintPattern } from "../src/lib/paint";
 import {
-  DEFAULT_CONFIG, PRESETS, decodeConfig, encodeConfig, generateRosace, normalizeConfig,
+  DEFAULT_CONFIG, GEOMETRY_COUNT, GEOMETRY_NAMES, PRESETS, SYMBOLS, decodeConfig, encodeConfig,
+  generateRosace, getPatternName, normalizeConfig, type RosaceConfig,
 } from "../src/lib/rosace";
 import {
-  buildProject, importProject, parseRuns, remainingByColor, serializeRuns,
+  LEGACY_PROJECT_VERSION, MAX_ZOOM, MIN_ZOOM, PROJECT_FORMAT, PROJECT_VERSION, buildProject,
+  clampViewport, emptyProgress, importProject, migrateLegacyProgressRecord, parseRuns,
+  progressStorageKey, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
 } from "../src/lib/progress";
 
 let checks = 0;
@@ -93,7 +99,7 @@ test("planches : chaque croix apparaît exactement une fois sur les grilles impa
   assert.equal(countRegionStitches(regions, pattern.stitches), pattern.stitches.length);
 });
 
-test("recettes : les six configurations restent reproductibles et cohérentes", () => {
+test(`recettes : les ${PRESETS.length} configurations restent reproductibles et cohérentes`, () => {
   for (const preset of PRESETS) {
     const generated = generateRosace(preset.config);
     assert.equal(generated.usage.reduce((sum, line) => sum + line.count, 0), generated.stitches.length);
@@ -111,17 +117,19 @@ test("progression : sérialisation compacte et bijection", () => {
 });
 
 test("progression : export/import accepté seulement avec la même empreinte", () => {
+  const realIndices = pattern.stitches.slice(0, 3).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const runs = serializeRuns(realIndices);
   const project = buildProject(pattern, {
     version: 2,
     fingerprint: patternFingerprint(pattern),
-    completedRuns: "0-2,5",
+    completedRuns: runs,
     selectedCode: pattern.config.palette[0],
     viewport: { k: 2, x: 10, y: -10 },
     updatedAt: new Date().toISOString(),
   });
   const imported = importProject(JSON.parse(JSON.stringify(project)));
   assert.equal(imported.ok, true);
-  if (imported.ok) assert.equal(imported.progress.completedRuns, "0-2,5");
+  if (imported.ok) assert.equal(imported.progress.completedRuns, runs);
   const tampered = { ...project, fingerprint: "00000000DEADBEEF" };
   assert.equal(importProject(tampered).ok, false);
   const outsider = { ...project, progress: { ...project.progress, completedRuns: `${pattern.cells.length}-99999` } };
@@ -139,14 +147,406 @@ test("progression : restants par fil = total moins cases cochées", () => {
   assert.equal(code, pattern.config.palette[color]);
 });
 
-test("aucune régression : six réglages changent la matrice, palette préservée", () => {
+test("aucune régression : chaque réglage de forme change la matrice, palette préservée", () => {
   const base = generateRosace(DEFAULT_CONFIG);
-  for (const key of ["structure", "trace", "density", "scale", "twist", "wave"] as const) {
+  for (const key of ["structure", "trace", "density", "scale", "geometry", "twist", "wave", "paletteShift"] as const) {
     const changed = generateRosace({ ...DEFAULT_CONFIG, [key]: 5 });
     assert.ok(changed.stitches.length > 0);
+    assert.notDeepEqual([...changed.cells], [...base.cells], `${key} ne change pas la matrice`);
   }
   assert.deepEqual(normalizeConfig(DEFAULT_CONFIG).palette, DEFAULT_CONFIG.palette);
   assert.equal(SKEIN_STRAND_METERS, 48);
 });
+
+test("géométries : six familles distinctes, corolle d'origine bit à bit préservée", () => {
+  const base = generateRosace(DEFAULT_CONFIG);
+  assert.equal(patternFingerprint(base), "353C357F12EC80D5", "la recette par défaut a changé");
+  assert.equal(base.stitches.length, 3381);
+  assert.equal(GEOMETRY_COUNT, 6);
+  const fingerprints = new Set<string>();
+  for (let geometry = 1; geometry <= GEOMETRY_COUNT; geometry += 1) {
+    const variant = generateRosace({ ...DEFAULT_CONFIG, geometry });
+    assert.ok(variant.stitches.length > 1000, `géométrie ${geometry} trop pauvre`);
+    assert.equal(variant.mirrorSymmetric, true, `géométrie ${geometry} perd la symétrie miroir`);
+    assert.equal(variant.cleaned, 0, `géométrie ${geometry} génère des croix isolées`);
+    assert.equal(variant.usage.reduce((sum, line) => sum + line.count, 0), variant.stitches.length);
+    fingerprints.add(patternFingerprint(variant));
+    if (geometry > 1) assert.notDeepEqual([...variant.cells], [...base.cells], `géométrie ${geometry} identique à la corolle`);
+    assert.match(
+      getPatternName(variant.config),
+      geometry === 1 ? /pétales/ : new RegExp(GEOMETRY_NAMES[geometry - 1].toLowerCase()),
+    );
+    let firstStructureCells: number[] | null = null;
+    for (let structure = 1; structure <= 5; structure += 1) {
+      const combined = generateRosace({ ...DEFAULT_CONFIG, geometry, structure });
+      assert.ok(combined.stitches.length > 0, `géométrie ${geometry} incompatible avec la structure ${structure}`);
+      assert.equal(combined.usage.reduce((sum, line) => sum + line.count, 0), combined.stitches.length);
+      assert.equal(combined.mirrorSymmetric, true, `géométrie ${geometry}, structure ${structure} : symétrie perdue`);
+      assert.equal(combined.cleaned, 0, `géométrie ${geometry}, structure ${structure} : nettoyage détériore le motif`);
+      const cells = [...combined.cells];
+      if (structure === 1) firstStructureCells = cells;
+      else assert.notDeepEqual(cells, firstStructureCells, `géométrie ${geometry} ignore la structure ${structure}`);
+    }
+    for (const key of ["trace", "density", "scale", "twist", "wave"] as const) {
+      const extreme = generateRosace({ ...DEFAULT_CONFIG, geometry, [key]: 5 });
+      assert.notDeepEqual([...extreme.cells], [...variant.cells], `géométrie ${geometry} ignore ${key}`);
+    }
+  }
+  assert.equal(fingerprints.size, GEOMETRY_COUNT, "deux familles partagent la même empreinte");
+  assert.equal(normalizeConfig({ ...DEFAULT_CONFIG, geometry: 0 }).geometry, 1);
+  assert.equal(normalizeConfig({ ...DEFAULT_CONFIG, geometry: 99 }).geometry, GEOMETRY_COUNT);
+  assert.equal(decodeConfig(encodeConfig({ ...DEFAULT_CONFIG, geometry: 4 }))?.geometry, 4);
+  assert.equal(PRESETS.filter((preset) => preset.config.geometry > 1).length, GEOMETRY_COUNT - 1);
+});
+
+test("anciennes créations : lien sans champ géométrie retombe sur la corolle d'origine", () => {
+  const legacy = { ...DEFAULT_CONFIG } as Partial<RosaceConfig>;
+  delete legacy.geometry;
+  const encoded = Buffer.from(JSON.stringify(legacy))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+  const decoded = decodeConfig(encoded);
+  assert.equal(decoded?.geometry, 1, "une ancienne recette doit être normalisée vers la corolle");
+  assert.equal(patternFingerprint(generateRosace(decoded!)), "353C357F12EC80D5");
+});
+
+test("PDF : aperçu et planches sont générés depuis la même matrice pour les six géométries", () => {
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const previousWindow = scope.window;
+  let html = "";
+  scope.window = {
+    open: () => ({
+      opener: null,
+      document: {
+        write: (content: string) => { html = content; },
+        close: () => {},
+      },
+    }),
+  };
+  try {
+    for (let geometry = 1; geometry <= GEOMETRY_COUNT; geometry += 1) {
+      const variant = generateRosace({ ...DEFAULT_CONFIG, geometry });
+      html = "";
+      assert.equal(printWorksheet(variant), true);
+      const expectedPreview = patternToSvg(variant, false).replace(/^<\?xml[^>]*>\s*/, "");
+      const preview = html.match(/<div class="preview">([\s\S]*?)<\/div>/)?.[1];
+      assert.equal(preview, expectedPreview, `géométrie ${geometry} : aperçu PDF différent de la prévisualisation`);
+      assert.equal((html.match(/class="tile-page"/g) ?? []).length, 4);
+      assert.match(html, /Imprimer \/ PDF · 5 pages/);
+      assert.ok(html.includes(patternFingerprint(variant)), "empreinte absente de la fiche");
+      const symbols = [...html.matchAll(/<text[^>]*>([^<]+)<\/text>/g)]
+        .map((match) => match[1])
+        .filter((text) => SYMBOLS.includes(text));
+      assert.equal(symbols.length, variant.stitches.length, `géométrie ${geometry} : les planches ne couvrent pas chaque croix une fois`);
+    }
+  } finally {
+    scope.window = previousWindow;
+  }
+});
+
+test("catalogue étendu : 328 ajouts et couronne de 489 références sans doublon", () => {
+  assert.equal(DMC_ADDED_THREADS.length, 328);
+  assert.equal(CROWN_THREADS.length, 489);
+  assert.equal(new Set(CROWN_THREADS.map((thread) => thread.code)).size, 489);
+  assert.deepEqual(
+    new Set(CROWN_THREADS.map((thread) => thread.code)),
+    new Set(DMC_ALL_THREADS.map((thread) => thread.code)),
+  );
+});
+
+test("anciennes recettes : casse des codes DMC résolue, aucune référence inventée", () => {
+  for (const old of DMC_THREADS) {
+    const legacy = old.code.toLowerCase();
+    assert.equal(resolveThreadCode(legacy), old.code);
+    assert.equal(getThread(legacy).hex, old.hex);
+    const normalized = normalizeConfig({
+      ...DEFAULT_CONFIG,
+      palette: [legacy, ...DEFAULT_CONFIG.palette.slice(1, 5)],
+    });
+    assert.equal(normalized.palette[0], old.code);
+  }
+  assert.equal(resolveThreadCode("INCONNU-9999"), null);
+  assert.equal(normalizeConfig({ ...DEFAULT_CONFIG, wastePercent: Number.NaN }).wastePercent, 15);
+});
+
+test("planches : le SVG imprimé émet chaque croix et son symbole une seule fois", () => {
+  const margin = 36;
+  const cell = 12;
+  const seen = new Map<string, number>();
+  for (const region of chartRegions(pattern.size)) {
+    const svg = patternToSvg(pattern, true, region);
+    for (const match of svg.matchAll(/<text x="([\d.-]+)" y="([\d.-]+)">([^<]+)<\/text>/g)) {
+      const symbol = match[3];
+      if (!SYMBOLS.includes(symbol)) continue;
+      const x = Math.round((Number(match[1]) - margin) / cell) + region.x;
+      const y = Math.round((Number(match[2]) - 0.5 - margin) / cell) + region.y;
+      const key = `${x}:${y}:${symbol}`;
+      seen.set(key, (seen.get(key) ?? 0) + 1);
+    }
+  }
+  const expected = pattern.stitches.map((stitch) => `${stitch.x}:${stitch.y}:${SYMBOLS[stitch.color]}`);
+  assert.equal(seen.size, expected.length);
+  for (const key of expected) assert.equal(seen.get(key), 1, `croix manquante ou dupliquée : ${key}`);
+  assert.equal([...seen.values()].filter((count) => count !== 1).length, 0);
+});
+
+test("projet : journal, sélection, zoom et cases vides sont validés", () => {
+  const first = pattern.stitches[0];
+  const second = pattern.stitches[1];
+  const i0 = stitchIndex(pattern.size, first.x, first.y);
+  const i1 = stitchIndex(pattern.size, second.x, second.y);
+  const progress = {
+    ...emptyProgress(pattern),
+    completedRuns: serializeRuns([i0, i1]),
+    selectedCode: pattern.config.palette[1],
+    viewport: { k: 0.2, x: 99999, y: -99999 },
+    journal: [{ index: i0, added: true }, { index: i1, added: true }],
+  };
+  const project = buildProject(pattern, progress);
+  assert.equal(project.format, "rosace-project");
+  assert.equal(project.version, 2);
+  assert.equal(project.fingerprint, patternFingerprint(pattern));
+  assert.equal(project.progress.journal.length, 2);
+  const imported = importProject(JSON.parse(JSON.stringify(project)));
+  assert.equal(imported.ok, true);
+  if (imported.ok) {
+    assert.equal(imported.progress.journal?.length, 2);
+    assert.equal(imported.progress.selectedCode, pattern.config.palette[1]);
+    assert.equal(imported.progress.viewport.k, MIN_ZOOM);
+    assert.ok(Math.abs(imported.progress.viewport.x) <= 900 * MIN_ZOOM);
+  }
+  assert.equal(clampViewport({ k: 99, x: 0, y: 0 }).k, MAX_ZOOM);
+  const emptyCell = [...pattern.cells].findIndex((value) => value < 0);
+  assert.ok(emptyCell >= 0);
+  const tampered = { ...project, progress: { ...project.progress, completedRuns: String(emptyCell) } };
+  assert.equal(importProject(tampered).ok, false);
+  const wrongSelection = { ...project, progress: { ...project.progress, selectedCode: "INCONNU" } };
+  const selectedImport = importProject(wrongSelection);
+  assert.equal(selectedImport.ok, true);
+  if (selectedImport.ok) assert.equal(selectedImport.progress.selectedCode, null);
+});
+
+test("projet : l'export nettoie aussi une progression locale corrompue", () => {
+  const stitch = pattern.stitches[0];
+  const valid = stitchIndex(pattern.size, stitch.x, stitch.y);
+  const emptyCell = [...pattern.cells].findIndex((value) => value < 0);
+  assert.ok(emptyCell >= 0);
+  const progress = {
+    ...emptyProgress(pattern),
+    completedRuns: serializeRuns([valid, emptyCell]),
+    selectedCode: "INCONNU",
+    viewport: { k: 99, x: 1e9, y: -1e9 },
+    journal: [
+      { index: valid, added: true },
+      { index: emptyCell, added: true },
+      { index: Number.NaN, added: false },
+    ],
+    updatedAt: "2026-11-03T00:00:00.000Z",
+  };
+  const project = buildProject(pattern, progress);
+  assert.equal(project.progress.completedRuns, serializeRuns([valid]));
+  assert.equal(project.progress.selectedCode, null);
+  assert.equal(project.progress.viewport.k, MAX_ZOOM);
+  assert.deepEqual(project.progress.journal, [{ index: valid, added: true }]);
+  assert.equal(project.progress.updatedAt, "2026-11-03T00:00:00.000Z");
+  assert.equal(importProject(JSON.parse(JSON.stringify(project))).ok, true);
+});
+
+test("progression : fusion concurrente sans écrasement ni résurrection", () => {
+  const [a, b, c, d] = pattern.stitches.slice(0, 4).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const base = { ...emptyProgress(pattern), completedRuns: serializeRuns([a, b]), updatedAt: "2026-11-03T00:00:00.000Z" };
+  const remote = { ...base, completedRuns: serializeRuns([a, b, c]), updatedAt: "2026-11-03T00:00:01.000Z" };
+  const local = { ...base, completedRuns: serializeRuns([a, d]), updatedAt: "2026-11-03T00:00:02.000Z" };
+  const merged = reconcileProgress(remote, local, base);
+  assert.deepEqual([...parseRuns(merged.completedRuns)].sort((x, y) => x - y), [a, c, d].sort((x, y) => x - y));
+  assert.equal(parseRuns(merged.completedRuns).has(b), false, "une suppression locale a été annulée");
+});
+
+test("projet : import version 1 migré explicitement, empreinte recalculée", () => {
+  const [a, b] = pattern.stitches.slice(0, 2).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const legacy = {
+    format: PROJECT_FORMAT,
+    version: LEGACY_PROJECT_VERSION,
+    fingerprint: "ANCIENNE_EMPREINTE",
+    config: { ...DEFAULT_CONFIG, palette: [...DEFAULT_CONFIG.palette] },
+    progress: {
+      completed: [a, b],
+      selectedCode: "blanc",
+      viewport: { k: 99, x: 1e9, y: -1e9 },
+      journal: [{ index: a, added: true }, { index: 999999, added: true }],
+      updatedAt: "2026-11-03T00:00:00.000Z",
+    },
+  };
+  const imported = importProject(legacy);
+  assert.equal(imported.ok, true);
+  if (imported.ok) {
+    assert.equal(imported.migratedFrom, 1);
+    assert.equal(imported.progress.version, PROJECT_VERSION);
+    assert.equal(imported.progress.completedRuns, serializeRuns([a, b]));
+    assert.equal(imported.progress.viewport.k, MAX_ZOOM);
+    assert.equal(imported.progress.selectedCode, "902", "une sélection v1 inconnue retombe sur le premier fil du patron");
+    assert.deepEqual(imported.progress.journal, [{ index: a, added: true }]);
+    assert.match(imported.warning ?? "", /recalculée/);
+  }
+});
+
+test("projet : version 1 au format inconnu reçoit un message de compatibilité clair", () => {
+  const result = importProject({
+    format: PROJECT_FORMAT,
+    version: LEGACY_PROJECT_VERSION,
+    config: { ...DEFAULT_CONFIG },
+    progress: { mystere: true },
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.error, /version 1.*inconnu|migration impossible/);
+});
+
+test("progression : ancien enregistrement local v1 migré et borné", () => {
+  const [a] = pattern.stitches.slice(0, 1).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const migrated = migrateLegacyProgressRecord({
+    completed: [a, 999999],
+    selectedCode: "902",
+    viewport: { k: 0.2, x: 1e9, y: -1e9 },
+    journal: [{ index: a, added: true }],
+    updatedAt: "2026-11-03T00:00:00.000Z",
+  }, pattern);
+  assert.ok(migrated);
+  if (migrated) {
+    assert.equal(migrated.progress.version, 2);
+    assert.equal(migrated.progress.completedRuns, serializeRuns([a]));
+    assert.equal(migrated.progress.viewport.k, MIN_ZOOM);
+    assert.equal(migrated.progress.selectedCode, "902");
+    assert.match(migrated.warning ?? "", /ignorée/);
+  }
+});
+
+test("progression : saveProgress protège contre une écriture d'un autre onglet", () => {
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const previous = scope.window;
+  const store = new Map<string, string>();
+  scope.window = {
+    localStorage: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => { store.set(key, value); },
+      removeItem: (key: string) => { store.delete(key); },
+    },
+  };
+  try {
+    const [a, b, c] = pattern.stitches.slice(0, 3).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+    const base = { ...emptyProgress(pattern), completedRuns: serializeRuns([a]), updatedAt: "2026-11-03T00:00:00.000Z" };
+    saveProgress(base);
+    const remote = { ...base, completedRuns: serializeRuns([a, b]), updatedAt: "2026-11-03T00:00:01.000Z" };
+    store.set(progressStorageKey(base.fingerprint), JSON.stringify(remote));
+    const local = { ...base, completedRuns: serializeRuns([a, c]), updatedAt: "2026-11-03T00:00:02.000Z" };
+    const saved = saveProgress(local, base);
+    assert.deepEqual([...parseRuns(saved.completedRuns)].sort((x, y) => x - y), [a, b, c].sort((x, y) => x - y));
+  } finally {
+    scope.window = previous;
+  }
+});
+
+/** Stubs canvas minimaux : permettent de vérifier le rendu sans navigateur ni moteur parallèle. */
+function verifyCanvasMatrix() {
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const saved = { document: scope.document, Path2D: scope.Path2D };
+  const trace = {
+    symbols: [] as Array<{ text: string; x: number; y: number; width: number }>,
+    segments: [] as Array<{ id: number; x1: number; y1: number; x2: number; y2: number }>,
+    pathCanvas: new Map<number, number>(),
+    createdIds: [] as number[],
+  };
+  let nextId = 0;
+
+  class FakePath2D {
+    __id = nextId++;
+    constructor() { trace.createdIds.push(this.__id); }
+    __last: { x: number; y: number } | null = null;
+    segments: Array<{ x1: number; y1: number; x2: number; y2: number }> = [];
+    addPath(source: FakePath2D) { for (const segment of source.segments) this.segments.push(segment); }
+    moveTo(x: number, y: number) { this.__last = { x, y }; }
+    lineTo(x: number, y: number) {
+      if (!this.__last) return;
+      const segment = { id: this.__id, x1: this.__last.x, y1: this.__last.y, x2: x, y2: y };
+      this.segments.push({ x1: segment.x1, y1: segment.y1, x2: segment.x2, y2: segment.y2 });
+      trace.segments.push(segment);
+      this.__last = null;
+    }
+  }
+
+  const makeCanvas = () => {
+    const ctx: Record<string, unknown> = {};
+    const canvas = { width: 0, height: 0, getContext: () => ctx };
+    ctx.canvas = canvas;
+    const gradient = { addColorStop: () => {} };
+    Object.assign(ctx, {
+      clearRect: () => {}, fillRect: () => {}, strokeRect: () => {}, save: () => {}, restore: () => {},
+      beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, arc: () => {}, fill: () => {},
+      createPattern: () => null,
+      createRadialGradient: () => gradient,
+      createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }),
+      putImageData: () => {},
+      stroke: (path?: FakePath2D) => {
+        if (path && typeof path.__id === "number") trace.pathCanvas.set(path.__id, canvas.width);
+      },
+      fillText: (text: unknown, x: number, y: number) => {
+        const value = String(text);
+        if (SYMBOLS.includes(value)) trace.symbols.push({ text: value, x, y, width: canvas.width });
+      },
+    });
+    return canvas;
+  };
+
+  scope.Path2D = FakePath2D;
+  scope.document = { createElement: (tag: string) => (tag === "canvas" ? makeCanvas() : {}) };
+  try {
+    const hoop = makeCanvas() as unknown as HTMLCanvasElement;
+    const base = makeCanvas() as unknown as HTMLCanvasElement;
+    paintPattern(hoop, pattern, "fabric", 1200);
+    paintPattern(base, pattern, "chart", 1800);
+  } finally {
+    scope.document = saved.document;
+    scope.Path2D = saved.Path2D;
+  }
+
+  const fabric = chartGeometry(1200, pattern.size, "fabric");
+  const chart = chartGeometry(1800, pattern.size, "chart");
+  const keyOf = (x: number, y: number, color: number) => `${x}:${y}:${color}`;
+  const expected = new Set(pattern.stitches.map((stitch) => keyOf(stitch.x, stitch.y, stitch.color)));
+
+  const chartKeys = new Set<string>();
+  for (const symbol of trace.symbols.filter((entry) => entry.width === 1800)) {
+    const x = Math.round((symbol.x - chart.origin) / chart.cell);
+    const y = Math.round((symbol.y - chart.cell * 0.04 - chart.origin) / chart.cell);
+    chartKeys.add(keyOf(x, y, SYMBOLS.indexOf(symbol.text)));
+  }
+  assert.equal(chartKeys.size, expected.size, "la grille Broderie ne dessine pas toutes les croix");
+
+  // Cinq Path2D sont créés par couleur, dans l'ordre : ombre, brin inférieur, reflet bas,
+  // brin supérieur, reflet haut. Les ombres sont fusionnées avant d'être tracées.
+  const underIds = trace.createdIds
+    .slice(0, pattern.config.palette.length * 5)
+    .filter((_, index) => index % 5 === 1);
+  assert.equal(underIds.length, pattern.config.palette.length);
+  for (const id of underIds) assert.equal(trace.pathCanvas.get(id), 1200);
+  const hoopKeys = new Set<string>();
+  underIds.forEach((id, color) => {
+    for (const segment of trace.segments.filter((entry) => entry.id === id)) {
+      const x = Math.round(((segment.x1 + segment.x2) / 2 - fabric.origin) / fabric.cell);
+      const y = Math.round(((segment.y1 + segment.y2) / 2 - fabric.origin) / fabric.cell);
+      hoopKeys.add(keyOf(x, y, color));
+    }
+  });
+  assert.equal(hoopKeys.size, expected.size, "le tambour ne dessine pas toutes les croix");
+  for (const key of expected) {
+    assert.ok(hoopKeys.has(key), `croix absente du tambour : ${key}`);
+    assert.ok(chartKeys.has(key), `croix absente de la grille Broderie : ${key}`);
+  }
+  assert.deepEqual([...hoopKeys].sort(), [...expected].sort());
+  assert.deepEqual([...chartKeys].sort(), [...expected].sort());
+}
+
+test("matrice unique : tambour et grille Broderie peignent exactement les mêmes croix et couleurs", verifyCanvasMatrix);
 
 console.log(`\n${checks} tests réussis.`);

@@ -48,6 +48,8 @@
 .studio-stats p { flex: 1; margin: 0; color: var(--encre-3); font-size: 12.5px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-stats strong { color: var(--encre); font-weight: 700; }
 .studio-stats span { margin: 0 7px; color: var(--trait-2); }
+/* Le séparateur reste discret, mais la valeur « 17,2 cm » doit rester lisible (axe color-contrast). */
+.studio-stats .stat-cm:not([aria-hidden="true"]) { color: var(--encre-2); }
 @media (max-width: 560px) { .studio-stats p { font-size: 11.5px; } .studio-stats .stat-cm { display: none; } }
 
 /* ---------- Panneau coulissant ---------- */
@@ -105,23 +107,7 @@ html[data-mode="nuit"] .panneau-alertes { background: #3a2f12; color: #f6e3b4; }
 .dock-categorie kbd { display: none; }
 .dock-alerte { position: absolute; top: 7px; right: calc(50% - 17px); width: 7px; height: 7px; border-radius: 50%; background: #d97706; box-shadow: 0 0 0 2px var(--carte); }
 
-/* ---------- Grille technique sur place ---------- */
-.disque.is-grid .disque-layer { opacity: .1; filter: grayscale(1); }
-.disque.is-grid .disque-hoop { visibility: hidden; }
-.grille-panneau { position: absolute; inset: 1%; z-index: 5; display: flex; flex-direction: column; gap: 10px; padding: clamp(10px, 2.2cqw, 20px); border: 1px solid var(--trait); border-radius: var(--rayon-xl); background: var(--carte); box-shadow: var(--ombre-ecran); animation: grille-entree .3s cubic-bezier(.22, 1, .36, 1); }
-@keyframes grille-entree { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
-.grille-tete { display: flex; flex: none; align-items: flex-start; justify-content: space-between; gap: 12px; }
-.grille-tete .surtitre { margin-bottom: 5px; }
-.grille-sous { margin: 0; font-size: 13px; color: var(--encre-2); }
-.grille-survol { min-height: 1.35em; margin: 5px 0 0; font-size: 12.5px; color: var(--encre-2); }
-.grille-survol b { font-weight: 800; color: var(--encre); }
-.grille-defilement { flex: 1; min-height: 0; overflow: auto; border-radius: 12px; border: 1px solid var(--trait); background: #fffefa; }
-.grille-canvas { display: block; height: calc(var(--zoom, 1) * 100%); width: auto; aspect-ratio: 1 / 1; margin-inline: auto; cursor: crosshair; touch-action: pan-x pan-y; }
-.grille-pied { display: flex; flex: none; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; }
-.grille-legende { display: flex; flex: 1 1 auto; flex-wrap: wrap; gap: 6px 14px; margin: 0; padding: 0; list-style: none; }
-.grille-legende li { display: flex; align-items: center; gap: 6px; font-size: 12.5px; font-weight: 500; }
-.grille-legende b { width: 14px; text-align: center; font-weight: 800; }
-.grille-legende i { width: 14px; height: 14px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(11,11,12,.15); }
+/* ---------- Zoom commun (loupe) ---------- */
 .zoom { display: flex; align-items: center; gap: 6px; font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
 /* ---------- La loupe ---------- */
@@ -159,5 +145,5 @@ html[data-mode="nuit"] .panneau-alertes { background: #3a2f12; color: #f6e3b4; }
   .hoop-loupe { opacity: 1; }
 }
 @media (prefers-reduced-motion: reduce) {
-  .studio-panel, .grille-panneau, .loupe { animation: none; }
+  .studio-panel, .loupe { animation: none; }
 }

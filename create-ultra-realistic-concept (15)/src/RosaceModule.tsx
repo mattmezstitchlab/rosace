@@ -17,6 +17,7 @@ export function RosaceContent() {
   return (
     <>
       <main id="rosace" className="rosace">
+        <h1 className="sr-only">ROSACE — atelier de point de croix</h1>
         <Composer />
       </main>
       <CatalogDialog />

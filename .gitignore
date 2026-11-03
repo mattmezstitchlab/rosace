@@ -1,0 +1,9 @@
+# Dépendances et artefacts de construction : jamais versionnés.
+node_modules/
+dist/
+.vite/
+*.log
+.DS_Store
+
+# Artefacts locaux de tests navigateur (captures, PDF, exports).
+tests/artifacts/
