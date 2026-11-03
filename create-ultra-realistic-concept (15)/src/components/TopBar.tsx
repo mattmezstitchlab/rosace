@@ -2,14 +2,14 @@ import { Heart, Redo2, Share2, Undo2 } from "lucide-react";
 import { useRosaceApi } from "../state/rosace-store";
 import { RosaceLogo } from "./RosaceLogo";
 
-/** Barre supérieure compacte : la marque, annuler, rétablir, enregistrer, partager. Rien d'autre. */
+/** Barre supérieure compacte : la marque (qui ramène à la présentation), annuler, rétablir, enregistrer, partager. */
 export function TopBar() {
   const api = useRosaceApi();
   const { history, future, savedCurrent, favorites, exportActions } = api;
 
   return (
     <header className="topbar">
-      <a className="topbar-marque" href="#composer" aria-label="ROSACE — revenir à l'atelier">
+      <a className="topbar-marque" href="#presentation" aria-label="ROSACE — revenir à la présentation" title="Présentation">
         <RosaceLogo />
         <span className="topbar-nom">ROSACE<sup>®</sup></span>
       </a>

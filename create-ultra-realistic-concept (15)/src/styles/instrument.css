@@ -100,11 +100,18 @@ html[data-mode="nuit"] .panneau-alertes { background: #3a2f12; color: #f6e3b4; }
 .curseur input[type="range"]:focus-visible { outline: 2px solid var(--encre); outline-offset: 5px; border-radius: 4px; }
 
 /* ---------- Dock des catégories ---------- */
-.studio-dock { flex: none; display: flex; align-items: stretch; justify-content: space-around; gap: 2px; padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); border-top: 1px solid var(--trait); background: var(--carte); z-index: 20; }
-.dock-categorie { position: relative; display: flex; flex: 1; max-width: 96px; min-height: 54px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; padding: 5px 4px; border: 0; border-radius: 13px; background: transparent; color: var(--encre-3); font-size: 10.5px; font-weight: 600; }
-.dock-categorie:hover { color: var(--encre); }
+.studio-dock { flex: none; display: flex; align-items: stretch; justify-content: space-around; gap: 2px; padding: 7px 6px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--trait); background: var(--carte); z-index: 20; }
+/* Six verbes, un picto lisible : l'icône porte le geste, le mot lève l'ambiguïté. */
+.dock-categorie { position: relative; display: flex; flex: 1; max-width: 100px; min-height: 60px; flex-direction: column; align-items: center; justify-content: center; gap: 5px; padding: 7px 4px 6px; border: 0; border-radius: 14px; background: transparent; color: var(--encre-3); font-size: 11px; font-weight: 600; letter-spacing: -0.005em; }
+.dock-categorie > svg { flex: none; }
+.dock-categorie > span:not(.dock-alerte) { max-width: 100%; line-height: 1.05; white-space: nowrap; }
+.dock-categorie:hover { color: var(--encre); background: color-mix(in srgb, var(--doux) 60%, transparent); }
 .dock-categorie.is-active { color: var(--encre); background: var(--doux); }
 .dock-categorie kbd { display: none; }
+@media (max-width: 480px) {
+  .dock-categorie { gap: 4px; min-height: 56px; font-size: 9.5px; letter-spacing: -0.015em; }
+  .dock-categorie > svg { width: 23px; height: 23px; }
+}
 .dock-alerte { position: absolute; top: 7px; right: calc(50% - 17px); width: 7px; height: 7px; border-radius: 50%; background: #d97706; box-shadow: 0 0 0 2px var(--carte); }
 
 /* ---------- Zoom commun (loupe) ---------- */
@@ -129,9 +136,10 @@ html[data-mode="nuit"] .panneau-alertes { background: #3a2f12; color: #f6e3b4; }
 /* ---------- Bureau : rail à gauche, panneau à droite ---------- */
 @media (min-width: 1024px) {
   .studio { flex-direction: row; }
-  .studio-dock { order: 0; flex-direction: column; justify-content: flex-start; width: 92px; padding: 14px 8px; border-top: 0; border-right: 1px solid var(--trait); gap: 6px; }
-  .dock-categorie { flex: none; width: 100%; max-width: none; min-height: 62px; }
-  .dock-categorie kbd { display: block; font-family: inherit; font-size: 9px; font-weight: 600; color: var(--encre-3); }
+  .studio-dock { order: 0; flex-direction: column; justify-content: flex-start; width: 106px; padding: 14px 9px; border-top: 0; border-right: 1px solid var(--trait); gap: 4px; }
+  .dock-categorie { flex: none; width: 100%; max-width: none; min-height: 70px; gap: 6px; font-size: 11.5px; }
+  .dock-categorie kbd { display: block; font-family: inherit; font-size: 9.5px; font-weight: 600; color: var(--encre-3); }
+  .dock-categorie.is-active kbd { color: var(--encre-2); }
   .studio-main { order: 1; }
   .studio-panel { order: 2; width: 384px; height: auto; border-top: 0; border-left: 1px solid var(--trait); box-shadow: none; animation: panel-in-x .26s cubic-bezier(.22, 1, .36, 1); }
   @keyframes panel-in-x { from { transform: translateX(18px); opacity: .4; } to { transform: none; opacity: 1; } }

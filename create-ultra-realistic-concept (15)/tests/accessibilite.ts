@@ -14,6 +14,8 @@ import AxeBuilder from "@axe-core/playwright";
 import { chromium, firefox, webkit, type Browser, type BrowserContext, type Page } from "playwright-core";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
+/** La présentation est servie sur /, l'atelier sur /#atelier. */
+const STUDIO_URL = `${BASE_URL}#atelier`;
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ?? path.join(os.tmpdir(), "rosace-browser-artifacts");
 const BROWSER = process.env.BROWSER ?? "chromium";
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH ?? [
@@ -40,7 +42,7 @@ async function checkConfiguration(browser: Browser, id: string, viewport: { widt
   }, theme);
   const page: Page = await context.newPage();
   try {
-    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await page.locator(".hoop-canvas").waitFor({ state: "visible" });
 
     const reduced = await page.evaluate(() => matchMedia("(prefers-reduced-motion: reduce)").matches);
@@ -58,8 +60,24 @@ async function checkConfiguration(browser: Browser, id: string, viewport: { widt
     const escapeClosedPanel = (await page.locator(".studio-panel").count()) === 0;
 
     const results = await new AxeBuilder({ page }).analyze();
+
+    /* La présentation est aussi contrôlée : c'est la première page vue. */
+    const landingUrl = new URL(BASE_URL);
+    landingUrl.searchParams.set("vue", "presentation");
+    landingUrl.hash = "";
+    await page.goto(landingUrl.toString(), { waitUntil: "domcontentloaded" });
+    await page.locator(".presentation").waitFor({ state: "visible" });
+    const landing = await new AxeBuilder({ page }).analyze();
+
     return {
       id,
+      presentationViolations: landing.violations.map((violation) => ({
+        id: violation.id,
+        impact: violation.impact,
+        nodes: violation.nodes.length,
+        help: violation.help,
+        targets: violation.nodes.slice(0, 10).map((node) => node.target.join(" ")),
+      })),
       theme: appliedTheme,
       reducedMotionRespected: reduced,
       firstFocusTag,
@@ -125,6 +143,7 @@ async function main() {
       if (!entry.keyboardOpenedPanel) problems.push(`${entry.id} : Entrée n'ouvre pas le panneau`);
       if (!entry.escapeClosedPanel) problems.push(`${entry.id} : Échap ne ferme pas le panneau`);
       for (const violation of entry.violations) problems.push(`${entry.id} : ${violation.id} (${violation.nodes} nœud(s))`);
+      for (const violation of entry.presentationViolations) problems.push(`${entry.id} · présentation : ${violation.id} (${violation.nodes} nœud(s))`);
     }
     if (problems.length > 0) throw new Error(`Accessibilité bloquante :\n- ${problems.join("\n- ")}`);
     console.log(`Accessibilité validée sur ${configurations.length} configurations · 0 violation sérieuse`);

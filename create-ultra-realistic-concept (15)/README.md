@@ -4,6 +4,8 @@
 
 ROSACE est un atelier de point de croix à écran fixe : une recette produit **un seul patron**, affiché dans le tambour, puis suivi dans le mode **Broder** jusqu'aux dernières croix. La géométrie, les couleurs, les calculs de fil, les exports et la progression partagent la même matrice.
 
+L'application a deux entrées : une **présentation** (page d'accueil) qui montre le résultat, et l'**atelier** qui le fabrique.
+
 ## Concept
 
 - Sept réglages de forme, dont **six familles géométriques**, cinq harmonies, 489 références DMC, couronne chromatique complète.
@@ -11,6 +13,35 @@ ROSACE est un atelier de point de croix à écran fixe : une recette produit **u
 - **Tambour** = vue textile ; **Broder** = vue technique de la même grille.
 - Progression séparée du motif, indexée par empreinte du patron, jamais mélangée à la recette.
 - Design, couronne chromatique et ergonomie mobile conservés.
+
+## Présentation et atelier
+
+| URL | Écran |
+|---|---|
+| `/` | présentation : « La géométrie devient broderie. » |
+| `/#atelier` | atelier, panneau fermé |
+| `/#atelier-forme`, `/#atelier-couleurs`, `/#atelier-reglages`, `/#atelier-export` | atelier avec le panneau correspondant ouvert |
+| `/#atelier-broder` | atelier en mode broderie |
+| `/#r=…` | atelier sur une recette partagée |
+
+Les liens `#atelier…` sont remplacés dès l'ouverture par la recette courante (`#r=…`), pour que l'URL reste partageable. La marque, en haut de l'atelier, ramène à la présentation.
+
+La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
+
+## Dock de l'atelier
+
+Six verbes, un picto lisible par geste :
+
+| Entrée | Panneau / action |
+|---|---|
+| **Composer** | structure, tracé, densité, échelle, géométrie |
+| **Colorer** | couronne DMC, palette, harmonies, contraste |
+| **Ajuster** | toile, aïda, brins, marge, signature |
+| **Broder** | mode broderie plein écran |
+| **Sauvegarder** | collection et favoris |
+| **Exporter** | PNG, SVG, CSV, PDF, projet ROSACE |
+
+Les identifiants internes (`PanelId`) sont inchangés : seuls les libellés et la taille des pictos ont évolué.
 
 ## Installation
 

@@ -27,6 +27,8 @@ import {
 } from "../src/lib/progress";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
+/** La présentation est la page d'accueil ; l'atelier s'ouvre sur #atelier. */
+const STUDIO_URL = `${BASE_URL}#atelier`;
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ?? path.join(os.tmpdir(), "rosace-browser-artifacts");
 const BROWSER = process.env.BROWSER ?? "chromium";
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH ?? [
@@ -272,7 +274,7 @@ async function main() {
     await installTrace(mobile);
     const page = await mobile.newPage();
     page.on("pageerror", (error) => pageErrors.push(`mobile: ${error.message}`));
-    await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await page.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await page.locator(".hoop-canvas").waitFor({ state: "visible" });
     await page.waitForFunction(() => (window as any).__rosaceTrace().pathCanvas.some(([, width]: [number, number]) => width === 1200));
 
@@ -284,7 +286,7 @@ async function main() {
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "mobile-atelier.png") });
 
     /* ---------------- Catalogue 489 fils ---------------- */
-    await openDock(page, "Couleurs");
+    await openDock(page, "Colorer");
     await page.getByRole("button", { name: "Nuancier complet" }).click();
     await page.locator(".catalogue-liste .catalogue-fil").first().waitFor({ state: "visible" });
     const catalogCodes = await page.locator(".catalogue-fil strong").allTextContents();
@@ -307,7 +309,7 @@ async function main() {
     await closePanel(page);
 
     /* ---------------- Exports PNG / SVG / CSV / PDF ---------------- */
-    await openDock(page, "Export");
+    await openDock(page, "Exporter");
     const shareUrl = await page.locator("input.champ-lien").inputValue();
     assert.match(shareUrl, /#r=/);
 
@@ -445,7 +447,7 @@ async function main() {
     await waitProgress(page, "1 / 3");
     await closeBroder(page);
 
-    await openDock(page, "Export");
+    await openDock(page, "Exporter");
     const panelProject = await captureDownload(page, () => page.getByRole("button", { name: /Exporter le projet/ }).click(), "projet-export.json");
     const panelJson = JSON.parse(await readFile(panelProject.filePath, "utf8"));
     for (const key of ["format", "version", "fingerprint", "config"] as const) {
@@ -470,7 +472,7 @@ async function main() {
     await closeBroder(page);
 
     /* ---------------- Paramètres textiles : même empreinte ---------------- */
-    await openDock(page, "Réglages");
+    await openDock(page, "Ajuster");
     await page.getByRole("button", { name: "Aïda 18" }).click();
     await page.getByRole("button", { name: "5 brins" }).click();
     await page.locator('input[type="range"][aria-label^="Marge de sécurité"]').fill("30");
@@ -482,7 +484,7 @@ async function main() {
     await closeBroder(page);
 
     /* ---------------- Palette : nouvelle empreinte, nouvelle progression ---------------- */
-    await openDock(page, "Couleurs");
+    await openDock(page, "Colorer");
     await page.getByRole("button", { name: "Nuancier complet" }).click();
     await page.getByRole("textbox", { name: "Rechercher une référence ou un nom" }).fill("310");
     await page.locator(".catalogue-fil").filter({ hasText: "DMC 310" }).first().click();
@@ -494,7 +496,7 @@ async function main() {
     assert.match(await progressText(page), /0 \/ 3/);
     await closeBroder(page);
 
-    await openDock(page, "Réglages");
+    await openDock(page, "Ajuster");
     await page.getByRole("button", { name: /Réinitialiser la rosace/ }).click();
     await closePanel(page);
     assert.match((await page.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/);
@@ -523,7 +525,7 @@ async function main() {
     const legacyConfig = await legacyPage.evaluate(() => JSON.parse(localStorage.getItem("aime-rosace-current-v1") ?? "{}"));
     assert.deepEqual(legacyConfig.palette, ["BLANC", "ECRU", "310", "902", "3607"]);
     assert.equal(legacyConfig.seed, 123);
-    await legacyPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await legacyPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await legacyPage.evaluate(() => {
       localStorage.setItem("aime-rosace-favorites-v1", JSON.stringify([{
         id: "legacy-1", name: "Ancienne recette", createdAt: new Date().toISOString(), stitches: 3381,
@@ -533,7 +535,7 @@ async function main() {
     await legacyPage.reload({ waitUntil: "domcontentloaded" });
     const favoritePalette = await legacyPage.evaluate(() => JSON.parse(localStorage.getItem("aime-rosace-favorites-v1") ?? "[]")[0].config.palette);
     assert.deepEqual(favoritePalette, ["BLANC", "ECRU", "310", "902", "3607"]);
-    await openDock(legacyPage, "Collection");
+    await openDock(legacyPage, "Sauvegarder");
     assert.equal(await legacyPage.locator(".collection-carte").count(), 1);
     await sharedContext.close();
     await legacyContext.close();
@@ -542,7 +544,7 @@ async function main() {
     const recipeContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const recipePage = await recipeContext.newPage();
     trackErrors(recipePage, "recette");
-    await recipePage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await recipePage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await recipePage.locator(".hoop-canvas").waitFor({ state: "visible" });
     const readSeed = async () => {
       const hash = await recipePage.evaluate(() => window.location.hash);
@@ -550,7 +552,7 @@ async function main() {
       return decodeConfig(encoded)?.seed ?? null;
     };
     const seedBefore = await readSeed();
-    await openDock(recipePage, "Réglages");
+    await openDock(recipePage, "Ajuster");
     await recipePage.getByRole("button", { name: "Tirer une signature" }).click();
     const seedVaried = await readSeed();
     assert.notEqual(seedVaried, seedBefore, "la création d'une rosace n'a pas changé la signature");
@@ -567,9 +569,9 @@ async function main() {
     const geometryContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, acceptDownloads: true });
     const geometryPage = await geometryContext.newPage();
     trackErrors(geometryPage, "geometries");
-    await geometryPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await geometryPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await geometryPage.locator(".hoop-canvas").waitFor({ state: "visible" });
-    await openDock(geometryPage, "Forme");
+    await openDock(geometryPage, "Composer");
     const geometrySlider = geometryPage.locator('input[aria-label="Géométrie"]');
     assert.equal(await geometrySlider.getAttribute("max"), String(GEOMETRY_COUNT));
     assert.equal(await geometryPage.locator('input[type="range"]').count(), 7);
@@ -584,10 +586,10 @@ async function main() {
       await geometryPage.keyboard.press("Escape");
       await geometryPage.locator(".studio-panel").waitFor({ state: "detached" });
       await geometryPage.locator(".hoop-canvas").screenshot({ path: path.join(ARTIFACT_DIR, `geometrie-${geometry}.png`) });
-      if (geometry < GEOMETRY_COUNT) await openDock(geometryPage, "Forme");
+      if (geometry < GEOMETRY_COUNT) await openDock(geometryPage, "Composer");
     }
     assert.equal(geometryStats.size, GEOMETRY_COUNT, "deux familles affichent le même nombre de croix");
-    await openDock(geometryPage, "Forme");
+    await openDock(geometryPage, "Composer");
     await geometrySlider.fill("1");
     await geometryPage.waitForTimeout(120);
     assert.match((await geometryPage.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/, "retour à la corolle classique impossible");
@@ -600,7 +602,7 @@ async function main() {
     await clickStitch(geometryPage, fractale.stitches[0]);
     await waitProgress(geometryPage, "1 /");
     await closeBroder(geometryPage);
-    await openDock(geometryPage, "Export");
+    await openDock(geometryPage, "Exporter");
     const fractaleProject = await captureDownload(
       geometryPage,
       () => geometryPage.getByRole("button", { name: /Exporter le projet/ }).click(),
@@ -624,7 +626,7 @@ async function main() {
     const navContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const navPage = await navContext.newPage();
     trackErrors(navPage, "navigation");
-    await navPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await navPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     const configA = normalizeConfig({ ...DEFAULT_CONFIG, seed: 123, palette: [...DEFAULT_CONFIG.palette] });
     const configB = normalizeConfig({ ...DEFAULT_CONFIG, seed: 456, palette: [...DEFAULT_CONFIG.palette] });
     const hashA = `#r=${encodeConfig(configA)}`;
@@ -648,7 +650,7 @@ async function main() {
     const v1Context = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const v1Page = await v1Context.newPage();
     trackErrors(v1Page, "projet v1");
-    await v1Page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await v1Page.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     const [firstStitch, secondStitch] = pattern.stitches.slice(0, 2);
     const legacyIndices = [stitchIndex(pattern.size, firstStitch.x, firstStitch.y), stitchIndex(pattern.size, secondStitch.x, secondStitch.y)];
     const legacyProject = {
@@ -666,7 +668,7 @@ async function main() {
     };
     const v1Path = path.join(ARTIFACT_DIR, "projet-v1.json");
     await writeFile(v1Path, JSON.stringify(legacyProject, null, 2));
-    await openDock(v1Page, "Export");
+    await openDock(v1Page, "Exporter");
     await v1Page.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(v1Path);
     await v1Page.locator(".toast").filter({ hasText: "Projet version 1 migré" }).waitFor({ state: "visible" });
     await closePanel(v1Page);
@@ -680,7 +682,7 @@ async function main() {
       config: { ...DEFAULT_CONFIG, palette: [...DEFAULT_CONFIG.palette] },
       progress: { mystere: true },
     }, null, 2));
-    await openDock(v1Page, "Export");
+    await openDock(v1Page, "Exporter");
     await v1Page.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(badV1Path);
     const refusal = v1Page.locator(".toast").filter({ hasText: "Projet refusé" });
     await refusal.waitFor({ state: "visible" });
@@ -695,8 +697,8 @@ async function main() {
     trackErrors(tabA, "onglet A");
     trackErrors(tabB, "onglet B");
     await Promise.all([
-      tabA.goto(BASE_URL, { waitUntil: "domcontentloaded" }),
-      tabB.goto(BASE_URL, { waitUntil: "domcontentloaded" }),
+      tabA.goto(STUDIO_URL, { waitUntil: "domcontentloaded" }),
+      tabB.goto(STUDIO_URL, { waitUntil: "domcontentloaded" }),
     ]);
     await Promise.all([
       tabA.locator(".hoop-canvas").waitFor({ state: "visible" }),
@@ -724,7 +726,7 @@ async function main() {
     const corruptContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const corruptPage = await corruptContext.newPage();
     trackErrors(corruptPage, "stockage corrompu");
-    await corruptPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await corruptPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await corruptPage.evaluate((key) => localStorage.setItem(key, "{JSON INVALIDE"), progressStorageKey(fingerprint));
     await corruptPage.reload({ waitUntil: "domcontentloaded" });
     await openBroder(corruptPage);
@@ -736,7 +738,7 @@ async function main() {
     const legacyStorageContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const legacyStoragePage = await legacyStorageContext.newPage();
     trackErrors(legacyStoragePage, "ancienne clé v1");
-    await legacyStoragePage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await legacyStoragePage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await legacyStoragePage.evaluate(([key, record]) => localStorage.setItem(key, JSON.stringify(record)), [
       `${LEGACY_PROGRESS_STORAGE_PREFIXES[0]}${fingerprint}`,
       { completed: [indexA], selectedCode: "902", viewport: { k: 1, x: 0, y: 0 }, journal: [], updatedAt: "2026-11-03T00:00:00.000Z" },
@@ -750,7 +752,7 @@ async function main() {
     const quotaContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
     const quotaPage = await quotaContext.newPage();
     trackErrors(quotaPage, "quota");
-    await quotaPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await quotaPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await quotaPage.evaluate(() => {
       const original = Storage.prototype.setItem;
       Storage.prototype.setItem = function (key: string, value: string) {
@@ -769,12 +771,12 @@ async function main() {
     const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     const desktopPage = await desktop.newPage();
     desktopPage.on("pageerror", (error) => pageErrors.push(`bureau: ${error.message}`));
-    await desktopPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await desktopPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
     await desktopPage.locator(".hoop-canvas").waitFor({ state: "visible" });
     assert.equal(await desktopPage.locator(".crown-seg").count(), 489);
     assert.ok(await desktopPage.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1));
     assert.equal(await desktopPage.locator(".studio-dock").evaluate((el) => getComputedStyle(el).flexDirection), "column");
-    await openDock(desktopPage, "Export");
+    await openDock(desktopPage, "Exporter");
     assert.equal(await desktopPage.locator(".studio-panel").evaluate((el) => Math.round(el.getBoundingClientRect().width)), 384);
     await desktopPage.screenshot({ path: path.join(ARTIFACT_DIR, "bureau-export.png") });
     await closePanel(desktopPage);
