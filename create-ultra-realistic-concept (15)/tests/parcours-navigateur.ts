@@ -17,8 +17,11 @@ import { chromium, type BrowserContext, type Page } from "playwright-core";
 import { DMC_ALL_THREADS, FAMILY_LABELS } from "../src/data/dmc";
 import { shortFingerprint, patternFingerprint } from "../src/lib/pattern-id";
 import { chartGeometry } from "../src/lib/paint";
-import { DEFAULT_CONFIG, SYMBOLS, encodeConfig, generateRosace, normalizeConfig } from "../src/lib/rosace";
-import { PROJECT_FORMAT, PROJECT_VERSION } from "../src/lib/progress";
+import { DEFAULT_CONFIG, SYMBOLS, decodeConfig, encodeConfig, generateRosace, normalizeConfig } from "../src/lib/rosace";
+import {
+  LEGACY_PROGRESS_STORAGE_PREFIXES, LEGACY_PROJECT_VERSION, PROJECT_FORMAT, PROJECT_VERSION,
+  progressStorageKey, serializeRuns, stitchIndex,
+} from "../src/lib/progress";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ?? path.join(os.tmpdir(), "rosace-browser-artifacts");
@@ -51,8 +54,10 @@ async function openDock(page: Page, label: string) {
 }
 
 async function closePanel(page: Page) {
-  await page.getByRole("button", { name: "Fermer le panneau" }).click();
-  await page.locator(".studio-panel").waitFor({ state: "detached" });
+  const panel = page.locator(".studio-panel");
+  if (await panel.count() === 0) return;
+  await panel.getByRole("button", { name: "Fermer le panneau" }).click({ timeout: 2000 }).catch(() => {});
+  await panel.waitFor({ state: "detached" });
 }
 
 async function openBroder(page: Page) {
@@ -75,6 +80,26 @@ async function waitProgress(page: Page, expected: string) {
     expected,
     { timeout: 10000 },
   );
+}
+
+/** Clique sur une case réelle de la grille Broderie, en coordonnées écran. */
+async function clickStitch(page: Page, stitch: { x: number; y: number }) {
+  const rect = await page.locator(".broder-canvas").evaluate((canvas) => {
+    const r = canvas.getBoundingClientRect();
+    return { left: r.left, top: r.top, width: r.width, height: r.height };
+  });
+  const chart = chartGeometry(1800, pattern.size, "chart");
+  const fit = Math.min(rect.width, rect.height) * 0.985 / 1800;
+  const bx = -900 + chart.origin + stitch.x * chart.cell;
+  const by = -900 + chart.origin + stitch.y * chart.cell;
+  await page.mouse.click(
+    rect.left + rect.width / 2 + fit * bx,
+    rect.top + rect.height / 2 + fit * by,
+  );
+}
+
+function trackErrors(page: Page, label: string) {
+  page.on("pageerror", (error) => pageErrors.push(`${label}: ${error.message}`));
 }
 
 /**
@@ -480,6 +505,176 @@ async function main() {
     assert.equal(await legacyPage.locator(".collection-carte").count(), 1);
     await sharedContext.close();
     await legacyContext.close();
+
+    /* ---------------- Création, annuler/rétablir, Échap avec focus ---------------- */
+    const recipeContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const recipePage = await recipeContext.newPage();
+    trackErrors(recipePage, "recette");
+    await recipePage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await recipePage.locator(".hoop-canvas").waitFor({ state: "visible" });
+    const readSeed = async () => {
+      const hash = await recipePage.evaluate(() => window.location.hash);
+      const encoded = hash.match(/^#r=([A-Za-z0-9_-]+)/)?.[1] ?? "";
+      return decodeConfig(encoded)?.seed ?? null;
+    };
+    const seedBefore = await readSeed();
+    await openDock(recipePage, "Réglages");
+    await recipePage.getByRole("button", { name: "Tirer une signature" }).click();
+    const seedVaried = await readSeed();
+    assert.notEqual(seedVaried, seedBefore, "la création d'une rosace n'a pas changé la signature");
+    await recipePage.getByRole("button", { name: "Annuler le dernier réglage" }).click();
+    assert.equal(await readSeed(), seedBefore, "Annuler n'a pas restauré la recette");
+    await recipePage.getByRole("button", { name: "Rétablir le réglage annulé" }).click();
+    assert.equal(await readSeed(), seedVaried, "Rétablir n'a pas restauré la variante");
+    await recipePage.locator('.studio-panel input[type="range"]').first().focus();
+    await recipePage.keyboard.press("Escape");
+    await recipePage.locator(".studio-panel").waitFor({ state: "detached" });
+    await recipeContext.close();
+
+    /* ---------------- hashchange, popstate, retour / avant ---------------- */
+    const navContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const navPage = await navContext.newPage();
+    trackErrors(navPage, "navigation");
+    await navPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    const configA = normalizeConfig({ ...DEFAULT_CONFIG, seed: 123, palette: [...DEFAULT_CONFIG.palette] });
+    const configB = normalizeConfig({ ...DEFAULT_CONFIG, seed: 456, palette: [...DEFAULT_CONFIG.palette] });
+    const hashA = `#r=${encodeConfig(configA)}`;
+    const hashB = `#r=${encodeConfig(configB)}`;
+    const storedSeed = () => navPage.evaluate(() => JSON.parse(localStorage.getItem("aime-rosace-current-v1") ?? "{}").seed ?? null);
+    await navPage.evaluate((hash) => { window.location.hash = hash; }, hashA);
+    await navPage.waitForFunction((hash) => window.location.hash === hash, hashA);
+    assert.equal(await storedSeed(), 123, "hashchange n'a pas appliqué la recette");
+    await navPage.evaluate((hash) => { window.location.hash = hash; }, hashB);
+    await navPage.waitForFunction((hash) => window.location.hash === hash, hashB);
+    assert.equal(await storedSeed(), 456, "le second lien de recette n'a pas été appliqué");
+    await navPage.goBack();
+    await navPage.waitForFunction((hash) => window.location.hash === hash, hashA);
+    assert.equal(await storedSeed(), 123, "le retour navigateur n'a pas restauré la recette");
+    await navPage.goForward();
+    await navPage.waitForFunction((hash) => window.location.hash === hash, hashB);
+    assert.equal(await storedSeed(), 456, "l'avant navigateur n'a pas restauré la recette");
+    await navContext.close();
+
+    /* ---------------- Projet v1 : migration et message de compatibilité ---------------- */
+    const v1Context = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const v1Page = await v1Context.newPage();
+    trackErrors(v1Page, "projet v1");
+    await v1Page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    const [firstStitch, secondStitch] = pattern.stitches.slice(0, 2);
+    const legacyIndices = [stitchIndex(pattern.size, firstStitch.x, firstStitch.y), stitchIndex(pattern.size, secondStitch.x, secondStitch.y)];
+    const legacyProject = {
+      format: PROJECT_FORMAT,
+      version: LEGACY_PROJECT_VERSION,
+      fingerprint: "ANCIENNE_EMPREINTE",
+      config: { ...DEFAULT_CONFIG, palette: [...DEFAULT_CONFIG.palette] },
+      progress: {
+        completed: legacyIndices,
+        selectedCode: "902",
+        viewport: { k: 1, x: 0, y: 0 },
+        journal: [],
+        updatedAt: "2026-11-03T00:00:00.000Z",
+      },
+    };
+    const v1Path = path.join(ARTIFACT_DIR, "projet-v1.json");
+    await writeFile(v1Path, JSON.stringify(legacyProject, null, 2));
+    await openDock(v1Page, "Export");
+    await v1Page.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(v1Path);
+    await v1Page.locator(".toast").filter({ hasText: "Projet version 1 migré" }).waitFor({ state: "visible" });
+    await closePanel(v1Page);
+    await openBroder(v1Page);
+    await waitProgress(v1Page, "2 / 3");
+    await closeBroder(v1Page);
+    const badV1Path = path.join(ARTIFACT_DIR, "projet-v1-inconnu.json");
+    await writeFile(badV1Path, JSON.stringify({
+      format: PROJECT_FORMAT,
+      version: LEGACY_PROJECT_VERSION,
+      config: { ...DEFAULT_CONFIG, palette: [...DEFAULT_CONFIG.palette] },
+      progress: { mystere: true },
+    }, null, 2));
+    await openDock(v1Page, "Export");
+    await v1Page.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(badV1Path);
+    const refusal = v1Page.locator(".toast").filter({ hasText: "Projet refusé" });
+    await refusal.waitFor({ state: "visible" });
+    assert.match((await refusal.textContent()) ?? "", /version 1/);
+    await closePanel(v1Page);
+    await v1Context.close();
+
+    /* ---------------- Progression concurrente entre deux onglets ---------------- */
+    const syncContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const tabA = await syncContext.newPage();
+    const tabB = await syncContext.newPage();
+    trackErrors(tabA, "onglet A");
+    trackErrors(tabB, "onglet B");
+    await Promise.all([
+      tabA.goto(BASE_URL, { waitUntil: "domcontentloaded" }),
+      tabB.goto(BASE_URL, { waitUntil: "domcontentloaded" }),
+    ]);
+    await Promise.all([
+      tabA.locator(".hoop-canvas").waitFor({ state: "visible" }),
+      tabB.locator(".hoop-canvas").waitFor({ state: "visible" }),
+    ]);
+    await openBroder(tabA);
+    await openBroder(tabB);
+    const stitchA = pattern.stitches[0];
+    const stitchB = pattern.stitches.find((stitch) => stitch.x !== stitchA.x || stitch.y !== stitchA.y)!;
+    const indexA = stitchIndex(pattern.size, stitchA.x, stitchA.y);
+    const indexB = stitchIndex(pattern.size, stitchB.x, stitchB.y);
+    await clickStitch(tabA, stitchA);
+    await waitProgress(tabA, "1 / 3");
+    await waitProgress(tabB, "1 / 3");
+    await clickStitch(tabB, stitchB);
+    await waitProgress(tabB, "2 / 3");
+    await waitProgress(tabA, "2 / 3");
+    const synced = await tabA.evaluate((key) => JSON.parse(localStorage.getItem(key) ?? "{}"), progressStorageKey(fingerprint));
+    assert.equal(synced.completedRuns, serializeRuns([indexA, indexB]));
+    await closeBroder(tabA);
+    await closeBroder(tabB);
+    await syncContext.close();
+
+    /* ---------------- Stockage corrompu, ancienne clé v1, quota dépassé ---------------- */
+    const corruptContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const corruptPage = await corruptContext.newPage();
+    trackErrors(corruptPage, "stockage corrompu");
+    await corruptPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await corruptPage.evaluate((key) => localStorage.setItem(key, "{JSON INVALIDE"), progressStorageKey(fingerprint));
+    await corruptPage.reload({ waitUntil: "domcontentloaded" });
+    await openBroder(corruptPage);
+    await waitProgress(corruptPage, "0 / 3");
+    await closeBroder(corruptPage);
+    await corruptPage.evaluate((key) => localStorage.removeItem(key), progressStorageKey(fingerprint));
+    await corruptContext.close();
+
+    const legacyStorageContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const legacyStoragePage = await legacyStorageContext.newPage();
+    trackErrors(legacyStoragePage, "ancienne clé v1");
+    await legacyStoragePage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await legacyStoragePage.evaluate(([key, record]) => localStorage.setItem(key, JSON.stringify(record)), [
+      `${LEGACY_PROGRESS_STORAGE_PREFIXES[0]}${fingerprint}`,
+      { completed: [indexA], selectedCode: "902", viewport: { k: 1, x: 0, y: 0 }, journal: [], updatedAt: "2026-11-03T00:00:00.000Z" },
+    ] as [string, unknown]);
+    await legacyStoragePage.reload({ waitUntil: "domcontentloaded" });
+    await openBroder(legacyStoragePage);
+    await waitProgress(legacyStoragePage, "1 / 3");
+    await closeBroder(legacyStoragePage);
+    await legacyStorageContext.close();
+
+    const quotaContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+    const quotaPage = await quotaContext.newPage();
+    trackErrors(quotaPage, "quota");
+    await quotaPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await quotaPage.evaluate(() => {
+      const original = Storage.prototype.setItem;
+      Storage.prototype.setItem = function (key: string, value: string) {
+        if (String(key).startsWith("aime-rosace-progress-v2:")) throw new DOMException("Quota dépassé", "QuotaExceededError");
+        return original.call(this, key, value);
+      };
+    });
+    await openBroder(quotaPage);
+    await quotaPage.locator(".broder-canvas").focus();
+    await quotaPage.keyboard.press("Space");
+    await quotaPage.locator(".toast").filter({ hasText: "Progression non enregistrée" }).waitFor({ state: "visible" });
+    await closeBroder(quotaPage);
+    await quotaContext.close();
 
     /* ---------------- Bureau ---------------- */
     const desktop = await browser.newContext({ viewport: { width: 1440, height: 900 } });

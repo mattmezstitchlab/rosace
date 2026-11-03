@@ -51,14 +51,20 @@ export function Composer() {
     const onKey = (event: KeyboardEvent) => {
       // Le mode Broderie est plein écran : ses touches ne doivent pas ouvrir un panneau derrière lui.
       if (embroideryOpen) return;
+      // Échap ferme le panneau même si un curseur, une recherche ou un champ a le focus.
+      if (event.key === "Escape") {
+        if (panel) {
+          event.preventDefault();
+          setPanel(null);
+        }
+        return;
+      }
       const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) return;
       const index = ["1", "2", "3", "4", "5", "6"].indexOf(event.key);
       if (index >= 0 && !event.metaKey && !event.ctrlKey && !event.altKey) {
         event.preventDefault();
         choose(CATEGORIES[index].id);
-      } else if (event.key === "Escape") {
-        if (panel) setPanel(null);
       }
     };
     window.addEventListener("keydown", onKey);

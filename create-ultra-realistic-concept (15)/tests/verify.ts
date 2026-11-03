@@ -10,8 +10,9 @@ import {
   DEFAULT_CONFIG, PRESETS, SYMBOLS, decodeConfig, encodeConfig, generateRosace, normalizeConfig,
 } from "../src/lib/rosace";
 import {
-  MAX_ZOOM, MIN_ZOOM, buildProject, clampViewport, emptyProgress, importProject,
-  parseRuns, remainingByColor, serializeRuns, stitchIndex,
+  LEGACY_PROJECT_VERSION, MAX_ZOOM, MIN_ZOOM, PROJECT_FORMAT, PROJECT_VERSION, buildProject,
+  clampViewport, emptyProgress, importProject, migrateLegacyProgressRecord, parseRuns,
+  progressStorageKey, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
 } from "../src/lib/progress";
 
 let checks = 0;
@@ -262,6 +263,99 @@ test("projet : l'export nettoie aussi une progression locale corrompue", () => {
   assert.deepEqual(project.progress.journal, [{ index: valid, added: true }]);
   assert.equal(project.progress.updatedAt, "2026-11-03T00:00:00.000Z");
   assert.equal(importProject(JSON.parse(JSON.stringify(project))).ok, true);
+});
+
+test("progression : fusion concurrente sans écrasement ni résurrection", () => {
+  const [a, b, c, d] = pattern.stitches.slice(0, 4).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const base = { ...emptyProgress(pattern), completedRuns: serializeRuns([a, b]), updatedAt: "2026-11-03T00:00:00.000Z" };
+  const remote = { ...base, completedRuns: serializeRuns([a, b, c]), updatedAt: "2026-11-03T00:00:01.000Z" };
+  const local = { ...base, completedRuns: serializeRuns([a, d]), updatedAt: "2026-11-03T00:00:02.000Z" };
+  const merged = reconcileProgress(remote, local, base);
+  assert.deepEqual([...parseRuns(merged.completedRuns)].sort((x, y) => x - y), [a, c, d].sort((x, y) => x - y));
+  assert.equal(parseRuns(merged.completedRuns).has(b), false, "une suppression locale a été annulée");
+});
+
+test("projet : import version 1 migré explicitement, empreinte recalculée", () => {
+  const [a, b] = pattern.stitches.slice(0, 2).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const legacy = {
+    format: PROJECT_FORMAT,
+    version: LEGACY_PROJECT_VERSION,
+    fingerprint: "ANCIENNE_EMPREINTE",
+    config: { ...DEFAULT_CONFIG, palette: [...DEFAULT_CONFIG.palette] },
+    progress: {
+      completed: [a, b],
+      selectedCode: "blanc",
+      viewport: { k: 99, x: 1e9, y: -1e9 },
+      journal: [{ index: a, added: true }, { index: 999999, added: true }],
+      updatedAt: "2026-11-03T00:00:00.000Z",
+    },
+  };
+  const imported = importProject(legacy);
+  assert.equal(imported.ok, true);
+  if (imported.ok) {
+    assert.equal(imported.migratedFrom, 1);
+    assert.equal(imported.progress.version, PROJECT_VERSION);
+    assert.equal(imported.progress.completedRuns, serializeRuns([a, b]));
+    assert.equal(imported.progress.viewport.k, MAX_ZOOM);
+    assert.equal(imported.progress.selectedCode, "902", "une sélection v1 inconnue retombe sur le premier fil du patron");
+    assert.deepEqual(imported.progress.journal, [{ index: a, added: true }]);
+    assert.match(imported.warning ?? "", /recalculée/);
+  }
+});
+
+test("projet : version 1 au format inconnu reçoit un message de compatibilité clair", () => {
+  const result = importProject({
+    format: PROJECT_FORMAT,
+    version: LEGACY_PROJECT_VERSION,
+    config: { ...DEFAULT_CONFIG },
+    progress: { mystere: true },
+  });
+  assert.equal(result.ok, false);
+  if (!result.ok) assert.match(result.error, /version 1.*inconnu|migration impossible/);
+});
+
+test("progression : ancien enregistrement local v1 migré et borné", () => {
+  const [a] = pattern.stitches.slice(0, 1).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+  const migrated = migrateLegacyProgressRecord({
+    completed: [a, 999999],
+    selectedCode: "902",
+    viewport: { k: 0.2, x: 1e9, y: -1e9 },
+    journal: [{ index: a, added: true }],
+    updatedAt: "2026-11-03T00:00:00.000Z",
+  }, pattern);
+  assert.ok(migrated);
+  if (migrated) {
+    assert.equal(migrated.progress.version, 2);
+    assert.equal(migrated.progress.completedRuns, serializeRuns([a]));
+    assert.equal(migrated.progress.viewport.k, MIN_ZOOM);
+    assert.equal(migrated.progress.selectedCode, "902");
+    assert.match(migrated.warning ?? "", /ignorée/);
+  }
+});
+
+test("progression : saveProgress protège contre une écriture d'un autre onglet", () => {
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const previous = scope.window;
+  const store = new Map<string, string>();
+  scope.window = {
+    localStorage: {
+      getItem: (key: string) => store.get(key) ?? null,
+      setItem: (key: string, value: string) => { store.set(key, value); },
+      removeItem: (key: string) => { store.delete(key); },
+    },
+  };
+  try {
+    const [a, b, c] = pattern.stitches.slice(0, 3).map((stitch) => stitchIndex(pattern.size, stitch.x, stitch.y));
+    const base = { ...emptyProgress(pattern), completedRuns: serializeRuns([a]), updatedAt: "2026-11-03T00:00:00.000Z" };
+    saveProgress(base);
+    const remote = { ...base, completedRuns: serializeRuns([a, b]), updatedAt: "2026-11-03T00:00:01.000Z" };
+    store.set(progressStorageKey(base.fingerprint), JSON.stringify(remote));
+    const local = { ...base, completedRuns: serializeRuns([a, c]), updatedAt: "2026-11-03T00:00:02.000Z" };
+    const saved = saveProgress(local, base);
+    assert.deepEqual([...parseRuns(saved.completedRuns)].sort((x, y) => x - y), [a, b, c].sort((x, y) => x - y));
+  } finally {
+    scope.window = previous;
+  }
 });
 
 /** Stubs canvas minimaux : permettent de vérifier le rendu sans navigateur ni moteur parallèle. */

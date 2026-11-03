@@ -131,12 +131,12 @@ function useRosaceState() {
   }, []);
 
   /** Unique point d'entrée de modification de la recette. Un geste continu (glisser une poignée) = une seule entrée d'historique. */
-  const commit = useCallback((next: RosaceConfig) => {
+  const commit = useCallback((next: RosaceConfig, options?: { history?: boolean }) => {
     const current = configRef.current;
     const normalized = normalizeConfig(next);
     if (JSON.stringify(normalized) === JSON.stringify(current)) return;
     const flow = gesture.current;
-    if (!(flow.active && flow.pushed)) {
+    if (options?.history !== false && !(flow.active && flow.pushed)) {
       historyRef.current = [...historyRef.current.slice(-29), current];
       setHistory(historyRef.current);
     }
@@ -146,6 +146,33 @@ function useRosaceState() {
     configRef.current = normalized;
     setConfigState(normalized);
   }, []);
+
+  /** Applique la recette portée par l'URL sans polluer l'historique Annuler de l'atelier. */
+  const applyLocationRecipe = useCallback(() => {
+    const shared = window.location.hash.match(/^#r=([A-Za-z0-9_-]+)/)?.[1];
+    if (!shared) return;
+    const decoded = decodeConfig(shared);
+    if (decoded) commit(decoded, { history: false });
+  }, [commit]);
+
+  /** L'URL reflète toujours la recette courante, sans créer d'entrée d'historique navigateur. */
+  useEffect(() => {
+    const hash = `#r=${encodeConfig(config)}`;
+    if (window.location.hash !== hash) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+    }
+  }, [config]);
+
+  /** hashchange + popstate : liens de recette, retour et avant du navigateur. */
+  useEffect(() => {
+    const onNavigate = () => applyLocationRecipe();
+    window.addEventListener("hashchange", onNavigate);
+    window.addEventListener("popstate", onNavigate);
+    return () => {
+      window.removeEventListener("hashchange", onNavigate);
+      window.removeEventListener("popstate", onNavigate);
+    };
+  }, [applyLocationRecipe]);
 
   const beginGesture = useCallback(() => { gesture.current = { active: true, pushed: false }; }, []);
   const endGesture = useCallback(() => { gesture.current = { active: false, pushed: false }; }, []);
@@ -371,7 +398,9 @@ function useRosaceState() {
       commit(result.config);
       setEmbroideryOpen(false);
       setProgressRevision((value) => value + 1);
-      notify("Projet importé", `Recette et progression restaurées · ${shortFingerprint(result.progress.fingerprint)}`);
+      const title = result.migratedFrom ? "Projet version 1 migré" : "Projet importé";
+      const detail = result.warning ?? `Recette et progression restaurées · ${shortFingerprint(result.progress.fingerprint)}`;
+      notify(title, detail);
     },
     print: () => {
       if (!printWorksheet(pattern)) notify("La fenêtre d'impression est bloquée", "Autorisez les fenêtres pop-up pour créer la fiche PDF");

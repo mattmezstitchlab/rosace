@@ -5,8 +5,8 @@ import { chartGeometry, paintPattern } from "../lib/paint";
 import { patternFingerprint, shortFingerprint } from "../lib/pattern-id";
 import { SYMBOLS } from "../lib/rosace";
 import {
-  MAX_ZOOM, MIN_ZOOM, clampViewport, loadPatternProgress, parseRuns, progressPercent,
-  remainingByColor, saveProgress, serializeRuns, stitchIndex,
+  MAX_ZOOM, MIN_ZOOM, clampViewport, emptyProgress, loadPatternProgress, parseRuns, progressPercent,
+  progressStorageKey, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
   type EmbroideryProgress, type Viewport,
 } from "../lib/progress";
 import { formatSeed, useRosaceApi } from "../state/rosace-store";
@@ -33,6 +33,10 @@ export function EmbroideryView() {
   const hydrated = useRef(false);
   const storageWarned = useRef(false);
   const saveTimer = useRef<number | null>(null);
+  /** Dernier état connu du stockage : sert de base à la fusion entre onglets. */
+  const baseProgressRef = useRef<EmbroideryProgress | null>(null);
+  /** Évite une réécriture immédiate après l'intégration d'un événement `storage`. */
+  const suppressSaveRef = useRef(false);
 
   const [size, setSize] = useState({ w: 320, h: 420 });
   const [view, setView] = useState<Viewport>({ k: 1, x: 0, y: 0 });
@@ -48,14 +52,16 @@ export function EmbroideryView() {
   const pinch = useRef<{ distance: number; k: number; x: number; y: number; mx: number; my: number } | null>(null);
   const tap = useRef<Tap | null>(null);
   const suppressTap = useRef(0);
+  const liveRef = useRef({ completed, selectedCode, view, history });
+  liveRef.current = { completed, selectedCode, view, history };
 
   const progress = useMemo(() => progressPercent(pattern, completed), [pattern, completed]);
   const remaining = useMemo(() => remainingByColor(pattern, completed), [pattern, completed]);
   const selectedRemaining = selectedCode ? remaining.find((line) => line.code === selectedCode) : null;
 
   /* ---------- Progression : une seule écriture canonique ---------- */
-  const persist = useCallback((snapshot?: EmbroideryProgress) => {
-    if (!hydrated.current) return;
+  const persist = useCallback((snapshot?: EmbroideryProgress): EmbroideryProgress | null => {
+    if (!hydrated.current) return null;
     const record: EmbroideryProgress = snapshot ?? {
       version: 2,
       fingerprint,
@@ -65,14 +71,17 @@ export function EmbroideryView() {
       journal: history,
       updatedAt: new Date().toISOString(),
     };
-    if (record.fingerprint !== fingerprint) return;
+    if (record.fingerprint !== fingerprint) return null;
     try {
-      saveProgress(record);
+      const saved = saveProgress(record, baseProgressRef.current);
+      baseProgressRef.current = saved;
+      return saved;
     } catch {
       if (!storageWarned.current) {
         storageWarned.current = true;
         notify("Progression non enregistrée", "Le stockage du navigateur est plein ou indisponible.");
       }
+      return null;
     }
   }, [completed, fingerprint, history, notify, selectedCode, view]);
 
@@ -122,6 +131,8 @@ export function EmbroideryView() {
     }
     setHistory(saved?.journal ?? []);
     setFuture([]);
+    baseProgressRef.current = saved ?? emptyProgress(pattern);
+    suppressSaveRef.current = false;
     hydrated.current = true;
     const timer = window.setTimeout(() => closeRef.current?.focus(), 80);
     const onKey = (event: KeyboardEvent) => {
@@ -142,12 +153,46 @@ export function EmbroideryView() {
 
   useEffect(() => {
     if (!embroideryOpen || !hydrated.current) return;
+    if (suppressSaveRef.current) {
+      suppressSaveRef.current = false;
+      return;
+    }
     if (saveTimer.current) window.clearTimeout(saveTimer.current);
     saveTimer.current = window.setTimeout(() => {
       persist();
     }, 350);
     return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
   }, [completed, selectedCode, view, history, persist, embroideryOpen]);
+
+  /** Un autre onglet a écrit : on fusionne les croix au lieu d'écraser la progression locale. */
+  useEffect(() => {
+    if (!embroideryOpen) return;
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== progressStorageKey(fingerprint)) return;
+      const remote = loadPatternProgress(pattern);
+      if (!remote) return;
+      const live = liveRef.current;
+      const localSnapshot: EmbroideryProgress = {
+        version: 2,
+        fingerprint,
+        completedRuns: serializeRuns(live.completed),
+        selectedCode: live.selectedCode,
+        viewport: live.view,
+        journal: live.history,
+        updatedAt: new Date().toISOString(),
+      };
+      const merged = reconcileProgress(remote, localSnapshot, baseProgressRef.current);
+      suppressSaveRef.current = true;
+      setCompleted(parseRuns(merged.completedRuns));
+      setHistory(merged.journal ?? []);
+      setSelectedCode(merged.selectedCode);
+      setView(merged.viewport);
+      baseProgressRef.current = remote;
+      notify("Progression synchronisée", "Un autre onglet a modifié cet ouvrage : les croix ont été fusionnées.");
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [embroideryOpen, fingerprint, notify, pattern]);
 
   /* ---------- Base graphique et dessin ---------- */
   useEffect(() => {

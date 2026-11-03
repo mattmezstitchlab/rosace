@@ -1,3 +1,4 @@
+import { resolveThreadCode } from "../data/dmc";
 import { generateRosace, normalizeConfig, type RosaceConfig, type RosacePattern } from "./rosace";
 import { patternFingerprint } from "./pattern-id";
 
@@ -7,10 +8,19 @@ import { patternFingerprint } from "./pattern-id";
  * et le patron régénéré portent exactement la même empreinte.
  */
 export const PROGRESS_STORAGE_PREFIX = "aime-rosace-progress-v2:";
+/** Anciennes clés locales susceptibles d'exister dans un navigateur ayant connu une version 1. */
+export const LEGACY_PROGRESS_STORAGE_PREFIXES = [
+  "aime-rosace-progress-v1:",
+  "aime-rosace-progress:",
+  "rosace-progress-v1:",
+] as const;
 export const PROJECT_FORMAT = "rosace-project";
 export const PROJECT_VERSION = 2;
+export const LEGACY_PROJECT_VERSION = 1;
 export const MIN_ZOOM = 0.8;
 export const MAX_ZOOM = 8;
+
+export const progressStorageKey = (fingerprint: string) => `${PROGRESS_STORAGE_PREFIX}${fingerprint}`;
 
 export interface Viewport {
   k: number;
@@ -43,10 +53,29 @@ export interface ProjectFile {
   };
 }
 
+type JournalEntry = { index: number; added: boolean };
+type LegacyProgressLike = {
+  completed?: unknown;
+  completedRuns?: unknown;
+  completedIndices?: unknown;
+  selectedCode?: unknown;
+  viewport?: unknown;
+  journal?: unknown;
+  updatedAt?: unknown;
+};
+
 const finite = (value: unknown, fallback: number) => {
   const number = Number(value);
   return Number.isFinite(number) ? number : fallback;
 };
+
+const timestamp = (value: unknown) => {
+  if (typeof value !== "string") return 0;
+  const parsed = Date.parse(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const newest = (a: unknown, b: unknown) => (timestamp(a) >= timestamp(b) ? String(a) : String(b));
 
 /** Unique bornage de la vue Broderie, partagé par la sauvegarde locale et l'import de projet. */
 export function clampViewport(view: Partial<Viewport> | null | undefined): Viewport {
@@ -64,13 +93,29 @@ function isStitchIndex(pattern: RosacePattern, index: number) {
   return Number.isInteger(index) && index >= 0 && index < pattern.cells.length && pattern.cells[index] >= 0;
 }
 
-function sanitizeJournal(pattern: RosacePattern, journal: unknown): Array<{ index: number; added: boolean }> {
+function sanitizeJournal(pattern: RosacePattern, journal: unknown): JournalEntry[] {
   if (!Array.isArray(journal)) return [];
   return journal
-    .filter((entry): entry is { index: number; added: boolean } =>
-      Boolean(entry) && isStitchIndex(pattern, Number(entry.index)) && typeof entry.added === "boolean")
+    .filter((entry): entry is JournalEntry =>
+      Boolean(entry) && isStitchIndex(pattern, Number((entry as JournalEntry).index)) && typeof (entry as JournalEntry).added === "boolean")
     .map((entry) => ({ index: Number(entry.index), added: entry.added }))
     .slice(-100);
+}
+
+function mergeJournals(existing: unknown, incoming: unknown): JournalEntry[] {
+  const merged: JournalEntry[] = [];
+  const seen = new Set<string>();
+  for (const entry of [...(Array.isArray(existing) ? existing : []), ...(Array.isArray(incoming) ? incoming : [])]) {
+    if (!entry || typeof entry !== "object") continue;
+    const index = Number((entry as JournalEntry).index);
+    const added = (entry as JournalEntry).added;
+    if (!Number.isInteger(index) || typeof added !== "boolean") continue;
+    const key = `${index}:${added}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    merged.push({ index, added });
+  }
+  return merged.slice(-100);
 }
 
 /** Une progression vide, au format canonique, pour un patron donné. */
@@ -121,41 +166,135 @@ export function parseRuns(runs: string): Set<number> {
 
 export const stitchIndex = (size: number, x: number, y: number) => y * size + x;
 
+/**
+ * Fusion à trois états pour éviter les écrasements silencieux entre onglets.
+ * `base` est la progression connue au chargement ; `existing` est l'état actuel du stockage.
+ * Les suppressions locales restent des suppressions, les ajouts distants sont conservés.
+ */
+export function reconcileProgress(
+  existing: EmbroideryProgress,
+  incoming: EmbroideryProgress,
+  base?: EmbroideryProgress | null,
+): EmbroideryProgress {
+  const baseSet = base ? parseRuns(String(base.completedRuns ?? "")) : new Set<number>();
+  const localSet = parseRuns(String(incoming.completedRuns ?? ""));
+  const remoteSet = parseRuns(String(existing.completedRuns ?? ""));
+  const localDeletions = new Set([...baseSet].filter((index) => !localSet.has(index)));
+  const merged = new Set([...remoteSet, ...localSet].filter((index) => !localDeletions.has(index)));
+  return {
+    ...incoming,
+    completedRuns: serializeRuns(merged),
+    journal: mergeJournals(existing.journal, incoming.journal),
+    updatedAt: newest(existing.updatedAt, incoming.updatedAt),
+  };
+}
+
+function canonicalSelection(code: unknown, palette: string[]): string | null {
+  if (typeof code !== "string") return null;
+  const canonical = resolveThreadCode(code) ?? code;
+  return palette.includes(canonical) ? canonical : null;
+}
+
+/** Migration explicite d'un enregistrement de progression v1 vers le format v2. */
+export function migrateLegacyProgressRecord(raw: unknown, pattern: RosacePattern): { progress: EmbroideryProgress; warning?: string } | null {
+  if (!raw || typeof raw !== "object") return null;
+  const source = raw as LegacyProgressLike;
+  let runs = "";
+  if (typeof source.completedRuns === "string") runs = source.completedRuns;
+  else if (typeof source.completed === "string") runs = source.completed;
+  else if (Array.isArray(source.completed)) runs = serializeRuns(source.completed.filter((value): value is number => Number.isInteger(value) && value >= 0));
+  else if (Array.isArray(source.completedIndices)) runs = serializeRuns(source.completedIndices.filter((value): value is number => Number.isInteger(value) && value >= 0));
+  else return null;
+
+  const parsed = [...parseRuns(runs)];
+  const valid = parsed.filter((index) => isStitchIndex(pattern, index));
+  const dropped = parsed.length - valid.length;
+  const fingerprint = patternFingerprint(pattern);
+  return {
+    progress: {
+      version: 2,
+      fingerprint,
+      completedRuns: serializeRuns(valid),
+      selectedCode: canonicalSelection(source.selectedCode, pattern.config.palette) ?? pattern.config.palette[0] ?? null,
+      viewport: clampViewport(source.viewport as Partial<Viewport> | null | undefined),
+      journal: sanitizeJournal(pattern, source.journal),
+      updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date().toISOString(),
+    },
+    warning: dropped > 0 ? `${dropped} case(s) v1 ignorée(s) : elles n'appartiennent pas au patron.` : undefined,
+  };
+}
+
 export function loadProgress(fingerprint: string): EmbroideryProgress | null {
   try {
-    const raw = window.localStorage.getItem(`${PROGRESS_STORAGE_PREFIX}${fingerprint}`);
+    const raw = window.localStorage.getItem(progressStorageKey(fingerprint));
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as EmbroideryProgress;
+    const parsed = JSON.parse(raw) as Partial<EmbroideryProgress>;
     if (parsed?.version !== 2 || parsed.fingerprint !== fingerprint) return null;
-    return parsed;
+    return {
+      version: 2,
+      fingerprint,
+      completedRuns: String(parsed.completedRuns ?? ""),
+      selectedCode: typeof parsed.selectedCode === "string" ? parsed.selectedCode : null,
+      viewport: clampViewport(parsed.viewport),
+      journal: Array.isArray(parsed.journal) ? parsed.journal : [],
+      updatedAt: typeof parsed.updatedAt === "string" ? parsed.updatedAt : new Date().toISOString(),
+    };
   } catch {
     return null;
   }
 }
 
-/** Chargement validé : la progression locale est nettoyée contre la matrice canonique du patron. */
+/** Recherche et migration automatique d'une ancienne clé locale v1, sans supprimer la source. */
+function loadLegacyProgress(pattern: RosacePattern): EmbroideryProgress | null {
+  const fingerprint = patternFingerprint(pattern);
+  for (const prefix of LEGACY_PROGRESS_STORAGE_PREFIXES) {
+    try {
+      const raw = window.localStorage.getItem(`${prefix}${fingerprint}`);
+      if (!raw) continue;
+      const migrated = migrateLegacyProgressRecord(JSON.parse(raw), pattern);
+      if (!migrated) continue;
+      try { window.localStorage.setItem(progressStorageKey(fingerprint), JSON.stringify(migrated.progress)); } catch { /* quota : la session reste utilisable */ }
+      return migrated.progress;
+    } catch { /* clé illisible : on essaie la suivante */ }
+  }
+  return null;
+}
+
+/** Chargement validé : progression v2 nettoyée, sinon ancienne progression v1 migrée. */
 export function loadPatternProgress(pattern: RosacePattern): EmbroideryProgress | null {
   const fingerprint = patternFingerprint(pattern);
   const saved = loadProgress(fingerprint);
-  if (!saved) return null;
-  const completed = [...parseRuns(String(saved.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
+  const source = saved ?? loadLegacyProgress(pattern);
+  if (!source) return null;
+  const completed = [...parseRuns(String(source.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
   return {
     version: 2,
     fingerprint,
     completedRuns: serializeRuns(completed),
-    selectedCode: saved.selectedCode && pattern.config.palette.includes(saved.selectedCode) ? saved.selectedCode : pattern.config.palette[0] ?? null,
-    viewport: clampViewport(saved.viewport),
-    journal: sanitizeJournal(pattern, saved.journal),
-    updatedAt: typeof saved.updatedAt === "string" ? saved.updatedAt : new Date().toISOString(),
+    selectedCode: canonicalSelection(source.selectedCode, pattern.config.palette) ?? pattern.config.palette[0] ?? null,
+    viewport: clampViewport(source.viewport),
+    journal: sanitizeJournal(pattern, source.journal),
+    updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date().toISOString(),
   };
 }
 
-export function saveProgress(progress: EmbroideryProgress) {
-  window.localStorage.setItem(`${PROGRESS_STORAGE_PREFIX}${progress.fingerprint}`, JSON.stringify(progress));
+/**
+ * Écriture canonique. Si un autre onglet a écrit depuis le chargement (`base`),
+ * les deux progressions sont fusionnées au lieu d'être écrasées silencieusement.
+ * Retourne l'enregistrement réellement stocké, pour mettre à jour la base locale.
+ */
+export function saveProgress(progress: EmbroideryProgress, base?: EmbroideryProgress | null): EmbroideryProgress {
+  const key = progressStorageKey(progress.fingerprint);
+  const existing = loadProgress(progress.fingerprint);
+  const record = existing && (!base || existing.updatedAt !== base.updatedAt)
+    ? reconcileProgress(existing, progress, base)
+    : progress;
+  window.localStorage.setItem(key, JSON.stringify(record));
+  return record;
 }
 
 export function deleteProgress(fingerprint: string) {
-  window.localStorage.removeItem(`${PROGRESS_STORAGE_PREFIX}${fingerprint}`);
+  window.localStorage.removeItem(progressStorageKey(fingerprint));
 }
 
 /** Unique constructeur de fichier projet : recette exacte + progression nettoyée contre la matrice. */
@@ -163,9 +302,7 @@ export function buildProject(pattern: RosacePattern, progress: EmbroideryProgres
   const fingerprint = patternFingerprint(pattern);
   if (progress.fingerprint !== fingerprint) throw new Error("La progression ne correspond pas au patron.");
   const completed = [...parseRuns(String(progress.completedRuns ?? ""))].filter((index) => isStitchIndex(pattern, index));
-  const selectedCode = progress.selectedCode && pattern.config.palette.includes(progress.selectedCode)
-    ? progress.selectedCode
-    : null;
+  const selectedCode = canonicalSelection(progress.selectedCode, pattern.config.palette);
   return {
     format: PROJECT_FORMAT,
     version: PROJECT_VERSION,
@@ -182,15 +319,49 @@ export function buildProject(pattern: RosacePattern, progress: EmbroideryProgres
 }
 
 export type ImportResult =
-  | { ok: true; config: RosaceConfig; progress: EmbroideryProgress }
+  | { ok: true; config: RosaceConfig; progress: EmbroideryProgress; migratedFrom?: 1; warning?: string }
   | { ok: false; error: string };
 
-/** Unique validateur de projet : recette régénérée, empreinte, cases et journal vérifiés. */
+/** Migration d'un projet version 1 : recette régénérée, ancienne empreinte recalculée. */
+function migrateProjectV1(raw: unknown): ImportResult {
+  const project = raw as Partial<ProjectFile> & { progress?: unknown; config?: unknown; fingerprint?: unknown };
+  if (!project || typeof project !== "object") {
+    return { ok: false, error: "Projet ROSACE version 1 détecté, mais le fichier est illisible : migration impossible." };
+  }
+  if (project.format && project.format !== PROJECT_FORMAT) {
+    return { ok: false, error: "Projet version 1 détecté, mais son format est inconnu : migration impossible." };
+  }
+  if (!project.config || typeof project.config !== "object") {
+    return { ok: false, error: "Projet ROSACE version 1 détecté, mais la recette est absente : migration impossible." };
+  }
+  try {
+    const config = normalizeConfig(project.config as RosaceConfig);
+    const regenerated = generateRosace(config);
+    const fingerprint = patternFingerprint(regenerated);
+    const migrated = migrateLegacyProgressRecord(project.progress ?? project, regenerated);
+    if (!migrated) {
+      return { ok: false, error: "Projet ROSACE version 1 détecté, mais la progression est dans un format inconnu : migration impossible." };
+    }
+    const notes = ["Projet version 1 migré au format version 2."];
+    if (typeof project.fingerprint === "string" && project.fingerprint !== fingerprint) notes.push("L'ancienne empreinte a été recalculée à partir de la recette.");
+    if (migrated.warning) notes.push(migrated.warning);
+    return { ok: true, config, progress: migrated.progress, migratedFrom: 1, warning: notes.join(" ") };
+  } catch {
+    return { ok: false, error: "Projet ROSACE version 1 détecté, mais la recette est invalide : migration impossible." };
+  }
+}
+
+/** Unique validateur de projet : v2 strict, v1 migré explicitement, sinon message clair. */
 export function importProject(raw: unknown): ImportResult {
   try {
+    const probe = raw as { version?: unknown; format?: unknown } | null;
+    if (!probe || typeof probe !== "object") {
+      return { ok: false, error: "Le fichier n'est pas un projet ROSACE lisible." };
+    }
+    if (probe.version === LEGACY_PROJECT_VERSION) return migrateProjectV1(raw);
     const project = raw as Partial<ProjectFile>;
-    if (!project || project.format !== PROJECT_FORMAT || project.version !== PROJECT_VERSION) {
-      return { ok: false, error: "Ce fichier n'est pas un projet ROSACE version 2." };
+    if (project.format !== PROJECT_FORMAT || project.version !== PROJECT_VERSION) {
+      return { ok: false, error: "Ce fichier n'est pas un projet ROSACE version 2. Les projets version 1 sont migrés automatiquement." };
     }
     if (!project.config || typeof project.fingerprint !== "string" || !project.progress) {
       return { ok: false, error: "Le fichier projet est incomplet." };
@@ -205,9 +376,7 @@ export function importProject(raw: unknown): ImportResult {
     if (completed.some((index) => !isStitchIndex(regenerated, index))) {
       return { ok: false, error: "La progression contient des cases vides ou hors de la grille : import refusé." };
     }
-    const selectedCode = typeof project.progress.selectedCode === "string" && config.palette.includes(project.progress.selectedCode)
-      ? project.progress.selectedCode
-      : null;
+    const selectedCode = canonicalSelection(project.progress.selectedCode, config.palette);
     return {
       ok: true,
       config,
