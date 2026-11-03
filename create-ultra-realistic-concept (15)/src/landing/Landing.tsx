@@ -11,6 +11,7 @@ const LIENS = [
   { href: "#realisation", label: "Réalisation" },
   { href: "#vues", label: "Deux vues" },
   { href: "#progression", label: "Progression" },
+  { href: "#atelier-importer", label: "Importer" },
 ];
 
 const INFOS = [
@@ -122,12 +123,12 @@ export function Landing() {
                 Composer une rosace
                 <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
               </a>
-              <a className="bouton bouton-contour" href="#realisation">
-                Voir comment ça marche
+              <a className="bouton bouton-contour" href="#atelier-importer">
+                Importer un patron PDF
               </a>
             </div>
             <p className="heros-mention">
-              Gratuit à essayer <span aria-hidden="true">·</span> Aucun compte nécessaire pour commencer
+              Gratuit à essayer <span aria-hidden="true">·</span> Aucun compte nécessaire pour commencer <span aria-hidden="true">·</span> <a href="#realisation">Voir comment ça marche</a>
             </p>
           </div>
 

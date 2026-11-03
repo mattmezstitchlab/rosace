@@ -122,6 +122,9 @@ function useRosaceState() {
   const [activeDimension, setActiveDimension] = useState<DimensionKey>("structure");
   const [favorites, setFavorites] = useState<SavedRosace[]>(readFavorites);
   const [embroideryOpen, setEmbroideryOpen] = useState(() => window.location.hash.startsWith("#atelier-broder"));
+  /** Import PDF : ouvert par le dock, la landing ou `#atelier-importer` ; le fichier n'est lu qu'ici. */
+  const [importOpen, setImportOpen] = useState(() => window.location.hash.startsWith("#atelier-importer"));
+  const [importFile, setImportFile] = useState<File | null>(null);
   /** Incrémenté après un import : force le mode Broderie à relire la progression canonique. */
   const [progressRevision, setProgressRevision] = useState(0);
   const [panel, setPanel] = useState<PanelId | null>(panelFromHash);
@@ -210,11 +213,12 @@ function useRosaceState() {
    * la recette (`#r=`) pour une rosace, `#atelier-patron` pour un patron importé qui n'a pas de recette.
    */
   useEffect(() => {
+    if (importOpen) return; // `#atelier-importer` reste lisible tant que l'import est ouvert.
     const hash = imported ? IMPORTED_HASH : `#r=${encodeConfig(config)}`;
     if (window.location.hash !== hash) {
       window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
     }
-  }, [config, imported]);
+  }, [config, imported, importOpen]);
 
   /** Un patron importé remplace l'ouvrage actif ; la recette reste intacte pour y revenir. */
   const loadImportedWork = useCallback((next: StitchWork, options?: { openEmbroidery?: boolean }) => {
@@ -222,8 +226,26 @@ function useRosaceState() {
     setInspectCode(null);
     setCollectionOpen(false);
     setPanel(null);
+    setImportOpen(false);
+    setImportFile(null);
     setProgressRevision((value) => value + 1);
     setEmbroideryOpen(options?.openEmbroidery ?? true);
+  }, []);
+
+  const openImport = useCallback((file?: File) => {
+    setPanel(null);
+    setEmbroideryOpen(false);
+    setCollectionOpen(false);
+    if (file) setImportFile(file);
+    setImportOpen(true);
+  }, []);
+  /** Annuler l'import ne touche à rien : ni la recette, ni l'ouvrage actif, ni sa progression. */
+  const closeImport = useCallback(() => {
+    setImportOpen(false);
+    setImportFile(null);
+    if (window.location.hash.startsWith("#atelier-importer")) {
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}#atelier`);
+    }
   }, []);
 
   /** Quitte le patron importé : la rosace de la recette redevient l'ouvrage actif. */
@@ -239,6 +261,7 @@ function useRosaceState() {
       const target = panelFromHash();
       if (target) setPanel(target);
       if (window.location.hash.startsWith("#atelier-broder")) setEmbroideryOpen(true);
+      if (window.location.hash.startsWith("#atelier-importer")) setImportOpen(true);
       applyLocationRecipe();
     };
     window.addEventListener("hashchange", onNavigate);
@@ -527,6 +550,7 @@ function useRosaceState() {
 
   return {
     config, pattern, work, imported, loadImportedWork, clearImportedWork, canFavorite,
+    importOpen, importFile, setImportFile, openImport, closeImport,
     warnings, history, future, isDefault, shareUrl,
     activeIndex, inspectedCode, activeDimension, setActiveDimension,
     favorites, savedCurrent, toasts,

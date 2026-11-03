@@ -1,8 +1,9 @@
 import { Minus, Plus, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { getThread } from "../data/dmc";
-import { FABRIC_COLORS, getPatternName, SYMBOLS } from "../lib/rosace";
-import { formatSeed, useRosaceApi } from "../state/rosace-store";
+import { workTitle } from "../lib/exporters";
+import { FABRIC_COLORS, getPatternName } from "../lib/rosace";
+import { useRosaceApi } from "../state/rosace-store";
 import { RosaceCanvas } from "./RosaceCanvas";
 
 /**
@@ -13,7 +14,10 @@ import { RosaceCanvas } from "./RosaceCanvas";
  */
 export function Loupe() {
   const api = useRosaceApi();
-  const { config, pattern, loupeOpen, setLoupeOpen } = api;
+  const { work: pattern, loupeOpen, setLoupeOpen } = api;
+  const config = pattern.textile;
+  const title = workTitle(pattern);
+  const subtitle = pattern.origin.kind === "rosace" ? getPatternName(pattern.origin.config) : `${pattern.origin.provenance.file} · patron importé`;
   const [zoom, setZoom] = useState(1);
   const closeRef = useRef<HTMLButtonElement>(null);
   const used = pattern.usage.filter((usage) => usage.count > 0);
@@ -40,11 +44,11 @@ export function Loupe() {
   if (!loupeOpen) return null;
 
   return (
-    <div className="loupe" role="dialog" aria-modal="true" aria-label={`Détail de la rosace n° ${formatSeed(config.seed)}`}>
+    <div className="loupe" role="dialog" aria-modal="true" aria-label={`Détail, ${title}`}>
       <header className="loupe-tete">
         <div>
-          <p className="surtitre">Détail · {pattern.size} × {pattern.size} points</p>
-          <p className="loupe-titre">Rosace n° {formatSeed(config.seed)} <span>{getPatternName(config)}</span></p>
+          <p className="surtitre">Détail · {pattern.width} × {pattern.height} points</p>
+          <p className="loupe-titre">{title} <span>{subtitle}</span></p>
         </div>
         <div className="loupe-outils">
           <div className="zoom" role="group" aria-label="Zoom du détail">
@@ -74,7 +78,7 @@ export function Loupe() {
             const thread = getThread(usage.code);
             return (
               <li key={usage.paletteIndex}>
-                <b aria-hidden="true">{usage.symbol ?? SYMBOLS[usage.paletteIndex]}</b>
+                <b aria-hidden="true">{usage.symbol}</b>
                 <i style={{ background: thread.hex }} aria-hidden="true" />
                 <span>DMC {usage.code}</span>
               </li>

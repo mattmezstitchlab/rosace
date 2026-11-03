@@ -493,6 +493,11 @@ const PUBLICS = [
     titre: "Je veux préparer un ouvrage",
     texte: "Obtenir une grille, des couleurs et des dimensions précises avant de piquer l'aiguille.",
   },
+  {
+    titre: "J'ai déjà un patron PDF",
+    texte: "Importer ses pages, recomposer la grille dans l'atelier et suivre chaque croix jusqu'à la dernière.",
+    href: "#atelier-importer",
+  },
 ];
 
 function Public() {
@@ -515,6 +520,7 @@ function Public() {
             <span className="public-num">0{index + 1}</span>
             <h3>{entree.titre}</h3>
             <p>{entree.texte}</p>
+            {"href" in entree && entree.href && <a className="lien-souligne" href={entree.href}>Importer un patron</a>}
           </li>
         ))}
       </ul>

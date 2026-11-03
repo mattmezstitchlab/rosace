@@ -109,8 +109,15 @@ html[data-mode="nuit"] .panneau-alertes { background: #3a2f12; color: #f6e3b4; }
 .dock-categorie.is-active { color: var(--encre); background: var(--doux); }
 .dock-categorie kbd { display: none; }
 @media (max-width: 480px) {
-  .dock-categorie { gap: 4px; min-height: 56px; font-size: 8.6px; letter-spacing: .01em; }
-  .dock-categorie > svg { width: 23px; height: 23px; }
+  /* Sept verbes sur 390 px : le dock perd ses marges latérales, chaque entrée garde son mot entier. */
+  .studio-dock { gap: 0; padding-left: 2px; padding-right: 2px; }
+  .dock-categorie { gap: 4px; min-height: 56px; padding: 7px 1px 6px; font-size: 7.6px; letter-spacing: 0; }
+  .dock-categorie > span:not(.dock-alerte) { letter-spacing: .02em; }
+  .dock-categorie > svg { width: 22px; height: 22px; }
+}
+@media (max-width: 360px) {
+  .dock-categorie { font-size: 7px; }
+  .dock-categorie > svg { width: 20px; height: 20px; }
 }
 .dock-alerte { position: absolute; top: 7px; right: calc(50% - 17px); width: 7px; height: 7px; border-radius: 50%; background: #d97706; box-shadow: 0 0 0 2px var(--carte); }
 

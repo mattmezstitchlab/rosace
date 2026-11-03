@@ -1,0 +1,149 @@
+/* ---------- Importer un patron PDF : même famille visuelle que le mode Broder ---------- */
+.importer { position: fixed; z-index: 240; inset: 0; display: flex; height: 100dvh; flex-direction: column; overflow: hidden; color: var(--encre); background: var(--fond); }
+.importer-tete { display: flex; flex: none; align-items: center; gap: 10px; padding: calc(8px + env(safe-area-inset-top)) 12px 8px; border-bottom: 1px solid var(--trait); background: var(--carte); }
+.importer-titre { display: flex; min-width: 0; flex: 1; flex-direction: column; gap: 2px; }
+.importer-titre strong { overflow: hidden; font-size: 16px; font-weight: 650; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
+.importer-titre span { overflow: hidden; color: var(--encre-3); font-size: 12px; text-overflow: ellipsis; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.importer-etapes { display: none; margin: 0; padding: 0; list-style: none; gap: 4px; }
+@media (min-width: 720px) { .importer-etapes { display: flex; } }
+.importer-etapes button { display: inline-flex; min-height: 36px; align-items: center; gap: 7px; padding: 0 12px 0 6px; border: 1px solid transparent; border-radius: var(--rayon-pilule); background: transparent; color: var(--encre-3); font-size: 12px; font-weight: 600; }
+.importer-etapes button i { display: grid; width: 20px; height: 20px; place-items: center; border-radius: 50%; background: var(--doux); font-style: normal; font-size: 10.5px; font-weight: 800; }
+.importer-etapes button.is-active { color: var(--fond); background: var(--encre); }
+.importer-etapes button.is-active i { color: var(--encre); background: var(--fond); }
+.importer-etapes button.is-done { color: var(--encre); }
+.importer-etapes button:disabled { opacity: .45; }
+.importer-progression { flex: none; height: 3px; background: var(--trait); }
+.importer-progression span { display: block; height: 100%; background: var(--plum); transition: width .25s ease-out; }
+.importer-corps { flex: 1; min-height: 0; padding: 14px clamp(12px, 2.5vw, 28px) calc(16px + env(safe-area-inset-bottom)); overflow: auto; overscroll-behavior: contain; }
+.importer-corps-centre { display: grid; place-items: center; }
+.importer-alerte { margin: 0 0 12px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--erreur) 35%, var(--trait)); border-radius: var(--rayon-champ); background: color-mix(in srgb, var(--erreur) 7%, var(--carte)); color: var(--encre); font-size: 13px; line-height: 1.5; }
+.importer-h2 { margin: 0 0 8px; font-size: clamp(18px, 2.4vw, 24px); font-weight: 650; letter-spacing: -.025em; line-height: 1.15; }
+.importer-texte { margin: 0 0 16px; max-width: 70ch; color: var(--encre-2); font-size: 13.5px; line-height: 1.55; }
+.importer-colonne { max-width: 960px; margin: 0 auto; }
+.importer-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.importer-actions .bouton { min-height: 48px; }
+.importer-actions .bouton.noir { flex: 1; }
+
+/* Dépôt */
+.importer-depot { display: flex; max-width: 560px; flex-direction: column; align-items: center; gap: 12px; padding: clamp(28px, 5vw, 48px) clamp(20px, 4vw, 40px); border: 1.5px dashed var(--trait-2); border-radius: var(--rayon-xl); background: var(--carte); text-align: center; transition: border-color .15s, background .15s; }
+.importer-depot.is-over { border-color: var(--encre); background: var(--doux); }
+.importer-depot h2 { margin: 4px 0 0; font-size: 22px; font-weight: 650; letter-spacing: -.025em; }
+.importer-depot p { margin: 0; max-width: 44ch; color: var(--encre-2); font-size: 14px; line-height: 1.55; }
+.importer-depot small { color: var(--encre-3); font-size: 11.5px; line-height: 1.5; }
+
+/* Pages analysées */
+.importer-pages { display: grid; grid-template-columns: repeat(auto-fill, minmax(132px, 1fr)); gap: 10px; margin: 0; padding: 0; list-style: none; }
+.importer-page { display: flex; width: 100%; flex-direction: column; overflow: hidden; border: 1px solid var(--trait); border-radius: var(--rayon-sm); background: var(--carte); text-align: left; transition: transform .15s, box-shadow .15s; }
+.importer-page:hover { box-shadow: var(--ombre-dock); transform: translateY(-1px); }
+.importer-page:focus-visible { outline: 2px solid var(--encre); outline-offset: 2px; }
+.importer-page img { display: block; width: 100%; aspect-ratio: 1 / 1.1; object-fit: cover; background: #fff; }
+.importer-page span { display: flex; justify-content: space-between; gap: 6px; padding: 7px 9px; font-size: 11.5px; font-weight: 600; }
+.importer-page em { color: var(--encre-3); font-style: normal; font-weight: 500; }
+.importer-page em.is-chart { color: var(--plum); font-weight: 650; }
+
+/* Deux colonnes : scène + côté */
+.importer-deux { display: grid; gap: 14px; max-width: 1400px; margin: 0 auto; }
+@media (min-width: 960px) { .importer-deux { grid-template-columns: minmax(0, 1fr) 330px; align-items: start; } }
+.importer-cote { display: flex; flex-direction: column; gap: 12px; }
+.importer-section { padding: 12px 14px; border: 1px solid var(--trait); border-radius: var(--rayon-carte); background: var(--carte); }
+.importer-section .surtitre { margin-bottom: 8px; }
+.importer-cote .panneau-aide { margin-top: 8px; }
+
+/* Calage */
+.importer-onglets { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+.importer-onglets button { min-height: 32px; padding: 0 10px; border: 1px solid var(--trait-2); border-radius: var(--rayon-pilule); background: var(--carte); color: var(--encre-2); font-size: 12px; font-weight: 600; }
+.importer-onglets button.is-active { color: var(--fond); border-color: var(--encre); background: var(--encre); }
+.importer-feuille { position: relative; overflow: hidden; border: 1px solid var(--trait); border-radius: var(--rayon-carte); background: #fff; box-shadow: var(--ombre-dock); touch-action: none; user-select: none; }
+.importer-feuille.is-dessin { cursor: crosshair; outline: 2px solid var(--plum); }
+.importer-feuille > img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: fill; pointer-events: none; }
+.importer-bloc { position: absolute; border: 2px solid var(--plum); background: color-mix(in srgb, var(--plum) 14%, transparent); pointer-events: none; }
+.importer-bloc span { position: absolute; top: -20px; left: -2px; padding: 2px 6px; border-radius: 6px; background: var(--plum); color: #fff; font-size: 10px; font-weight: 700; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.importer-bloc.is-exclu { border-style: dashed; opacity: .45; }
+.importer-bloc.is-dessin { border-color: var(--encre); background: color-mix(in srgb, var(--encre) 10%, transparent); }
+.importer-liste { display: flex; flex-direction: column; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
+.importer-liste li { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border: 1px solid var(--trait); border-radius: var(--rayon-champ); background: var(--carte); font-size: 13px; font-weight: 600; }
+.importer-liste li.is-exclu { opacity: .5; }
+.importer-liste label { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--encre-3); font-size: 11px; font-weight: 500; }
+.importer-liste input[type="number"] { width: 62px; height: 36px; padding: 0 6px; border: 1px solid var(--trait-champ); border-radius: 9px; background: var(--carte); color: var(--encre); font-size: 13px; font-weight: 600; text-align: center; }
+.importer-liste input:focus { outline: none; border-color: var(--encre); box-shadow: 0 0 0 3px var(--doux); }
+.importer-liste .outil-icone { width: 36px; height: 36px; color: var(--encre-3); }
+.importer-liste .outil-icone[aria-pressed="true"] { color: var(--erreur); }
+.importer-vide { color: var(--encre-3); font-weight: 500; }
+
+/* Montage */
+.importer-montage { min-height: 60dvh; }
+.importer-plateau-zone { display: flex; min-width: 0; flex-direction: column; gap: 8px; }
+.importer-barre { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.importer-segments { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 3px; border: 1px solid var(--trait); border-radius: var(--rayon-champ); background: var(--doux); }
+.importer-segments button { display: inline-flex; min-height: 34px; align-items: center; gap: 6px; padding: 0 11px; border: 0; border-radius: 9px; background: transparent; color: var(--encre-3); font-size: 12.5px; font-weight: 600; }
+.importer-segments button[aria-pressed="true"] { color: var(--encre); background: var(--carte); box-shadow: var(--ombre-bascule); }
+.importer-zoom { display: flex; align-items: center; gap: 4px; }
+.importer-plateau { position: relative; display: flex; min-height: 420px; max-height: 70dvh; flex: 1; align-items: flex-start; justify-content: flex-start; overflow: auto; padding: 12px; border: 1px solid var(--trait); border-radius: var(--rayon-carte); background: var(--papier); background-image: radial-gradient(circle, color-mix(in srgb, var(--encre) 10%, transparent) 1px, transparent 1px); background-size: 24px 24px; overscroll-behavior: contain; }
+.importer-note { position: sticky; top: 0; left: 0; z-index: 5; margin: 0 0 10px; padding: 6px 10px; border-radius: 9px; background: color-mix(in srgb, var(--carte) 92%, transparent); color: var(--encre-2); font-size: 11.5px; line-height: 1.45; backdrop-filter: blur(6px); }
+.importer-table { position: relative; flex: none; min-width: 240px; min-height: 240px; margin: auto; border-radius: 10px; background-color: var(--carte); background-image: linear-gradient(to right, var(--trait) 1px, transparent 1px), linear-gradient(to bottom, var(--trait) 1px, transparent 1px); box-shadow: var(--ombre-dock); }
+.importer-guide { position: absolute; z-index: 30; pointer-events: none; background: var(--libre); box-shadow: 0 0 6px var(--libre); }
+.importer-guide-v { top: 0; bottom: 0; width: 2px; }
+.importer-guide-h { right: 0; left: 0; height: 2px; }
+.importer-carte { position: absolute; z-index: 20; overflow: hidden; border: 1px solid var(--trait-2); border-radius: 7px; background: #fff; box-shadow: 0 4px 14px -6px rgba(11,11,12,.35); cursor: grab; touch-action: none; user-select: none; transition: box-shadow .12s; }
+.importer-carte:hover { box-shadow: 0 10px 24px -10px rgba(11,11,12,.45); }
+.importer-carte:focus-visible { outline: 2px solid var(--encre); outline-offset: 1px; z-index: 35; }
+.importer-carte.is-drag { z-index: 40; cursor: grabbing; box-shadow: 0 24px 48px -16px rgba(11,11,12,.6); outline: 2px solid var(--plum); }
+.importer-carte.is-recouvre { outline: 2px solid var(--erreur); }
+.importer-carte img { position: absolute; max-width: none; object-fit: fill; pointer-events: none; }
+.importer-carte-badge { position: absolute; top: 5px; left: 5px; z-index: 2; display: inline-flex; align-items: center; gap: 5px; padding: 2px 7px; border-radius: var(--rayon-pilule); background: rgba(11,11,12,.82); color: #fff; font-size: 10px; font-weight: 800; pointer-events: none; }
+.importer-carte-badge em { font-style: normal; font-weight: 500; opacity: .75; }
+.importer-apercu { display: grid; min-height: 420px; max-height: 70dvh; place-items: center; overflow: auto; padding: 12px; border: 1px solid var(--trait); border-radius: var(--rayon-carte); background: #fffefa; }
+.importer-apercu canvas { display: block; max-width: 100%; max-height: calc(70dvh - 24px); height: auto; }
+.importer-apercu p { margin: 0; color: var(--encre-3); font-size: 13px; }
+.importer-apercu-final { min-height: 50dvh; }
+.importer-resume { margin: 0; color: var(--encre-3); font-size: 12px; font-variant-numeric: tabular-nums; }
+.importer-resume .is-attention { color: #a35a00; font-weight: 650; }
+html[data-mode="nuit"] .importer-resume .is-attention { color: #e8a94c; }
+.importer-case { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 13px; }
+.importer-case input { width: 18px; height: 18px; accent-color: var(--encre); }
+.importer-curseur { display: block; margin-top: 8px; color: var(--encre-3); font-size: 12px; }
+.importer-curseur input { display: block; width: 100%; margin-top: 4px; accent-color: var(--encre); }
+.importer-cartes-liste { display: flex; max-height: 220px; flex-direction: column; gap: 4px; margin: 0; padding: 0; overflow-y: auto; list-style: none; }
+.importer-cartes-liste li { display: flex; align-items: center; gap: 8px; padding: 4px 4px 4px 8px; border: 1px solid var(--trait); border-radius: 10px; background: var(--doux); cursor: grab; }
+.importer-cartes-liste i { display: grid; width: 24px; height: 24px; flex: none; place-items: center; border-radius: 7px; background: var(--carte); font-style: normal; font-size: 11px; font-weight: 800; }
+.importer-cartes-liste img { width: 30px; height: 38px; flex: none; border-radius: 4px; background: #fff; object-fit: cover; }
+.importer-cartes-liste span { min-width: 0; flex: 1; overflow: hidden; font-size: 12px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; }
+.importer-cartes-liste .outil-icone { width: 32px; height: 32px; font-size: 14px; }
+.importer-cartes-liste .outil-icone:disabled { opacity: .25; }
+.importer-fils { display: flex; max-height: 300px; flex-direction: column; gap: 8px; margin: 10px 0 0; padding: 0 2px 0 0; overflow-y: auto; list-style: none; }
+.importer-fils li { padding: 8px 10px; border: 1px solid var(--trait); border-radius: var(--rayon-champ); background: var(--doux); }
+.importer-fil-tete { display: flex; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
+.importer-fil-tete i { width: 20px; height: 20px; flex: none; border: 1px solid rgba(11,11,12,.15); border-radius: 6px; }
+.importer-fil-tete span { min-width: 0; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.importer-fil-tete small { color: var(--encre-3); font-weight: 500; font-variant-numeric: tabular-nums; }
+.importer-fils label { display: flex; align-items: center; gap: 8px; margin-top: 6px; color: var(--encre-3); font-size: 11.5px; }
+.importer-fils input, .importer-champ { height: 38px; min-width: 0; flex: 1; padding: 0 10px; border: 1px solid var(--trait-champ); border-radius: 9px; background: var(--carte); color: var(--encre); font-size: 13px; font-weight: 600; }
+.importer-champ { width: 100%; }
+.importer-fils input[aria-invalid="true"] { border-color: #d97706; }
+.importer-fils input:focus, .importer-champ:focus { outline: none; border-color: var(--encre); box-shadow: 0 0 0 3px var(--doux); }
+.importer-erreur { margin: 4px 0 0; color: #a35a00; font-size: 11px; }
+.importer-suggestions { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.importer-suggestions button { display: inline-flex; min-height: 30px; align-items: center; gap: 5px; padding: 0 8px; border: 1px solid var(--trait-2); border-radius: 8px; background: var(--carte); font-size: 11.5px; font-weight: 600; }
+.importer-suggestions i { width: 12px; height: 12px; border-radius: 3px; }
+
+/* Vérifier */
+.importer-controles { display: flex; flex-direction: column; gap: 6px; margin: 12px 0; padding: 0; list-style: none; }
+.importer-controles li { padding: 9px 12px 9px 14px; border-left: 3px solid var(--libre); border-radius: 10px; background: var(--carte); font-size: 13px; line-height: 1.5; }
+.importer-controles li.is-attention { border-left-color: #d97706; }
+.importer-controles li.is-bloquant { border-left-color: var(--erreur); }
+.importer-controles label { display: flex; align-items: flex-start; gap: 10px; cursor: pointer; }
+.importer-controles input { margin-top: 3px; width: 18px; height: 18px; flex: none; accent-color: var(--encre); }
+.importer-controles em { color: var(--encre-3); font-style: normal; font-weight: 600; }
+
+/* Occupé */
+.importer-busy { position: sticky; bottom: 8px; display: flex; width: max-content; max-width: 100%; align-items: center; gap: 10px; margin: 14px auto 0; padding: 9px 16px; border: 1px solid var(--trait); border-radius: var(--rayon-pilule); background: color-mix(in srgb, var(--carte) 94%, transparent); font-size: 13px; box-shadow: var(--ombre-dock); backdrop-filter: blur(8px); }
+.importer-spinner { width: 14px; height: 14px; border: 2px solid var(--trait-2); border-top-color: var(--encre); border-radius: 50%; animation: importer-tour .8s linear infinite; }
+@keyframes importer-tour { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .importer-spinner { animation-duration: 2s; } .importer-progression span, .importer-page { transition: none; } }
+
+/* Panneaux de l'atelier quand l'ouvrage actif est un patron importé */
+.panneau-import .panneau-aide strong { color: var(--encre); font-weight: 650; }
+.panneau-fils-import { display: flex; flex-direction: column; gap: 4px; margin: 12px 0 0; padding: 0; list-style: none; }
+.panneau-fils-import li { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
+.panneau-fils-import i { display: grid; width: 26px; height: 26px; flex: none; place-items: center; border: 1px solid var(--trait-2); border-radius: 7px; font-style: normal; font-size: 13px; }
+.panneau-fils-import small { color: var(--encre-3); font-weight: 500; }

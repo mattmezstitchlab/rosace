@@ -61,6 +61,13 @@ async function checkConfiguration(browser: Browser, id: string, viewport: { widt
 
     const results = await new AxeBuilder({ page }).analyze();
 
+    /* L'import PDF (zone de dépôt) est contrôlé lui aussi : même exigence que le reste de l'atelier. */
+    await page.evaluate(() => { window.location.hash = "#atelier-importer"; });
+    await page.locator(".importer-depot").waitFor({ state: "visible" });
+    const importer = await new AxeBuilder({ page }).analyze();
+    await page.getByRole("button", { name: "Fermer l'import" }).click();
+    await page.locator(".importer").waitFor({ state: "detached" });
+
     /* La présentation est aussi contrôlée : c'est la première page vue. */
     const landingUrl = new URL(BASE_URL);
     landingUrl.searchParams.set("vue", "presentation");
@@ -84,7 +91,7 @@ async function checkConfiguration(browser: Browser, id: string, viewport: { widt
       secondFocusTag,
       keyboardOpenedPanel,
       escapeClosedPanel,
-      violations: results.violations.map((violation) => ({
+      violations: [...results.violations, ...importer.violations.map((violation) => ({ ...violation, id: `importer:${violation.id}` }))].map((violation) => ({
         id: violation.id,
         impact: violation.impact,
         nodes: violation.nodes.length,

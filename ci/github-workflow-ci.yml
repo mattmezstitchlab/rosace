@@ -43,7 +43,7 @@ jobs:
         working-directory: create-ultra-realistic-concept (15)
         run: npm run typecheck
 
-      - name: Build singlefile
+      - name: Build (multifichier, dist/)
         working-directory: create-ultra-realistic-concept (15)
         run: npm run build
 

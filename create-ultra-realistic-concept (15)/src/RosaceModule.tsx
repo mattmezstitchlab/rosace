@@ -1,3 +1,4 @@
+import { Suspense, lazy } from "react";
 import { Composer } from "./components/Composer";
 import { EmbroideryView } from "./components/EmbroideryView";
 import { CatalogDialog, CollectionDialog } from "./components/Dialogs";
@@ -7,6 +8,19 @@ import { RosaceProvider, useRosaceApi } from "./state/rosace-store";
 
 function Toasts() {
   return <ToastStack messages={useRosaceApi().toasts} />;
+}
+
+/** L'import PDF et son moteur (pdf.js) ne sont chargés qu'à l'ouverture de l'import. */
+const ImportPdf = lazy(() => import("./components/ImportPdf").then((module) => ({ default: module.ImportPdf })));
+
+function ImportGate() {
+  const { importOpen } = useRosaceApi();
+  if (!importOpen) return null;
+  return (
+    <Suspense fallback={<div className="importer" role="status" aria-live="polite"><p className="importer-busy"><span className="importer-spinner" aria-hidden="true" />Chargement de l'import PDF…</p></div>}>
+      <ImportPdf />
+    </Suspense>
+  );
 }
 
 /**
@@ -22,6 +36,7 @@ export function RosaceContent() {
       </main>
       <CatalogDialog />
       <CollectionDialog />
+      <ImportGate />
       <EmbroideryView />
       <Loupe />
       <Toasts />

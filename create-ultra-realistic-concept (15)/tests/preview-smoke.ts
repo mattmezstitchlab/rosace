@@ -1,6 +1,6 @@
 /**
  * Fumage du build de production réellement servi par `npm run preview`.
- * Vérifie le singlefile, l'absence de client Vite, le rendu de base et une action fonctionnelle.
+ * Vérifie le build servi (multifichier, moteur d'import chargé à la demande), l'absence de client Vite, le rendu de base et une action fonctionnelle.
  */
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
@@ -57,8 +57,10 @@ async function main() {
     assert.equal(await page.locator(".crown-seg").count(), 489, "couronne chromatique absente du build");
     assert.match((await page.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/);
 
-    const externalScripts = await page.locator("script[src]").count();
-    assert.equal(externalScripts, 0, "le build singlefile ne doit pas charger de script externe");
+    /* Build multifichier : les scripts viennent du dossier assets/ du build, jamais d'un hôte tiers. */
+    const scriptSources = await page.locator("script[src]").evaluateAll((nodes) => nodes.map((node) => (node as HTMLScriptElement).src));
+    assert.ok(scriptSources.every((src) => src.startsWith(BASE_URL) && src.includes("/assets/")), `script externe au build : ${scriptSources.join(", ")}`);
+    assert.ok(!requests.some((url) => /ImportPdf|pdfjs|pdf\.worker/.test(url)), "le moteur d'import PDF ne doit pas être chargé avant l'ouverture de l'import");
     assert.ok(!requests.some((url) => url.includes("/@vite/client")), "le client Vite de dev est servi par erreur");
     assert.ok(!requests.some((url) => /\/src\//.test(url)), "un module source non compilé est servi par erreur");
 
