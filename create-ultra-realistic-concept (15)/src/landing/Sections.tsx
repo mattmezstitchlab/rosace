@@ -3,7 +3,6 @@ import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Layers, 
 import { EmbroideryHoop } from "../components/RosaceCanvas";
 import { SYMBOLS, formatDuration } from "../lib/rosace";
 import { formatMinutes } from "../lib/sessions";
-import aida from "../assets/aida-macro.jpg";
 import { DEMO_FORECAST, DEMO_HOOP, HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
 import { EcranImport, Tablette } from "./devices";
 import { DmcCrown, RosaceRender } from "./media";
@@ -148,18 +147,6 @@ function Couleurs() {
             <p className="couleurs-legende">
               <strong>{nombre(489)}</strong> références DMC Mouliné, une couronne continue.
             </p>
-          </div>
-
-          <div className="couleurs-duo">
-            <div className="couleurs-apercu">
-              <RosaceRender pattern={HERO_PATTERN} resolution={560} label="La rosace brodée avec la palette DMC retenue" />
-              <p className="couleurs-apercu-legende">La même rosace, une fois les fils choisis.</p>
-            </div>
-
-            <figure className="couleurs-matiere">
-              <img src={aida} alt="Aïda naturelle, fil de coton et aiguille posés sur la toile" loading="lazy" />
-              <figcaption>La matière : aïda 14, deux brins, un tambour de 20 cm.</figcaption>
-            </figure>
           </div>
         </div>
 
