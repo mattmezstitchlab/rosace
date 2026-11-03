@@ -20,6 +20,8 @@
 .broder-resume strong { font-size: 18px; font-weight: 700; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
 .broder-resume > div { font-size: 13px; color: var(--encre-2); }
 .broder-resume p { margin: 0; color: var(--encre-3); font-size: 11px; text-align: right; white-space: nowrap; }
+.broder-filtres-ligne { display: flex; flex-wrap: wrap; gap: 8px; }
+.broder-filtres-ligne .broder-filtres { flex: 1 1 260px; }
 .broder-filtres { display: flex; gap: 5px; }
 .broder-filtres button { display: inline-flex; flex: 1; min-height: 36px; align-items: center; justify-content: center; gap: 5px; padding: 0 8px; border: 1px solid var(--trait-2); border-radius: 10px; background: var(--carte); color: var(--encre-3); font-size: 12px; font-weight: 600; }
 .broder-filtres button.is-active { color: var(--fond); border-color: var(--encre); background: var(--encre); }

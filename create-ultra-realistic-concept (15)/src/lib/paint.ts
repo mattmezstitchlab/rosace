@@ -11,13 +11,17 @@ import { toWork, type StitchWork } from "./work";
  * Le réalisme vient de trois détails : le tissage réel de l'aïda, les trous aux
  * intersections, et du fil bombé avec son brin inférieur, son brin supérieur et sa soie.
  */
-export type CanvasMode = "fabric" | "chart";
+/**
+ * `fabric` : la toile et ses croix bombées (tambour) · `chart` : la grille à symboles (lecture classique) ·
+ * `color` : la grille à cases pleines de la couleur du fil · `color-chart` : cases pleines + symbole en contraste.
+ */
+export type CanvasMode = "fabric" | "chart" | "color" | "color-chart";
 
 /** `chartGeometry(side, size, mode)` reste valide pour une grille carrée ; `(side, width, height, mode)` pour une grille rectangulaire. */
 export function chartGeometry(side: number, width: number, heightOrMode: number | CanvasMode, modeArg?: CanvasMode) {
   const height = typeof heightOrMode === "number" ? heightOrMode : width;
   const mode: CanvasMode = typeof heightOrMode === "number" ? (modeArg ?? "chart") : heightOrMode;
-  const origin = side * (mode === "chart" ? 0.075 : 0.055);
+  const origin = side * (mode === "fabric" ? 0.055 : 0.075);
   const plot = side - origin * 2;
   const longest = Math.max(width, height);
   const cell = longest > 1 ? plot / (longest - 1) : plot;
@@ -145,6 +149,38 @@ function drawFabric(context: CanvasRenderingContext2D, side: number, tone: Fabri
   context.fillRect(0, 0, side, side);
 }
 
+/** Lignes de la grille seules (fines et repères lourds toutes les 10 cases), réutilisées par-dessus les cases colorées. */
+function drawChartLines(context: CanvasRenderingContext2D, originX: number, originY: number, width: number, height: number, cell: number, over = false) {
+  context.save();
+  const left = originX - cell / 2;
+  const top = originY - cell / 2;
+  const right = originX + (width - 1) * cell + cell / 2;
+  const bottom = originY + (height - 1) * cell + cell / 2;
+  const minor = over ? "rgba(76,49,66,0.22)" : "rgba(76,49,66,0.12)";
+  const majorColor = over ? "rgba(30,18,26,0.72)" : "rgba(76,49,66,0.38)";
+  for (let i = 0; i <= width; i += 1) {
+    const position = left + i * cell;
+    const major = i % 10 === 0;
+    context.strokeStyle = major ? majorColor : minor;
+    context.lineWidth = major ? 1.35 : 0.65;
+    context.beginPath();
+    context.moveTo(position, top);
+    context.lineTo(position, bottom);
+    context.stroke();
+  }
+  for (let i = 0; i <= height; i += 1) {
+    const position = top + i * cell;
+    const major = i % 10 === 0;
+    context.strokeStyle = major ? majorColor : minor;
+    context.lineWidth = major ? 1.35 : 0.65;
+    context.beginPath();
+    context.moveTo(left, position);
+    context.lineTo(right, position);
+    context.stroke();
+  }
+  context.restore();
+}
+
 function drawChart(context: CanvasRenderingContext2D, side: number, originX: number, originY: number, width: number, height: number, cell: number) {
   context.fillStyle = "#fffefa";
   context.fillRect(0, 0, side, side);
@@ -200,6 +236,31 @@ export function paintPattern(canvas: HTMLCanvasElement, source: RosacePattern | 
 
   if (mode === "fabric") drawFabric(context, side, pattern.textile.fabric, cell);
   else drawChart(context, side, originX, originY, pattern.width, pattern.height, cell);
+
+  if (mode === "color" || mode === "color-chart") {
+    // Cases pleines : la couleur du fil remplit la case, la grille fine reste visible par-dessus.
+    const hexes = pattern.palette.map((entry) => getThread(entry.code).hex);
+    context.save();
+    pattern.stitches.forEach((stitch) => {
+      context.fillStyle = hexes[stitch.color];
+      context.fillRect(originX + stitch.x * cell - cell / 2, originY + stitch.y * cell - cell / 2, cell + 0.2, cell + 0.2);
+    });
+    context.restore();
+    drawChartLines(context, originX, originY, pattern.width, pattern.height, cell, true);
+    if (mode === "color-chart") {
+      context.save();
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.font = `600 ${Math.max(7, cell * 0.86)}px "Inter Tight", Arial, sans-serif`;
+      pattern.stitches.forEach((stitch) => {
+        const hex = hexes[stitch.color];
+        context.fillStyle = luminance(hex) > 150 ? "rgba(20,14,18,0.82)" : "rgba(255,255,255,0.88)";
+        context.fillText(pattern.palette[stitch.color].symbol, originX + stitch.x * cell, originY + stitch.y * cell + cell * 0.04);
+      });
+      context.restore();
+    }
+    return;
+  }
 
   if (mode === "chart") {
     context.save();

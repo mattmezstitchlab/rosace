@@ -1,7 +1,7 @@
-import { ChevronLeft, Download, FolderOpen, Grid3X3, ListChecks, Minus, Plus, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { ChevronLeft, Download, FolderOpen, Grid3X3, ListChecks, Minus, Palette, Plus, Redo2, RotateCcw, Undo2 } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DMC_ALL_THREADS, getThread } from "../data/dmc";
-import { chartGeometry, paintPattern } from "../lib/paint";
+import { chartGeometry, paintPattern, type CanvasMode } from "../lib/paint";
 import { shortFingerprint } from "../lib/pattern-id";
 import { workTitle } from "../lib/exporters";
 import {
@@ -13,7 +13,22 @@ import { useRosaceApi } from "../state/rosace-store";
 
 const BASE = 1800;
 
+function luminanceOf(hex: string) {
+  const value = Number.parseInt(hex.replace("#", ""), 16);
+  return ((value >> 16) & 255) * 0.2126 + ((value >> 8) & 255) * 0.7152 + (value & 255) * 0.0722;
+}
+
 type Highlight = "all" | "thread" | "remaining";
+/** Affichage de la grille : symboles (lecture classique), couleurs des fils, ou les deux. Mémorisé par appareil. */
+type Display = "symbols" | "colors" | "both";
+const DISPLAY_KEY = "aime-rosace-broder-affichage-v1";
+const DISPLAY_MODE: Record<Display, CanvasMode> = { symbols: "chart", colors: "color", both: "color-chart" };
+function readDisplay(): Display {
+  try {
+    const stored = localStorage.getItem(DISPLAY_KEY);
+    return stored === "colors" || stored === "both" ? stored : "symbols";
+  } catch { return "symbols"; }
+}
 interface Tap { startX: number; startY: number; moved: boolean; pointerId: number }
 
 /**
@@ -47,6 +62,7 @@ export function EmbroideryView() {
   const [completed, setCompleted] = useState<Set<number>>(new Set());
   const [selectedCode, setSelectedCode] = useState<string | null>(config.palette[0] ?? null);
   const [highlight, setHighlight] = useState<Highlight>("all");
+  const [display, setDisplay] = useState<Display>(readDisplay);
   const [history, setHistory] = useState<Array<{ index: number; added: boolean }>>([]);
   const [future, setFuture] = useState<Array<{ index: number; added: boolean }>>([]);
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
@@ -204,11 +220,12 @@ export function EmbroideryView() {
     const base = document.createElement("canvas");
     base.width = BASE;
     base.height = BASE;
-    paintPattern(base, pattern, "chart", BASE);
+    paintPattern(base, pattern, DISPLAY_MODE[display], BASE);
     baseRef.current = base;
     draw();
+    try { localStorage.setItem(DISPLAY_KEY, display); } catch { /* préférence d'affichage seulement */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [embroideryOpen, pattern]);
+  }, [embroideryOpen, pattern, display]);
 
   useEffect(() => {
     if (!embroideryOpen) return;
@@ -290,11 +307,24 @@ export function EmbroideryView() {
         continue;
       }
       if (highlight === "thread" && paletteIndex !== selectedIndex) continue;
-      ctx.fillStyle = getThread(config.palette[paletteIndex]).hex;
-      ctx.fillRect(bx - cell / 2, by - cell / 2, cell + 0.35, cell + 0.35);
-      ctx.strokeStyle = "rgba(255,255,255,0.6)";
-      ctx.lineWidth = 0.9;
-      ctx.strokeRect(bx - cell / 2, by - cell / 2, cell, cell);
+      const hex = getThread(config.palette[paletteIndex]).hex;
+      if (display === "symbols") {
+        ctx.fillStyle = hex;
+        ctx.fillRect(bx - cell / 2, by - cell / 2, cell + 0.35, cell + 0.35);
+        ctx.strokeStyle = "rgba(255,255,255,0.6)";
+        ctx.lineWidth = 0.9;
+        ctx.strokeRect(bx - cell / 2, by - cell / 2, cell, cell);
+      } else {
+        // La case est déjà de la couleur du fil : une croix brodée se reconnaît à son trait diagonal net.
+        ctx.strokeStyle = luminanceOf(hex) > 150 ? "rgba(20,14,18,0.9)" : "rgba(255,255,255,0.92)";
+        ctx.lineWidth = Math.max(0.8, cell * 0.14);
+        ctx.beginPath();
+        ctx.moveTo(bx - cell * 0.32, by - cell * 0.32);
+        ctx.lineTo(bx + cell * 0.32, by + cell * 0.32);
+        ctx.moveTo(bx - cell * 0.32, by + cell * 0.32);
+        ctx.lineTo(bx + cell * 0.32, by - cell * 0.32);
+        ctx.stroke();
+      }
     }
 
     if (cursor) {
@@ -304,7 +334,7 @@ export function EmbroideryView() {
       ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
     }
     ctx.restore();
-  }, [completed, config.palette, cursor, geometry, highlight, pattern, selectedCode, size, view]);
+  }, [completed, config.palette, cursor, display, geometry, highlight, pattern, selectedCode, size, view]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -553,10 +583,17 @@ export function EmbroideryView() {
           </div>
           <p>Empreinte {shortFingerprint(fingerprint)} · {config.strands} brins · Aïda {config.aida}</p>
         </div>
-        <div className="broder-filtres" role="group" aria-label="Affichage de la grille">
-          <button className={highlight === "all" ? "is-active" : ""} aria-pressed={highlight === "all"} onClick={() => setHighlight("all")}><Grid3X3 size={14} aria-hidden="true" /> Tout</button>
-          <button className={highlight === "remaining" ? "is-active" : ""} aria-pressed={highlight === "remaining"} onClick={() => setHighlight("remaining")}><ListChecks size={14} aria-hidden="true" /> Restants</button>
-          <button className={highlight === "thread" ? "is-active" : ""} aria-pressed={highlight === "thread"} onClick={() => setHighlight("thread")} disabled={!selectedCode}>Ce fil</button>
+        <div className="broder-filtres-ligne">
+          <div className="broder-filtres" role="group" aria-label="Croix affichées">
+            <button className={highlight === "all" ? "is-active" : ""} aria-pressed={highlight === "all"} onClick={() => setHighlight("all")}><Grid3X3 size={14} aria-hidden="true" /> Tout</button>
+            <button className={highlight === "remaining" ? "is-active" : ""} aria-pressed={highlight === "remaining"} onClick={() => setHighlight("remaining")}><ListChecks size={14} aria-hidden="true" /> Restants</button>
+            <button className={highlight === "thread" ? "is-active" : ""} aria-pressed={highlight === "thread"} onClick={() => setHighlight("thread")} disabled={!selectedCode}>Ce fil</button>
+          </div>
+          <div className="broder-filtres" role="group" aria-label="Lecture de la grille">
+            <button className={display === "symbols" ? "is-active" : ""} aria-pressed={display === "symbols"} onClick={() => setDisplay("symbols")}>Symboles</button>
+            <button className={display === "colors" ? "is-active" : ""} aria-pressed={display === "colors"} onClick={() => setDisplay("colors")}><Palette size={14} aria-hidden="true" /> Couleurs</button>
+            <button className={display === "both" ? "is-active" : ""} aria-pressed={display === "both"} onClick={() => setDisplay("both")}>Les deux</button>
+          </div>
         </div>
         <div className="broder-fils" role="group" aria-label="Choisir un fil DMC à mettre en évidence">
           {colorsUsed.map((line) => {

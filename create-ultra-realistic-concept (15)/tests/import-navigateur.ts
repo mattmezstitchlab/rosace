@@ -169,6 +169,12 @@ async function main() {
     await canvas.focus();
     for (const key of ["ArrowRight", " ", "ArrowRight", " ", "ArrowDown", "Enter"]) await page.keyboard.press(key);
     await expectText(page, ".broder-titre span", /3 \/ 512/);
+    // Lecture en couleurs, puis couleurs + symboles : même grille, même progression.
+    await page.getByRole("button", { name: "Couleurs" }).click();
+    await expectText(page, ".broder-titre span", /3 \/ 512/);
+    await page.getByRole("button", { name: "Les deux" }).click();
+    await page.screenshot({ path: path.join(ARTIFACT_DIR, "import-5-broder-couleurs.png") });
+    await page.getByRole("button", { name: "Symboles" }).click();
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "import-5-broder.png") });
     await page.getByRole("button", { name: "Fermer le mode broderie et enregistrer la progression" }).click();
     await page.locator(".broder").waitFor({ state: "detached" });
