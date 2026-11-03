@@ -1,0 +1,968 @@
+{
+  "preset:grenat": {
+    "fingerprint": "353C357F12EC80D5",
+    "stitches": 3381,
+    "size": 101,
+    "cleaned": 0
+  },
+  "preset:ciel": {
+    "fingerprint": "E292118D0B87F715",
+    "stitches": 5193,
+    "size": 111,
+    "cleaned": 0
+  },
+  "preset:aube": {
+    "fingerprint": "0B364EC4DB710665",
+    "stitches": 2781,
+    "size": 91,
+    "cleaned": 0
+  },
+  "preset:herbier": {
+    "fingerprint": "180917C70B87F715",
+    "stitches": 5395,
+    "size": 111,
+    "cleaned": 0
+  },
+  "preset:cuivre": {
+    "fingerprint": "A4A115F912EC80D5",
+    "stitches": 4297,
+    "size": 101,
+    "cleaned": 0
+  },
+  "preset:vitrail": {
+    "fingerprint": "8FA6229EFF492553",
+    "stitches": 6405,
+    "size": 121,
+    "cleaned": 0
+  },
+  "preset:mandala": {
+    "fingerprint": "021DDACA12EC80D5",
+    "stitches": 5855,
+    "size": 101,
+    "cleaned": 0
+  },
+  "preset:arabesque": {
+    "fingerprint": "1EA7589B0B87F715",
+    "stitches": 6341,
+    "size": 111,
+    "cleaned": 0
+  },
+  "preset:kaleidoscope": {
+    "fingerprint": "4D5212CC168F61D3",
+    "stitches": 7393,
+    "size": 111,
+    "cleaned": 0
+  },
+  "preset:entrelacs": {
+    "fingerprint": "66D0B16712EC80D5",
+    "stitches": 4257,
+    "size": 101,
+    "cleaned": 0
+  },
+  "preset:fractale": {
+    "fingerprint": "8433F6A3C4A4D795",
+    "stitches": 3559,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g1-s1-scale1": {
+    "fingerprint": "91C218470F1E8315",
+    "stitches": 1929,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g1-s1-scale2": {
+    "fingerprint": "BF68ED6D5D8F04D5",
+    "stitches": 2455,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g1-s1-scale3": {
+    "fingerprint": "DD04D9DB12EC80D5",
+    "stitches": 2983,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g1-s1-scale4": {
+    "fingerprint": "C9A705690B87F715",
+    "stitches": 3607,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g1-s1-scale5": {
+    "fingerprint": "54C12825C4A4D795",
+    "stitches": 4280,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g1-s2-scale1": {
+    "fingerprint": "687DC2930F1E8315",
+    "stitches": 2117,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g1-s2-scale2": {
+    "fingerprint": "1D0F45E95D8F04D5",
+    "stitches": 2621,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g1-s2-scale3": {
+    "fingerprint": "E5CCE82712EC80D5",
+    "stitches": 3201,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g1-s2-scale4": {
+    "fingerprint": "3A1603950B87F715",
+    "stitches": 3857,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g1-s2-scale5": {
+    "fingerprint": "DECA80DBC4A4D795",
+    "stitches": 4657,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g1-s3-scale1": {
+    "fingerprint": "561E982F0F1E8315",
+    "stitches": 2563,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g1-s3-scale2": {
+    "fingerprint": "8BCCB0655D8F04D5",
+    "stitches": 3253,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g1-s3-scale3": {
+    "fingerprint": "C75127A312EC80D5",
+    "stitches": 3959,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g1-s3-scale4": {
+    "fingerprint": "FDFFBB410B87F715",
+    "stitches": 4731,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g1-s3-scale5": {
+    "fingerprint": "F64C7663C4A4D795",
+    "stitches": 5595,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g1-s4-scale1": {
+    "fingerprint": "6E79EC4B0F1E8315",
+    "stitches": 2829,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g1-s4-scale2": {
+    "fingerprint": "BAD7B4A15D8F04D5",
+    "stitches": 3549,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g1-s4-scale3": {
+    "fingerprint": "768D236712EC80D5",
+    "stitches": 4425,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g1-s4-scale4": {
+    "fingerprint": "358E580D0B87F715",
+    "stitches": 5233,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g1-s4-scale5": {
+    "fingerprint": "EC13E5E3C4A4D795",
+    "stitches": 6201,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g1-s5-scale1": {
+    "fingerprint": "8D4E0EF30F1E8315",
+    "stitches": 2787,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g1-s5-scale2": {
+    "fingerprint": "246540DD5D8F04D5",
+    "stitches": 3479,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g1-s5-scale3": {
+    "fingerprint": "B1D362FF12EC80D5",
+    "stitches": 4267,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g1-s5-scale4": {
+    "fingerprint": "63B487C90B87F715",
+    "stitches": 5083,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g1-s5-scale5": {
+    "fingerprint": "D7B0B403C4A4D795",
+    "stitches": 6051,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g2-s1-scale1": {
+    "fingerprint": "8FD37A2F0F1E8315",
+    "stitches": 4193,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g2-s1-scale2": {
+    "fingerprint": "ACD760A55D8F04D5",
+    "stitches": 5333,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g2-s1-scale3": {
+    "fingerprint": "C12D8AD312EC80D5",
+    "stitches": 6503,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g2-s1-scale4": {
+    "fingerprint": "2C63EF890B87F715",
+    "stitches": 7769,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g2-s1-scale5": {
+    "fingerprint": "7C1CCE93C4A4D795",
+    "stitches": 9273,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g2-s2-scale1": {
+    "fingerprint": "9F8194DB0F1E8315",
+    "stitches": 4133,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g2-s2-scale2": {
+    "fingerprint": "02487F495D8F04D5",
+    "stitches": 5197,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g2-s2-scale3": {
+    "fingerprint": "DCF13F6712EC80D5",
+    "stitches": 6433,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g2-s2-scale4": {
+    "fingerprint": "40D28CC50B87F715",
+    "stitches": 7697,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g2-s2-scale5": {
+    "fingerprint": "2DB8E89BC4A4D795",
+    "stitches": 9221,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g2-s3-scale1": {
+    "fingerprint": "C087E57B0F1E8315",
+    "stitches": 4135,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g2-s3-scale2": {
+    "fingerprint": "BBA636455D8F04D5",
+    "stitches": 5249,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g2-s3-scale3": {
+    "fingerprint": "918AD5C312EC80D5",
+    "stitches": 6443,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g2-s3-scale4": {
+    "fingerprint": "6846AE150B87F715",
+    "stitches": 7747,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g2-s3-scale5": {
+    "fingerprint": "B7C34403C4A4D795",
+    "stitches": 9219,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g2-s4-scale1": {
+    "fingerprint": "AEA079830F1E8315",
+    "stitches": 4029,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g2-s4-scale2": {
+    "fingerprint": "BD70D5695D8F04D5",
+    "stitches": 5057,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g2-s4-scale3": {
+    "fingerprint": "9D131F6F12EC80D5",
+    "stitches": 6285,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g2-s4-scale4": {
+    "fingerprint": "3410156D0B87F715",
+    "stitches": 7449,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g2-s4-scale5": {
+    "fingerprint": "48E4CBA3C4A4D795",
+    "stitches": 8901,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g2-s5-scale1": {
+    "fingerprint": "D161BF0B0F1E8315",
+    "stitches": 3969,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g2-s5-scale2": {
+    "fingerprint": "6E94E7AD5D8F04D5",
+    "stitches": 5087,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g2-s5-scale3": {
+    "fingerprint": "BBB2A15F12EC80D5",
+    "stitches": 6221,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g2-s5-scale4": {
+    "fingerprint": "4E0A50190B87F715",
+    "stitches": 7435,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g2-s5-scale5": {
+    "fingerprint": "A11E900BC4A4D795",
+    "stitches": 8933,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g3-s1-scale1": {
+    "fingerprint": "2A6CCAAF0F1E8315",
+    "stitches": 3153,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g3-s1-scale2": {
+    "fingerprint": "C86B58155D8F04D5",
+    "stitches": 3929,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g3-s1-scale3": {
+    "fingerprint": "A23AAFD312EC80D5",
+    "stitches": 4793,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g3-s1-scale4": {
+    "fingerprint": "A938C5E10B87F715",
+    "stitches": 5755,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g3-s1-scale5": {
+    "fingerprint": "D6A2F2C7C4A4D795",
+    "stitches": 6753,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g3-s2-scale1": {
+    "fingerprint": "BC89CCEB0F1E8315",
+    "stitches": 3349,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g3-s2-scale2": {
+    "fingerprint": "EA12D7D15D8F04D5",
+    "stitches": 4181,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g3-s2-scale3": {
+    "fingerprint": "AE8963F712EC80D5",
+    "stitches": 5137,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g3-s2-scale4": {
+    "fingerprint": "6A022B150B87F715",
+    "stitches": 6121,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g3-s2-scale5": {
+    "fingerprint": "720E222BC4A4D795",
+    "stitches": 7289,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g3-s3-scale1": {
+    "fingerprint": "F28A791F0F1E8315",
+    "stitches": 3211,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g3-s3-scale2": {
+    "fingerprint": "50971A2D5D8F04D5",
+    "stitches": 3997,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g3-s3-scale3": {
+    "fingerprint": "A04B0A8712EC80D5",
+    "stitches": 4887,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g3-s3-scale4": {
+    "fingerprint": "20B44E810B87F715",
+    "stitches": 5845,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g3-s3-scale5": {
+    "fingerprint": "57D8EE9BC4A4D795",
+    "stitches": 6929,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g3-s4-scale1": {
+    "fingerprint": "15B2CADB0F1E8315",
+    "stitches": 3185,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g3-s4-scale2": {
+    "fingerprint": "D2F3D9615D8F04D5",
+    "stitches": 4057,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g3-s4-scale3": {
+    "fingerprint": "9DA75F3712EC80D5",
+    "stitches": 4921,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g3-s4-scale4": {
+    "fingerprint": "820FC5750B87F715",
+    "stitches": 5937,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g3-s4-scale5": {
+    "fingerprint": "20320BBBC4A4D795",
+    "stitches": 6997,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g3-s5-scale1": {
+    "fingerprint": "644E88F30F1E8315",
+    "stitches": 3257,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g3-s5-scale2": {
+    "fingerprint": "9B5E8B355D8F04D5",
+    "stitches": 4101,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g3-s5-scale3": {
+    "fingerprint": "DB3EB3C312EC80D5",
+    "stitches": 4919,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g3-s5-scale4": {
+    "fingerprint": "FD536FB10B87F715",
+    "stitches": 5969,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g3-s5-scale5": {
+    "fingerprint": "9018E633C4A4D795",
+    "stitches": 7147,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g4-s1-scale1": {
+    "fingerprint": "4B2CE2330F1E8315",
+    "stitches": 3613,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g4-s1-scale2": {
+    "fingerprint": "D644FB055D8F04D5",
+    "stitches": 4569,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g4-s1-scale3": {
+    "fingerprint": "4DFDDF6B12EC80D5",
+    "stitches": 5633,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g4-s1-scale4": {
+    "fingerprint": "917959190B87F715",
+    "stitches": 6761,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g4-s1-scale5": {
+    "fingerprint": "BED42BFBC4A4D795",
+    "stitches": 8049,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g4-s2-scale1": {
+    "fingerprint": "F3B8AB0B0F1E8315",
+    "stitches": 3541,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g4-s2-scale2": {
+    "fingerprint": "4B3C0D515D8F04D5",
+    "stitches": 4477,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g4-s2-scale3": {
+    "fingerprint": "A1F8E30712EC80D5",
+    "stitches": 5609,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g4-s2-scale4": {
+    "fingerprint": "98222FCD0B87F715",
+    "stitches": 6817,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g4-s2-scale5": {
+    "fingerprint": "11CFEB13C4A4D795",
+    "stitches": 8045,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g4-s3-scale1": {
+    "fingerprint": "EF80AAC70F1E8315",
+    "stitches": 3601,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g4-s3-scale2": {
+    "fingerprint": "1EC07C955D8F04D5",
+    "stitches": 4589,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g4-s3-scale3": {
+    "fingerprint": "6FABF20712EC80D5",
+    "stitches": 5625,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g4-s3-scale4": {
+    "fingerprint": "5F5C5C850B87F715",
+    "stitches": 6805,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g4-s3-scale5": {
+    "fingerprint": "7F6859F3C4A4D795",
+    "stitches": 8133,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g4-s4-scale1": {
+    "fingerprint": "EB4DC11B0F1E8315",
+    "stitches": 3557,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g4-s4-scale2": {
+    "fingerprint": "DAF557715D8F04D5",
+    "stitches": 4557,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g4-s4-scale3": {
+    "fingerprint": "BF99579712EC80D5",
+    "stitches": 5529,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g4-s4-scale4": {
+    "fingerprint": "9AB60BC50B87F715",
+    "stitches": 6681,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g4-s4-scale5": {
+    "fingerprint": "4C9ECD73C4A4D795",
+    "stitches": 7837,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g4-s5-scale1": {
+    "fingerprint": "93DE00770F1E8315",
+    "stitches": 3625,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g4-s5-scale2": {
+    "fingerprint": "9E6419415D8F04D5",
+    "stitches": 4705,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g4-s5-scale3": {
+    "fingerprint": "14503DF312EC80D5",
+    "stitches": 5789,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g4-s5-scale4": {
+    "fingerprint": "3F4CCC990B87F715",
+    "stitches": 6949,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g4-s5-scale5": {
+    "fingerprint": "4B6E71EBC4A4D795",
+    "stitches": 8221,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g5-s1-scale1": {
+    "fingerprint": "FC77875F0F1E8315",
+    "stitches": 2797,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g5-s1-scale2": {
+    "fingerprint": "D064BC9D5D8F04D5",
+    "stitches": 3487,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g5-s1-scale3": {
+    "fingerprint": "A4C7C87712EC80D5",
+    "stitches": 4299,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g5-s1-scale4": {
+    "fingerprint": "B7C0C3490B87F715",
+    "stitches": 5281,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g5-s1-scale5": {
+    "fingerprint": "0B6F3E53C4A4D795",
+    "stitches": 6199,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g5-s2-scale1": {
+    "fingerprint": "8353AE2B0F1E8315",
+    "stitches": 3085,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g5-s2-scale2": {
+    "fingerprint": "A8F761D15D8F04D5",
+    "stitches": 3721,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g5-s2-scale3": {
+    "fingerprint": "13261AF712EC80D5",
+    "stitches": 4585,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g5-s2-scale4": {
+    "fingerprint": "A8FCA4450B87F715",
+    "stitches": 5685,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g5-s2-scale5": {
+    "fingerprint": "EC714193C4A4D795",
+    "stitches": 6513,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g5-s3-scale1": {
+    "fingerprint": "C82635CB0F1E8315",
+    "stitches": 2883,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g5-s3-scale2": {
+    "fingerprint": "BDA7DD215D8F04D5",
+    "stitches": 3629,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g5-s3-scale3": {
+    "fingerprint": "3C32250712EC80D5",
+    "stitches": 4433,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g5-s3-scale4": {
+    "fingerprint": "52A95A990B87F715",
+    "stitches": 5331,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g5-s3-scale5": {
+    "fingerprint": "5835211BC4A4D795",
+    "stitches": 6359,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g5-s4-scale1": {
+    "fingerprint": "3E80FEE30F1E8315",
+    "stitches": 2873,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g5-s4-scale2": {
+    "fingerprint": "8FEC26F15D8F04D5",
+    "stitches": 3553,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g5-s4-scale3": {
+    "fingerprint": "4F8CFC2F12EC80D5",
+    "stitches": 4369,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g5-s4-scale4": {
+    "fingerprint": "CB5118550B87F715",
+    "stitches": 5381,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g5-s4-scale5": {
+    "fingerprint": "62506153C4A4D795",
+    "stitches": 6085,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g5-s5-scale1": {
+    "fingerprint": "C2F118B30F1E8315",
+    "stitches": 2615,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g5-s5-scale2": {
+    "fingerprint": "B0EF24495D8F04D5",
+    "stitches": 3331,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g5-s5-scale3": {
+    "fingerprint": "0C4B032312EC80D5",
+    "stitches": 3997,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g5-s5-scale4": {
+    "fingerprint": "DFF7015D0B87F715",
+    "stitches": 4873,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g5-s5-scale5": {
+    "fingerprint": "7EBF23CFC4A4D795",
+    "stitches": 5833,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g6-s1-scale1": {
+    "fingerprint": "D4DACE570F1E8315",
+    "stitches": 931,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g6-s1-scale2": {
+    "fingerprint": "4E40D3CD5D8F04D5",
+    "stitches": 1185,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g6-s1-scale3": {
+    "fingerprint": "6B4B84F312EC80D5",
+    "stitches": 1455,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g6-s1-scale4": {
+    "fingerprint": "904070410B87F715",
+    "stitches": 1699,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g6-s1-scale5": {
+    "fingerprint": "BE94106BC4A4D795",
+    "stitches": 1987,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g6-s2-scale1": {
+    "fingerprint": "03D647930F1E8315",
+    "stitches": 973,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g6-s2-scale2": {
+    "fingerprint": "6D2A1DA95D8F04D5",
+    "stitches": 1181,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g6-s2-scale3": {
+    "fingerprint": "1EDB306712EC80D5",
+    "stitches": 1465,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g6-s2-scale4": {
+    "fingerprint": "D94EDC5D0B87F715",
+    "stitches": 1697,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g6-s2-scale5": {
+    "fingerprint": "E53452B3C4A4D795",
+    "stitches": 2029,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g6-s3-scale1": {
+    "fingerprint": "D3B738170F1E8315",
+    "stitches": 931,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g6-s3-scale2": {
+    "fingerprint": "166192C55D8F04D5",
+    "stitches": 1185,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g6-s3-scale3": {
+    "fingerprint": "21EACCE312EC80D5",
+    "stitches": 1463,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g6-s3-scale4": {
+    "fingerprint": "076B27C10B87F715",
+    "stitches": 1687,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g6-s3-scale5": {
+    "fingerprint": "5CA17E8BC4A4D795",
+    "stitches": 1979,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g6-s4-scale1": {
+    "fingerprint": "384C5A630F1E8315",
+    "stitches": 961,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g6-s4-scale2": {
+    "fingerprint": "9433DEF95D8F04D5",
+    "stitches": 1205,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g6-s4-scale3": {
+    "fingerprint": "51D2F88F12EC80D5",
+    "stitches": 1481,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g6-s4-scale4": {
+    "fingerprint": "3E5F53950B87F715",
+    "stitches": 1737,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g6-s4-scale5": {
+    "fingerprint": "206BE5F3C4A4D795",
+    "stitches": 1957,
+    "size": 121,
+    "cleaned": 0
+  },
+  "g6-s5-scale1": {
+    "fingerprint": "84B752970F1E8315",
+    "stitches": 951,
+    "size": 81,
+    "cleaned": 0
+  },
+  "g6-s5-scale2": {
+    "fingerprint": "A2B8361D5D8F04D5",
+    "stitches": 1199,
+    "size": 91,
+    "cleaned": 0
+  },
+  "g6-s5-scale3": {
+    "fingerprint": "55BEA68712EC80D5",
+    "stitches": 1455,
+    "size": 101,
+    "cleaned": 0
+  },
+  "g6-s5-scale4": {
+    "fingerprint": "FD7E65CD0B87F715",
+    "stitches": 1723,
+    "size": 111,
+    "cleaned": 0
+  },
+  "g6-s5-scale5": {
+    "fingerprint": "85576AB3C4A4D795",
+    "stitches": 2015,
+    "size": 121,
+    "cleaned": 0
+  }
+}
