@@ -1,7 +1,8 @@
 /*
   La présentation de ROSACE.
-  Une page de vente, pas l'atelier : fond crème, encre profonde, Bodoni pour l'emphase,
-  et les rosaces rendues par le moteur du produit. Rien n'est décoratif sans être vrai.
+  Une page de vente, pas l'atelier : fond blanc, encre profonde, une seule famille
+  typographique (la moderne de la marque, du masthead aux légendes), et les rosaces
+  rendues par le moteur du produit. Rien n'est décoratif sans être vrai.
   Tous les sélecteurs sont portés par .presentation pour ne jamais toucher l'atelier.
 */
 
@@ -60,25 +61,14 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 
 /* ---------- En-tête : le mot-symbole en très grand ---------- */
 .presentation .entete { padding: clamp(16px, 2.6vw, 30px) var(--l-gouttiere) 0; background: var(--l-fond); }
-.presentation .entete-haut {
-  display: flex; align-items: flex-end; justify-content: space-between; gap: clamp(12px, 3vw, 40px);
-}
-.presentation .entete-marque { display: block; color: var(--l-encre); text-decoration: none; }
+.presentation .entete-haut { display: block; text-align: center; }
+.presentation .entete-marque { display: block; color: var(--l-encre); text-decoration: none; text-align: center; }
 .presentation .entete-nom {
-  display: block; font-size: clamp(64px, 14.6vw, 224px); font-weight: 800; line-height: .76;
-  letter-spacing: -.055em;
+  display: block; font-size: clamp(72px, 18.4vw, 268px); font-weight: 800; line-height: .78;
+  letter-spacing: -.06em;
 }
 .presentation .entete-nom sup {
   margin-left: .06em; font-size: .085em; font-weight: 500; letter-spacing: 0; vertical-align: top;
-}
-.presentation .entete-droite {
-  display: flex; flex-direction: column; align-items: flex-end; gap: clamp(8px, 1.6vw, 18px);
-  padding-bottom: .3em; color: var(--l-encre);
-}
-.presentation .entete-droite .rosace-logo { flex: none; }
-.presentation .entete-baseline {
-  max-width: 19ch; margin: 0; font-family: var(--serif); font-style: italic;
-  font-size: clamp(14px, 1.7vw, 24px); line-height: 1.18; color: var(--l-encre-3); text-align: right;
 }
 .presentation .entete-bas {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
@@ -92,11 +82,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 }
 .presentation .entete-liens a:hover { color: var(--l-encre); }
 .presentation .entete-cta { height: 42px; padding: 0 18px; font-size: 13.5px; }
-@media (max-width: 860px) {
-  .presentation .entete-baseline { display: none; }
-  .presentation .entete-droite { padding-bottom: 0; }
-  .presentation .entete-droite .rosace-logo { width: 52px !important; height: 52px !important; }
-}
+
 @media (max-width: 700px) {
   .presentation .entete-bas { flex-wrap: wrap; gap: 12px; }
   .presentation .entete-liens { gap: 6px 16px; }
@@ -143,12 +129,12 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .heros-texte { max-width: 880px; margin-inline: auto; }
 .presentation .heros .surtitre { justify-content: center; }
 .presentation .heros-titre {
-  margin: 0 auto; font-size: clamp(42px, 6.2vw, 92px); line-height: .94; font-weight: 600;
-  letter-spacing: -0.045em; text-wrap: balance;
+  margin: 0 auto; font-size: clamp(42px, 6.2vw, 92px); line-height: .94; font-weight: 700;
+  letter-spacing: -0.05em; text-wrap: balance;
 }
-.presentation .heros-titre-serif {
-  display: block; font-family: var(--serif); font-style: italic; font-weight: 400;
-  letter-spacing: -0.025em; color: var(--l-grenat);
+.presentation .heros-titre-suite {
+  display: block; font-family: inherit; font-style: normal; font-weight: 700;
+  letter-spacing: -0.05em; color: var(--l-grenat);
 }
 .presentation .heros-chapeau {
   max-width: 56ch; margin: 24px auto 0; font-size: clamp(16.5px, 1.3vw, 19.5px); line-height: 1.55; color: var(--l-encre-2);
@@ -424,10 +410,10 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .section-pied { display: flex; flex-wrap: wrap; align-items: center; gap: 18px 26px; margin-top: 40px; }
 .presentation .section-note { max-width: 44ch; margin: 0; font-size: 14px; line-height: 1.55; color: var(--l-encre-3); }
 .presentation .section-manifeste {
-  margin-top: clamp(48px, 6vw, 84px); font-family: var(--serif); font-size: clamp(26px, 3.4vw, 46px);
-  line-height: 1.15; letter-spacing: -0.02em; color: var(--l-encre-2);
+  margin-top: clamp(48px, 6vw, 84px); font-size: clamp(24px, 3.1vw, 42px); font-weight: 500;
+  line-height: 1.12; letter-spacing: -0.04em; color: var(--l-encre-2);
 }
-.presentation .section-manifeste span { display: block; font-style: italic; color: var(--l-grenat); }
+.presentation .section-manifeste span { display: block; font-weight: 700; color: var(--l-grenat); }
 
 /* ---------- Formes ---------- */
 .presentation .formes {
@@ -673,7 +659,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 /* ---------- Public ---------- */
 .presentation .publics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; margin: 44px 0 0; padding: 0; list-style: none; }
 .presentation .publics li { padding: 26px 22px 24px; border: 1px solid var(--l-trait); border-radius: 20px; background: var(--l-carte); }
-.presentation .public-num { font-family: var(--serif); font-size: 22px; font-style: italic; color: var(--l-grenat); }
+.presentation .public-num { font-size: 13px; font-weight: 700; letter-spacing: .14em; color: var(--l-grenat); }
 .presentation .publics h3 { margin: 14px 0 0; font-size: 19px; font-weight: 600; letter-spacing: -0.025em; line-height: 1.2; }
 .presentation .publics p { margin: 8px 0 0; font-size: 14px; line-height: 1.5; color: var(--l-encre-3); }
 .presentation .public-fils {
@@ -698,7 +684,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 }
 .presentation .final-texte { position: relative; z-index: 2; max-width: 620px; }
 .presentation .final h2 { margin: 0 0 20px; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.02; font-weight: 600; letter-spacing: -0.04em; text-wrap: balance; }
-.presentation .final-texte p { margin: 0 0 30px; font-family: var(--serif); font-size: clamp(19px, 1.8vw, 25px); line-height: 1.4; color: rgba(244, 239, 228, .78); }
+.presentation .final-texte p { margin: 0 0 30px; font-size: clamp(17px, 1.5vw, 21px); font-weight: 400; line-height: 1.5; letter-spacing: -0.01em; color: rgba(244, 239, 228, .78); }
 .presentation .final-appareil { position: relative; z-index: 1; display: grid; justify-self: center; place-items: center; width: min(100%, 250px); }
 .presentation .final-halo {
   position: absolute; width: min(150%, 560px); aspect-ratio: 1; border-radius: 50%;
@@ -719,7 +705,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .pied-marque { display: flex; align-items: center; gap: 12px; }
 .presentation .pied-nom { margin: 0; font-size: 18px; font-weight: 800; letter-spacing: -0.02em; }
 .presentation .pied-nom sup { font-size: .38em; font-weight: 500; vertical-align: .9em; }
-.presentation .pied-sous { margin: 3px 0 0; font-family: var(--serif); font-style: italic; font-size: 15px; color: var(--l-encre-3); }
+.presentation .pied-sous { margin: 3px 0 0; font-size: 13.5px; letter-spacing: .01em; color: var(--l-encre-3); }
 .presentation .pied-liens { display: flex; flex-wrap: wrap; gap: 6px 16px; }
 .presentation .pied-liens a { font-size: 13.5px; color: var(--l-encre-2); text-decoration: none; padding: 4px 0; }
 .presentation .pied-liens a:hover { color: var(--l-encre); text-decoration: underline; text-underline-offset: 4px; }

@@ -28,7 +28,7 @@ Les liens `#atelier…` sont remplacés dès l'ouverture par la recette courante
 
 La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
 
-L'en-tête porte le mot-symbole **ROSACE** en très grand, à la manière d'un masthead ; une barre fine prend le relais dès que l'on descend.
+L'en-tête porte le mot-symbole **ROSACE** en très grand et centré, à la manière d'un masthead ; une barre fine prend le relais dès que l'on descend. La page n'utilise qu'une seule famille typographique, la moderne de la marque : pas d'italique classique, l'emphase passe par la graisse et la couleur.
 
 Le comparateur motif/grille se balaie à la main : on attrape le trait dans l'image (souris, doigt), ou on le déplace au clavier (flèches, `Maj` pour aller plus vite, `Début`/`Fin`). Le trait porte `role="slider"`, avec sa valeur annoncée en pourcentage de grille.
 

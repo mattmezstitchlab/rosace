@@ -71,10 +71,6 @@ export function Landing() {
               ROSACE<sup>®</sup>
             </span>
           </a>
-          <div className="entete-droite">
-            <RosaceLogo size={78} variant="nu" />
-            <p className="entete-baseline">La géométrie devient broderie.</p>
-          </div>
         </div>
         <div className="entete-bas">
           <nav className="entete-liens" aria-label="Sections de la présentation">
@@ -115,7 +111,7 @@ export function Landing() {
             <p className="surtitre">Atelier de point de croix</p>
             <h1 id="titre-heros" className="heros-titre">
               La géométrie
-              <span className="heros-titre-serif"> devient broderie.</span>
+              <span className="heros-titre-suite"> devient broderie.</span>
             </h1>
             <p className="heros-chapeau">
               Composez un motif circulaire, explorez les couleurs, puis donnez-lui une forme réelle sur toile.
