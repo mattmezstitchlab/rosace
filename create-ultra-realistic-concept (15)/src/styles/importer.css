@@ -147,3 +147,25 @@ html[data-mode="nuit"] .importer-resume .is-attention { color: #e8a94c; }
 .panneau-fils-import li { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; }
 .panneau-fils-import i { display: grid; width: 26px; height: 26px; flex: none; place-items: center; border: 1px solid var(--trait-2); border-radius: 7px; font-style: normal; font-size: 13px; }
 .panneau-fils-import small { color: var(--encre-3); font-weight: 500; }
+
+/* Fiche ROSACE reconnue */
+.importer-fiche { margin: 0 0 16px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--plum) 40%, var(--trait)); border-radius: var(--rayon-carte); background: color-mix(in srgb, var(--plum) 7%, var(--carte)); }
+.importer-fiche strong { display: block; margin-bottom: 4px; font-size: 15px; }
+.importer-fiche p { margin: 0 0 10px; color: var(--encre-2); font-size: 13px; line-height: 1.5; }
+
+/* Texte brodé */
+.importer-corps-centre { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+.importer-texte-atelier { width: min(100%, 640px); padding: clamp(20px, 3vw, 28px); border: 1px solid var(--trait); border-radius: var(--rayon-xl); background: var(--carte); }
+.importer-texte-atelier h2 { margin: 0 0 6px; font-size: 20px; font-weight: 650; letter-spacing: -.025em; }
+.importer-texte-atelier > p { margin: 0 0 14px; color: var(--encre-2); font-size: 13.5px; line-height: 1.5; }
+.importer-texte-champ { display: block; }
+.importer-texte-champ span { display: block; margin-bottom: 6px; color: var(--encre-3); font-size: 12px; }
+.importer-texte-champ textarea { width: 100%; min-height: 64px; padding: 10px 12px; border: 1px solid var(--trait-champ); border-radius: var(--rayon-champ); background: var(--carte); color: var(--encre); font: 600 18px/1.3 var(--font-sans); letter-spacing: .04em; text-transform: uppercase; resize: vertical; }
+.importer-texte-champ textarea:focus { outline: none; border-color: var(--encre); box-shadow: 0 0 0 3px var(--doux); }
+.importer-texte-options { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 10px; margin-top: 12px; }
+.importer-texte-options label { display: flex; flex-direction: column; gap: 4px; color: var(--encre-3); font-size: 12px; }
+.importer-texte-options input { width: 110px; height: 40px; padding: 0 10px; border: 1px solid var(--trait-champ); border-radius: 9px; background: var(--carte); color: var(--encre); font-size: 14px; font-weight: 600; }
+.importer-texte-options input:focus { outline: none; border-color: var(--encre); box-shadow: 0 0 0 3px var(--doux); }
+.importer-texte-apercu { display: flex; flex-direction: column; align-items: center; gap: 10px; margin-top: 14px; }
+.importer-texte-apercu canvas { display: block; width: 100%; max-width: 420px; height: auto; border: 1px solid var(--trait); border-radius: var(--rayon-sm); }
+.importer-texte-apercu p { margin: 0; color: var(--encre-3); font-size: 12px; }

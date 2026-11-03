@@ -473,7 +473,7 @@ async function main() {
 
     /* ---------------- Paramètres textiles : même empreinte ---------------- */
     await openDock(page, "Ajuster");
-    await page.getByRole("button", { name: "Aïda 18" }).click();
+    await page.getByRole("button", { name: "Aïda 18", exact: true }).click();
     await page.getByRole("button", { name: "5 brins" }).click();
     await page.locator('input[type="range"][aria-label^="Marge de sécurité"]').fill("30");
     await closePanel(page);

@@ -6,7 +6,7 @@ import { computeRhythm, forecast, recordStitches, sanitizeSessions, SESSION_GAP_
 import { parseThreadCodes, shoppingCsv, shoppingList } from "../src/lib/threadbox";
 import { HOOP_MARGIN_CM, hoopFits, suggestScale } from "../src/lib/hoop";
 import { textGrid, unsupportedChars } from "../src/lib/text";
-import { WORKSHEET_MARK, worksheetHtml } from "../src/lib/exporters";
+import { WORKSHEET_END, WORKSHEET_MARK, worksheetHtml } from "../src/lib/exporters";
 import { readRosaceWorksheet } from "../src/lib/import-pdf/worksheet";
 import type { PdfHandle } from "../src/lib/import-pdf/pdfimport";
 
@@ -133,12 +133,13 @@ await test("texte brodé : police 5 × 7, deux fils avec ombre, caractères inco
 
 await test("fiche ROSACE : la couverture porte la recette encodée, et sa lecture retrouve exactement la rosace", async () => {
   const html = worksheetHtml(rosace);
-  const match = new RegExp(`${WORKSHEET_MARK} ([0-9A-F]{16}) r=([A-Za-z0-9_-]+)`).exec(html);
+  const match = new RegExp(`${WORKSHEET_MARK} ([0-9A-F]{16}) r=([A-Za-z0-9_ -]+?) ${WORKSHEET_END}`).exec(html);
   assert.ok(match, "marqueur imprimé sur la couverture");
   assert.equal(match![1], rosace.fingerprint);
-  // Un PDF dont le texte contient le marqueur, découpé comme pdf.js pourrait le faire.
-  const token = `${WORKSHEET_MARK} ${match![1]} r=${match![2]}`;
-  const pieces = [token.slice(0, 20), token.slice(20, 41), token.slice(41)];
+  assert.ok(match![2].includes(" "), "la recette est découpée en morceaux pour tenir sur plusieurs lignes");
+  // Un PDF dont le texte contient le marqueur, découpé comme pdf.js pourrait le faire (lignes et morceaux).
+  const token = `${WORKSHEET_MARK} ${match![1]} r=${match![2]} ${WORKSHEET_END}`;
+  const pieces = token.split(" ");
   const handle: PdfHandle = {
     pages: 5,
     dims: async () => ({ w: 595, h: 842 }),

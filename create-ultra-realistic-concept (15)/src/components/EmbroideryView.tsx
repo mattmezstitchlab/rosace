@@ -1,4 +1,4 @@
-import { ChevronLeft, Download, FolderOpen, Grid3X3, ListChecks, Minus, Palette, Plus, Redo2, RotateCcw, Undo2 } from "lucide-react";
+import { ChevronLeft, Download, FolderOpen, Grid3X3, ListChecks, Minus, Navigation, Palette, Plus, Redo2, RotateCcw, Undo2, Users } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { DMC_ALL_THREADS, getThread } from "../data/dmc";
 import { chartGeometry, paintPattern, type CanvasMode } from "../lib/paint";
@@ -6,9 +6,11 @@ import { shortFingerprint } from "../lib/pattern-id";
 import { workTitle } from "../lib/exporters";
 import {
   MAX_ZOOM, MIN_ZOOM, clampViewport, emptyProgress, loadPatternProgress, parseRuns, progressPercent,
-  progressStorageKey, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
+  progressStorageKey, readPeerProgress, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
   type EmbroideryProgress, type Viewport,
 } from "../lib/progress";
+import { computeRhythm, forecast, formatMinutes, recordStitches, type StitchSession } from "../lib/sessions";
+import { readThreadBox } from "../lib/threadbox";
 import { useRosaceApi } from "../state/rosace-store";
 
 const BASE = 1800;
@@ -20,14 +22,46 @@ function luminanceOf(hex: string) {
 
 type Highlight = "all" | "thread" | "remaining";
 /** Affichage de la grille : symboles (lecture classique), couleurs des fils, ou les deux. Mémorisé par appareil. */
-type Display = "symbols" | "colors" | "both";
+type Display = "symbols" | "colors" | "both" | "fabric";
 const DISPLAY_KEY = "aime-rosace-broder-affichage-v1";
-const DISPLAY_MODE: Record<Display, CanvasMode> = { symbols: "chart", colors: "color", both: "color-chart" };
+const DISPLAY_MODE: Record<Display, CanvasMode> = { symbols: "chart", colors: "color", both: "color-chart", fabric: "chart" };
 function readDisplay(): Display {
   try {
     const stored = localStorage.getItem(DISPLAY_KEY);
-    return stored === "colors" || stored === "both" ? stored : "symbols";
+    return stored === "colors" || stored === "both" || stored === "fabric" ? stored : "symbols";
   } catch { return "symbols"; }
+}
+const PEER_KEY = (fingerprint: string) => `aime-rosace-amie-v1:${fingerprint}`;
+
+/** Fil conducteur : la zone compacte de croix restantes la plus proche d'un point, pour un fil donné (composante connexe, 8 voisins). */
+function nearestCluster(pattern: { width: number; height: number; cells: Int16Array }, completed: Set<number>, paletteIndex: number, from: { x: number; y: number }): { cells: number[]; nearest: { x: number; y: number } } | null {
+  const { width, height, cells } = pattern;
+  let best: { index: number; d: number } | null = null;
+  for (let y = 0; y < height; y += 1) for (let x = 0; x < width; x += 1) {
+    const index = y * width + x;
+    if (cells[index] !== paletteIndex || completed.has(index)) continue;
+    const d = (x - from.x) ** 2 + (y - from.y) ** 2;
+    if (!best || d < best.d) best = { index, d };
+  }
+  if (!best) return null;
+  const seen = new Set<number>([best.index]);
+  const queue = [best.index];
+  while (queue.length && seen.size < 4000) {
+    const index = queue.shift()!;
+    const x = index % width;
+    const y = Math.floor(index / width);
+    for (let dy = -1; dy <= 1; dy += 1) for (let dx = -1; dx <= 1; dx += 1) {
+      if (!dx && !dy) continue;
+      const nx = x + dx;
+      const ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+      const next = ny * width + nx;
+      if (seen.has(next) || cells[next] !== paletteIndex || completed.has(next)) continue;
+      seen.add(next);
+      queue.push(next);
+    }
+  }
+  return { cells: [...seen], nearest: { x: best.index % width, y: Math.floor(best.index / width) } };
 }
 interface Tap { startX: number; startY: number; moved: boolean; pointerId: number }
 
@@ -68,16 +102,34 @@ export function EmbroideryView() {
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [announce, setAnnounce] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
+  const [sessions, setSessions] = useState<StitchSession[]>([]);
+  const [guide, setGuide] = useState(true);
+  const [peer, setPeer] = useState<{ completed: Set<number>; updatedAt: string } | null>(null);
+  const [threadBox] = useState<Set<string>>(() => readThreadBox());
+  const peerRef = useRef<HTMLInputElement>(null);
+  const fabricRef = useRef<HTMLCanvasElement | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; k: number; x: number; y: number; mx: number; my: number } | null>(null);
   const tap = useRef<Tap | null>(null);
   const suppressTap = useRef(0);
-  const liveRef = useRef({ completed, selectedCode, view, history });
-  liveRef.current = { completed, selectedCode, view, history };
+  const liveRef = useRef({ completed, selectedCode, view, history, sessions });
+  liveRef.current = { completed, selectedCode, view, history, sessions };
 
   const progress = useMemo(() => progressPercent(pattern, completed), [pattern, completed]);
   const remaining = useMemo(() => remainingByColor(pattern, completed), [pattern, completed]);
   const selectedRemaining = selectedCode ? remaining.find((line) => line.code === selectedCode) : null;
+  const rhythm = useMemo(() => computeRhythm(sessions), [sessions]);
+  const prediction = useMemo(() => forecast(rhythm, progress.total - progress.done, sessions), [rhythm, progress.total, progress.done, sessions]);
+  /** Fil conducteur : prochaine zone compacte du fil sélectionné, depuis le curseur ou la dernière croix. */
+  const nextZone = useMemo(() => {
+    if (!guide || !selectedCode) return null;
+    const paletteIndex = paletteCodes.indexOf(selectedCode);
+    if (paletteIndex < 0) return null;
+    const last = history.length ? history[history.length - 1].index : -1;
+    const from = cursor ?? (last >= 0 ? { x: last % pattern.width, y: Math.floor(last / pattern.width) } : { x: Math.floor(pattern.width / 2), y: Math.floor(pattern.height / 2) });
+    return nearestCluster(pattern, completed, paletteIndex, from);
+  }, [guide, selectedCode, paletteCodes, history, cursor, pattern, completed]);
+  const peerDone = peer ? [...peer.completed].filter((index) => pattern.cells[index] >= 0).length : 0;
 
   /* ---------- Progression : une seule écriture canonique ---------- */
   const persist = useCallback((snapshot?: EmbroideryProgress): EmbroideryProgress | null => {
@@ -89,6 +141,7 @@ export function EmbroideryView() {
       selectedCode,
       viewport: view,
       journal: history,
+      sessions,
       updatedAt: new Date().toISOString(),
     };
     if (record.fingerprint !== fingerprint) return null;
@@ -103,17 +156,20 @@ export function EmbroideryView() {
       }
       return null;
     }
-  }, [completed, fingerprint, history, notify, selectedCode, view]);
+  }, [completed, fingerprint, history, notify, selectedCode, sessions, view]);
 
-  /** Toute modification de croix passe par ici : état, journal et stockage restent cohérents. */
+  /** Toute modification de croix passe par ici : état, journal, séances et stockage restent cohérents. */
   const commitProgress = useCallback((next: {
     completed: Set<number>;
     history: Array<{ index: number; added: boolean }>;
     future: Array<{ index: number; added: boolean }>;
   }) => {
+    const added = Math.max(0, next.completed.size - completed.size);
+    const nextSessions = recordStitches(sessions, added);
     setCompleted(next.completed);
     setHistory(next.history);
     setFuture(next.future);
+    setSessions(nextSessions);
     persist({
       version: 2,
       fingerprint,
@@ -121,9 +177,10 @@ export function EmbroideryView() {
       selectedCode,
       viewport: view,
       journal: next.history,
+      sessions: nextSessions,
       updatedAt: new Date().toISOString(),
     });
-  }, [fingerprint, persist, selectedCode, view]);
+  }, [completed.size, fingerprint, persist, selectedCode, sessions, view]);
 
   const close = useCallback(() => {
     persist();
@@ -140,9 +197,13 @@ export function EmbroideryView() {
     if (saved) {
       const valid = parseRuns(saved.completedRuns);
       setCompleted(valid);
-      setSelectedCode(saved.selectedCode && config.palette.includes(saved.selectedCode) ? saved.selectedCode : config.palette[0] ?? null);
+      // Fil conducteur : le fil choisi explicitement est conservé ; à défaut, celui de la dernière croix cochée.
+      const lastEntry = saved.journal?.length ? saved.journal[saved.journal.length - 1] : null;
+      const lastCode = lastEntry && pattern.cells[lastEntry.index] >= 0 ? config.palette[pattern.cells[lastEntry.index]] : null;
+      const savedCode = saved.selectedCode && config.palette.includes(saved.selectedCode) ? saved.selectedCode : null;
+      setSelectedCode(savedCode ?? lastCode ?? config.palette[0] ?? null);
       setView(clampViewport(saved.viewport));
-      setAnnounce(`Progression restaurée : ${valid.size} croix sur ${pattern.stitches.length}.`);
+      setAnnounce(`Progression restaurée : ${valid.size} croix sur ${pattern.stitches.length}.${savedCode ?? lastCode ? ` Fil en cours DMC ${savedCode ?? lastCode}.` : ""}`);
     } else {
       setCompleted(new Set());
       setSelectedCode(config.palette[0] ?? null);
@@ -150,7 +211,15 @@ export function EmbroideryView() {
       setAnnounce("Nouvelle progression pour ce patron.");
     }
     setHistory(saved?.journal ?? []);
+    setSessions(saved?.sessions ?? []);
     setFuture([]);
+    try {
+      const rawPeer = localStorage.getItem(PEER_KEY(fingerprint));
+      if (rawPeer) {
+        const parsed = JSON.parse(rawPeer) as { runs?: string; updatedAt?: string };
+        setPeer(parsed.runs ? { completed: parseRuns(parsed.runs), updatedAt: parsed.updatedAt ?? "" } : null);
+      } else setPeer(null);
+    } catch { setPeer(null); }
     baseProgressRef.current = saved ?? emptyProgress(pattern);
     suppressSaveRef.current = false;
     hydrated.current = true;
@@ -199,12 +268,14 @@ export function EmbroideryView() {
         selectedCode: live.selectedCode,
         viewport: live.view,
         journal: live.history,
+        sessions: live.sessions,
         updatedAt: new Date().toISOString(),
       };
       const merged = reconcileProgress(remote, localSnapshot, baseProgressRef.current);
       suppressSaveRef.current = true;
       setCompleted(parseRuns(merged.completedRuns));
       setHistory(merged.journal ?? []);
+      setSessions(merged.sessions ?? []);
       setSelectedCode(merged.selectedCode);
       setView(merged.viewport);
       baseProgressRef.current = remote;
@@ -222,6 +293,14 @@ export function EmbroideryView() {
     base.height = BASE;
     paintPattern(base, pattern, DISPLAY_MODE[display], BASE);
     baseRef.current = base;
+    if (display === "fabric") {
+      // Toile qui se remplit : la toile photoréaliste sert de réserve, copiée case par case pour les croix brodées.
+      const fabric = document.createElement("canvas");
+      fabric.width = BASE;
+      fabric.height = BASE;
+      paintPattern(fabric, pattern, "fabric", BASE);
+      fabricRef.current = fabric;
+    } else fabricRef.current = null;
     draw();
     try { localStorage.setItem(DISPLAY_KEY, display); } catch { /* préférence d'affichage seulement */ }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -244,6 +323,7 @@ export function EmbroideryView() {
     centerX: size.w / 2,
     centerY: size.h / 2,
     chart: chartGeometry(BASE, pattern.width, pattern.height, "chart"),
+    fabric: chartGeometry(BASE, pattern.width, pattern.height, "fabric"),
   }), [pattern.width, pattern.height, size]);
 
   const draw = useCallback(() => {
@@ -294,7 +374,33 @@ export function EmbroideryView() {
       }
     }
 
-    // Croix brodées : remplissage couleur du fil, symbole masqué.
+    // Fil conducteur : la prochaine zone compacte du fil en cours, en halo.
+    if (nextZone && highlight !== "remaining") {
+      ctx.fillStyle = "rgba(111,63,98,0.22)";
+      for (const index of nextZone.cells) {
+        const { bx, by } = toBase(index % pattern.width, Math.floor(index / pattern.width));
+        ctx.fillRect(bx - cell / 2, by - cell / 2, cell, cell);
+      }
+      const { bx, by } = toBase(nextZone.nearest.x, nextZone.nearest.y);
+      ctx.strokeStyle = "rgba(111,63,98,0.95)";
+      ctx.lineWidth = Math.max(1.2, cell * 0.16);
+      ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
+    }
+
+    // Broder ensemble : les croix de l'amie, en contour, jamais confondues avec les miennes.
+    if (peer) {
+      ctx.strokeStyle = "rgba(20,120,110,0.85)";
+      ctx.lineWidth = Math.max(0.8, cell * 0.12);
+      for (const index of peer.completed) {
+        if (pattern.cells[index] < 0 || completed.has(index)) continue;
+        const { bx, by } = toBase(index % pattern.width, Math.floor(index / pattern.width));
+        ctx.strokeRect(bx - cell / 2 + 1, by - cell / 2 + 1, cell - 2, cell - 2);
+      }
+    }
+
+    // Croix brodées : remplissage couleur du fil, symbole masqué ; en mode toile, le vrai fil bombé.
+    const fabricBase = fabricRef.current;
+    const fabricGeometry = geometry.fabric;
     for (const index of completed) {
       const x = index % pattern.width;
       const y = Math.floor(index / pattern.width);
@@ -308,7 +414,11 @@ export function EmbroideryView() {
       }
       if (highlight === "thread" && paletteIndex !== selectedIndex) continue;
       const hex = getThread(config.palette[paletteIndex]).hex;
-      if (display === "symbols") {
+      if (display === "fabric" && fabricBase) {
+        const sx = fabricGeometry.originX + x * fabricGeometry.cell - fabricGeometry.cell / 2;
+        const sy = fabricGeometry.originY + y * fabricGeometry.cell - fabricGeometry.cell / 2;
+        ctx.drawImage(fabricBase, sx, sy, fabricGeometry.cell, fabricGeometry.cell, bx - cell / 2, by - cell / 2, cell, cell);
+      } else if (display === "symbols") {
         ctx.fillStyle = hex;
         ctx.fillRect(bx - cell / 2, by - cell / 2, cell + 0.35, cell + 0.35);
         ctx.strokeStyle = "rgba(255,255,255,0.6)";
@@ -334,7 +444,7 @@ export function EmbroideryView() {
       ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
     }
     ctx.restore();
-  }, [completed, config.palette, cursor, display, geometry, highlight, pattern, selectedCode, size, view]);
+  }, [completed, config.palette, cursor, display, geometry, highlight, nextZone, pattern, peer, selectedCode, size, view]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -495,6 +605,37 @@ export function EmbroideryView() {
     }
   };
 
+  /** Fil conducteur : amène le curseur et la vue sur la prochaine croix du fil en cours. */
+  const goNext = () => {
+    if (!nextZone) {
+      setAnnounce(selectedCode ? `Toutes les croix de DMC ${selectedCode} sont brodées.` : "Choisissez un fil.");
+      return;
+    }
+    const { x, y } = nextZone.nearest;
+    setCursor({ x, y });
+    const { fit, chart } = geometry;
+    const scale = fit * Math.max(view.k, 2.5);
+    const bx = -BASE / 2 + chart.originX + x * chart.cell;
+    const by = -BASE / 2 + chart.originY + y * chart.cell;
+    setView(clampViewport({ k: Math.max(view.k, 2.5), x: -bx * scale, y: -by * scale }));
+    canvasRef.current?.focus();
+    setAnnounce(`Prochaine zone : ${nextZone.cells.length} croix de DMC ${selectedCode} à partir de la colonne ${x + 1}, ligne ${y + 1}.`);
+  };
+
+  const importPeer = async (file: File) => {
+    try {
+      const result = readPeerProgress(JSON.parse(await file.text()), pattern);
+      if (!result.ok) { notify("Projet refusé", result.error); return; }
+      setPeer({ completed: result.completed, updatedAt: result.updatedAt });
+      try { localStorage.setItem(PEER_KEY(fingerprint), JSON.stringify({ runs: serializeRuns(result.completed), updatedAt: result.updatedAt })); } catch { /* calque de séance seulement */ }
+      notify("Vous brodez ensemble", `${result.completed.size.toLocaleString("fr-FR")} croix de votre amie affichées en contour. Votre progression n'a pas changé.`);
+    } catch { notify("Projet illisible", "Le fichier n'est pas un JSON valide."); }
+  };
+  const clearPeer = () => {
+    setPeer(null);
+    try { localStorage.removeItem(PEER_KEY(fingerprint)); } catch { /* rien à retirer */ }
+  };
+
   const resetProgress = () => {
     commitProgress({ completed: new Set(), history: [], future: [] });
     setConfirmReset(false);
@@ -517,6 +658,7 @@ export function EmbroideryView() {
     selectedCode,
     viewport: view,
     journal: history,
+    sessions,
     updatedAt: new Date().toISOString(),
   });
   const exportProject = () => {
@@ -538,6 +680,7 @@ export function EmbroideryView() {
           <span>{progress.done.toLocaleString("fr-FR")} / {progress.total.toLocaleString("fr-FR")} · {progress.percent} %</span>
         </div>
         <div className="broder-actions">
+          <button className="outil broder-suivante" onClick={goNext} disabled={!selectedCode} aria-label="Aller à la prochaine zone du fil en cours"><Navigation size={16} aria-hidden="true" /><span>Suivante</span></button>
           <button className="outil outil-icone" onClick={undo} disabled={!history.length} aria-label="Annuler la dernière croix cochée"><Undo2 size={18} aria-hidden="true" /></button>
           <button className="outil outil-icone" onClick={redo} disabled={!future.length} aria-label="Rétablir la croix décochée"><Redo2 size={18} aria-hidden="true" /></button>
         </div>
@@ -580,9 +723,20 @@ export function EmbroideryView() {
           <div>
             <strong>{progress.total - progress.done}</strong> croix restantes
             {selectedLine && <span> · DMC {selectedLine.code} : {selectedLine.remaining}</span>}
+            {nextZone && <span> · prochaine zone : {nextZone.cells.length}</span>}
           </div>
-          <p>Empreinte {shortFingerprint(fingerprint)} · {config.strands} brins · Aïda {config.aida}</p>
+          <p>
+            {prediction
+              ? `À votre rythme (${rhythm.stitchesPerHour} croix/h) : ${formatMinutes(prediction.low)} à ${formatMinutes(prediction.high)} restantes${prediction.finishDate ? `, vers le ${prediction.finishDate.toLocaleDateString("fr-FR", { day: "numeric", month: "long" })}` : ""}`
+              : `${rhythm.minutes > 0 ? `${formatMinutes(rhythm.minutes)} brodées · ` : ""}Empreinte ${shortFingerprint(fingerprint)} · ${config.strands} brins · Aïda ${config.aida}`}
+          </p>
         </div>
+        {peer && (
+          <p className="broder-amie" role="status">
+            <Users size={14} aria-hidden="true" /> Votre amie : <strong>{peerDone.toLocaleString("fr-FR")}</strong> / {progress.total.toLocaleString("fr-FR")} croix, en contour vert{peer.updatedAt ? ` (${new Date(peer.updatedAt).toLocaleDateString("fr-FR")})` : ""}.
+            <button type="button" onClick={clearPeer}>Retirer</button>
+          </p>
+        )}
         <div className="broder-filtres-ligne">
           <div className="broder-filtres" role="group" aria-label="Croix affichées">
             <button className={highlight === "all" ? "is-active" : ""} aria-pressed={highlight === "all"} onClick={() => setHighlight("all")}><Grid3X3 size={14} aria-hidden="true" /> Tout</button>
@@ -593,6 +747,10 @@ export function EmbroideryView() {
             <button className={display === "symbols" ? "is-active" : ""} aria-pressed={display === "symbols"} onClick={() => setDisplay("symbols")}>Symboles</button>
             <button className={display === "colors" ? "is-active" : ""} aria-pressed={display === "colors"} onClick={() => setDisplay("colors")}><Palette size={14} aria-hidden="true" /> Couleurs</button>
             <button className={display === "both" ? "is-active" : ""} aria-pressed={display === "both"} onClick={() => setDisplay("both")}>Les deux</button>
+            <button className={display === "fabric" ? "is-active" : ""} aria-pressed={display === "fabric"} onClick={() => setDisplay("fabric")}>Toile</button>
+          </div>
+          <div className="broder-filtres" role="group" aria-label="Fil conducteur">
+            <button className={guide ? "is-active" : ""} aria-pressed={guide} onClick={() => setGuide((value) => !value)}><Navigation size={14} aria-hidden="true" /> Fil conducteur</button>
           </div>
         </div>
         <div className="broder-fils" role="group" aria-label="Choisir un fil DMC à mettre en évidence">
@@ -607,10 +765,10 @@ export function EmbroideryView() {
                   setSelectedCode(line.code);
                   setHighlight(active ? "all" : "thread");
                 }}
-                aria-label={`Mettre en évidence DMC ${line.code}, ${getThread(line.code).name}, ${line.remaining} croix restantes`}
+                aria-label={`Mettre en évidence DMC ${line.code}, ${getThread(line.code).name}, ${line.remaining} croix restantes${threadBox.size ? (threadBox.has(line.code) ? ", dans votre boîte" : ", manque dans votre boîte") : ""}`}
               >
                 <i style={{ background: getThread(line.code).hex }} aria-hidden="true">{line.symbol}</i>
-                <span>DMC {line.code}</span>
+                <span>DMC {line.code}{threadBox.size > 0 && <em className={threadBox.has(line.code) ? "is-owned" : "is-missing"} aria-hidden="true">{threadBox.has(line.code) ? "✓" : "manque"}</em>}</span>
                 <small>{line.remaining} rest.</small>
               </button>
             );
@@ -619,6 +777,19 @@ export function EmbroideryView() {
         <div className="broder-outils">
           <button className="bouton bouton-petit" onClick={exportProject}><Download size={15} aria-hidden="true" /> Projet</button>
           <button className="bouton bouton-petit" onClick={() => fileRef.current?.click()}><FolderOpen size={15} aria-hidden="true" /> Importer</button>
+          <button className="bouton bouton-petit" onClick={() => peerRef.current?.click()}><Users size={15} aria-hidden="true" /> Broder ensemble</button>
+          <input
+            ref={peerRef}
+            type="file"
+            accept="application/json,.json"
+            className="sr-only"
+            aria-label="Afficher la progression d'une amie sur ce même ouvrage"
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              if (file) void importPeer(file);
+              event.target.value = "";
+            }}
+          />
           {confirmReset ? (
             <button className="bouton bouton-petit broder-danger" onClick={resetProgress}>Confirmer le zéro</button>
           ) : (

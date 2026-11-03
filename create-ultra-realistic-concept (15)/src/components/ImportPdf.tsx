@@ -12,6 +12,9 @@ import { readCompleteGlyphChart, type CompleteGlyphChart } from "../lib/import-p
 import type { PdfHandle } from "../lib/import-pdf/pdfimport";
 import { readVectorChart, type VectorResult } from "../lib/import-pdf/pdfVector";
 import { paintPattern } from "../lib/paint";
+import { readRosaceWorksheet, type WorksheetReading } from "../lib/import-pdf/worksheet";
+import { textGrid, unsupportedChars, TEXT_MAX_CHARS } from "../lib/text";
+import { DEFAULT_CONFIG, type RosaceConfig } from "../lib/rosace";
 import { fromImport, type ImportLosses, type ImportedGrid, type StitchWork } from "../lib/work";
 import { prefersReducedMotion, useRosaceApi } from "../state/rosace-store";
 
@@ -57,14 +60,62 @@ async function declaredSizeFromText(handle: PdfHandle): Promise<{ w: number; h: 
 }
 
 export function ImportPdf() {
-  const { importOpen, importFile, setImportFile, closeImport, loadImportedWork, notify, work: activeWork } = useRosaceApi();
+  const { importOpen, importFile, setImportFile, closeImport, loadImportedWork, loadRecipe, notify, work: activeWork } = useRosaceApi();
   if (!importOpen) return null;
+  const onUse = (work: StitchWork) => { loadImportedWork(work); notify("Patron prêt à broder", `${work.width} × ${work.height} points · ${work.palette.length} fils · empreinte ${work.fingerprint.slice(0, 8)}`); };
+  const onRosace = (config: RosaceConfig, fingerprint: string) => { closeImport(); loadRecipe(config, "Fiche ROSACE retrouvée", `Recette et empreinte ${fingerprint.slice(0, 8)} identiques à l'impression`); };
   return importFile
-    ? <ImportWorkbench key={`${importFile.name}-${importFile.size}-${importFile.lastModified}`} file={importFile} onClose={closeImport} onUse={(work) => { loadImportedWork(work); notify("Patron prêt à broder", `${work.width} × ${work.height} points · ${work.palette.length} fils · empreinte ${work.fingerprint.slice(0, 8)}`); }} />
-    : <DropZone onFile={setImportFile} onClose={closeImport} activeTitle={activeWork.origin.kind !== "rosace" ? activeWork.origin.provenance.file : null} />;
+    ? <ImportWorkbench key={`${importFile.name}-${importFile.size}-${importFile.lastModified}`} file={importFile} onClose={closeImport} onUse={onUse} onRosace={onRosace} />
+    : <DropZone onFile={setImportFile} onClose={closeImport} onUse={onUse} activeTitle={activeWork.origin.kind !== "rosace" ? activeWork.origin.provenance.file : null} />;
 }
 
-function DropZone({ onFile, onClose, activeTitle }: { onFile: (file: File) => void; onClose: () => void; activeTitle: string | null }) {
+/** Texte brodé : une phrase, un ou deux fils, et l'ouvrage est prêt. Même validation que tout import. */
+function TextMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
+  const [text, setText] = useState("");
+  const [code, setCode] = useState(DEFAULT_CONFIG.palette[0]);
+  const [shadow, setShadow] = useState("");
+  const [align, setAlign] = useState<"left" | "center">("center");
+  const previewRef = useRef<HTMLCanvasElement>(null);
+  const grid = useMemo(() => (text.trim() ? textGrid({ text, code, shadowCode: shadow || null, align, margin: 2 }) : null), [text, code, shadow, align]);
+  const outcome = useMemo(() => (grid && !("error" in grid) ? fromImport(grid) : null), [grid]);
+  const work = outcome?.ok ? outcome.work : null;
+  const unknown = useMemo(() => unsupportedChars(text), [text]);
+  useEffect(() => {
+    const canvas = previewRef.current;
+    if (!canvas || !work) return;
+    paintPattern(canvas, work, "fabric", Math.min(1200, Math.max(400, Math.max(work.width, work.height) * 10)));
+  }, [work]);
+  const error = grid && "error" in grid ? grid.error : outcome && !outcome.ok ? outcome.error : "";
+  return (
+    <div className="importer-texte-atelier">
+      <h2>Ou brodez un texte</h2>
+      <p>Un prénom, une date, un mot doux : la police 5 × 7 de ROSACE le transforme en croix, avec un fil et une ombre facultative.</p>
+      <label className="importer-texte-champ">
+        <span>Texte (capitales, chiffres, accents, ♥ ; une ligne par retour)</span>
+        <textarea value={text} onChange={(event) => setText(event.target.value)} rows={2} maxLength={TEXT_MAX_CHARS * 4} placeholder={"MARIE & PAUL\n12 JUIN 2026"} />
+      </label>
+      <div className="importer-texte-options">
+        <label>Fil du texte<input value={code} onChange={(event) => setCode(event.target.value.toUpperCase().trim())} aria-label="Code DMC du texte" /></label>
+        <label>Ombre (facultatif)<input value={shadow} onChange={(event) => setShadow(event.target.value.toUpperCase().trim())} placeholder="aucune" aria-label="Code DMC de l'ombre" /></label>
+        <div className="importer-segments" role="group" aria-label="Alignement">
+          <button type="button" aria-pressed={align === "center"} onClick={() => setAlign("center")}>Centré</button>
+          <button type="button" aria-pressed={align === "left"} onClick={() => setAlign("left")}>À gauche</button>
+        </div>
+      </div>
+      {unknown.length > 0 && <p className="importer-erreur">Caractères non brodables, remplacés par un espace : {unknown.join(" ")}</p>}
+      {error && text.trim() && <p className="importer-erreur">{error}</p>}
+      {work && (
+        <div className="importer-texte-apercu">
+          <canvas ref={previewRef} role="img" aria-label={`Aperçu du texte brodé, ${work.width} par ${work.height} points`} />
+          <p>{work.width} × {work.height} points · {work.stitches.length.toLocaleString("fr-FR")} croix · {String(work.motifWidthCm).replace(".", ",")} × {String(work.motifHeightCm).replace(".", ",")} cm sur aïda 14</p>
+          <button type="button" className="bouton noir" onClick={() => onUse(work)}><Check size={16} aria-hidden="true" /> Broder ce texte</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DropZone({ onFile, onClose, onUse, activeTitle }: { onFile: (file: File) => void; onClose: () => void; onUse: (work: StitchWork) => void; activeTitle: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const firstRef = useRef<HTMLButtonElement>(null);
@@ -97,20 +148,22 @@ function DropZone({ onFile, onClose, activeTitle }: { onFile: (file: File) => vo
           <p>Un patron multipage de point de croix. ROSACE lit ses pages, recompose la grille avec vous, puis vous brodez croix par croix.</p>
           <button ref={firstRef} type="button" className="bouton noir" onClick={() => inputRef.current?.click()}>Choisir un fichier PDF</button>
           <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="sr-only" aria-label="Choisir un patron PDF" onChange={(event) => { accept(event.target.files?.[0]); event.target.value = ""; }} />
-          <small>Le fichier reste sur votre appareil : rien n'est envoyé. {activeTitle ? `Votre patron actuel (${activeTitle}) sera remplacé seulement à l'étape Utiliser.` : "Votre rosace actuelle n'est modifiée qu'à l'étape Utiliser."}</small>
+          <small>Le fichier reste sur votre appareil : rien n'est envoyé. {activeTitle ? `Votre patron actuel (${activeTitle}) sera remplacé seulement à l'étape Utiliser.` : "Votre rosace actuelle n'est modifiée qu'à l'étape Utiliser."} Une fiche imprimée par ROSACE est reconnue et retrouvée à l'identique.</small>
         </div>
+        <TextMaker onUse={onUse} />
       </div>
     </section>
   );
 }
 
-function ImportWorkbench({ file, onClose, onUse }: { file: File; onClose: () => void; onUse: (work: StitchWork) => void }) {
+function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClose: () => void; onUse: (work: StitchWork) => void; onRosace: (config: RosaceConfig, fingerprint: string) => void }) {
   const [analysis, setAnalysis] = useState<PdfAnalysis | null>(null);
   const [handle, setHandle] = useState<PdfHandle | null>(null);
   const [vector, setVector] = useState<VectorResult | null>(null);
   const [completeGlyph, setCompleteGlyph] = useState<CompleteGlyphChart | null>(null);
   const [glyphReason, setGlyphReason] = useState("");
   const [declaredFromText, setDeclaredFromText] = useState<{ w: number; h: number } | null>(null);
+  const [worksheet, setWorksheet] = useState<WorksheetReading>({ kind: "none" });
   const [stage, setStage] = useState(0);
   const [busy, setBusy] = useState("");
   const [error, setError] = useState("");
@@ -167,6 +220,11 @@ function ImportWorkbench({ file, onClose, onUse }: { file: File; onClose: () => 
         setAnalysis(a);
         setAuthor(a.author);
         a.legend.forEach((entry) => registry.current.addKnown(entry.bits, entry.code));
+        // Fiche imprimée par ROSACE ? Sa recette est relue en texte : pas de reconnaissance d'image.
+        setBusy("Recherche d'une fiche ROSACE…");
+        const sheet = await readRosaceWorksheet(h);
+        if (!live) return;
+        setWorksheet(sheet);
         setDeclaredFromText(await declaredSizeFromText(h));
         if (!live) return;
         setBusy("Lecture complète des symboles et codes DMC…");
@@ -491,6 +549,16 @@ function ImportWorkbench({ file, onClose, onUse }: { file: File; onClose: () => 
         {stage === 0 && analysis && (
           <div className="importer-colonne">
             <p className="surtitre">Analyser</p>
+            {worksheet.kind === "rosace" && (
+              <div className="importer-fiche" role="status">
+                <strong>Fiche ROSACE reconnue</strong>
+                <p>Ce PDF a été imprimé par ROSACE : sa recette est écrite en texte sur la couverture, et l'empreinte régénérée ({worksheet.fingerprint.slice(0, 8)}) est identique à celle imprimée. La rosace peut être retrouvée à l'identique, sans lecture d'image.</p>
+                <button type="button" className="bouton noir" onClick={() => onRosace(worksheet.config, worksheet.fingerprint)}><Check size={16} aria-hidden="true" /> Retrouver cette rosace</button>
+              </div>
+            )}
+            {worksheet.kind === "mismatch" && (
+              <p className="importer-alerte">Ce PDF ressemble à une fiche ROSACE, mais l'empreinte imprimée ({worksheet.printed.slice(0, 8)}) ne correspond pas à sa recette ({worksheet.regenerated.slice(0, 8)}) : la fiche a peut-être été modifiée. Lecture ordinaire par le puzzle.</p>
+            )}
             <h2 className="importer-h2">{analysis.pages.filter((p) => p.kind === "chart").length} page{analysis.pages.filter((p) => p.kind === "chart").length > 1 ? "s" : ""} de grille, {blocks.length} bloc{blocks.length > 1 ? "s" : ""} détecté{blocks.length > 1 ? "s" : ""}</h2>
             <p className="importer-texte" role="status">
               {completeGlyph?.ok
@@ -510,7 +578,10 @@ function ImportWorkbench({ file, onClose, onUse }: { file: File; onClose: () => 
               ))}
             </ul>
             <div className="importer-actions">
-              <button type="button" className="bouton noir" disabled={!!busy || !blocks.length} onClick={() => setStage(1)}>Caler les grilles <ArrowRight size={16} aria-hidden="true" /></button>
+              {(completeGlyph?.ok || vector?.ok) && (
+                <button type="button" className="bouton noir" disabled={!!busy || !blocks.length} onClick={() => { setStage(3); setChecked({ overlaps: false, holes: false, unresolved: false, lost: false }); }}>Lecture exacte : vérifier et broder <ArrowRight size={16} aria-hidden="true" /></button>
+              )}
+              <button type="button" className={`bouton ${completeGlyph?.ok || vector?.ok ? "bouton-petit" : "noir"}`} disabled={!!busy || !blocks.length} onClick={() => setStage(1)}>Caler les grilles <ArrowRight size={16} aria-hidden="true" /></button>
             </div>
           </div>
         )}

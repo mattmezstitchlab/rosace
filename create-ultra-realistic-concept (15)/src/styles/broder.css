@@ -54,3 +54,13 @@ html[data-mode="nuit"] .broder-fil i { box-shadow: inset 0 0 0 1px rgba(255,255,
   .broder-fil { min-height: 44px; }
   .broder-fil span { font-size: 10px; }
 }
+
+/* Fil conducteur, broder ensemble, boîte à fils */
+.broder-suivante { gap: 6px; padding: 0 12px; font-size: 13px; font-weight: 650; }
+.broder-suivante span { display: none; }
+@media (min-width: 640px) { .broder-suivante span { display: inline; } }
+.broder-amie { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0; padding: 6px 10px; border: 1px solid color-mix(in srgb, #147870 35%, var(--trait)); border-radius: 10px; background: color-mix(in srgb, #147870 8%, var(--carte)); font-size: 12px; }
+.broder-amie button { margin-left: auto; min-height: 28px; padding: 0 8px; border: 0; border-radius: 8px; background: transparent; color: var(--encre-3); font-size: 12px; font-weight: 600; text-decoration: underline; }
+.broder-fil em { margin-left: 5px; font-style: normal; font-size: 9.5px; font-weight: 700; letter-spacing: .02em; }
+.broder-fil em.is-owned { color: #1f8a5b; }
+.broder-fil em.is-missing { color: #a35a00; }
