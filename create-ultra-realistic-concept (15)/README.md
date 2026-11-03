@@ -30,7 +30,7 @@ L'application a deux entrées : une **présentation** (page d'accueil) qui montr
 
 Les liens `#atelier…` sont remplacés dès l'ouverture par la recette courante (`#r=…`), pour que l'URL reste partageable. La marque, en haut de l'atelier, ramène à la présentation.
 
-La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
+La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Elle présente les **trois portes** de l'atelier (créer une rosace, importer un patron PDF, écrire un texte brodé — la grille du mot « ROSACE » est produite par `textGrid`), puis une section sombre **Broder, en vrai** : les quatre affichages du mode Broder (symboles, couleurs, les deux, toile) rendus par le même `paintPattern`, et les six aides à l'ouvrage (fil conducteur, rythme et prévision, broder ensemble, boîte à fils, tambour sur mesure, fiche réimportable). L'exemple de prévision est calculé par le vrai moteur des séances sur des soirées **explicitement fictives**, et l'échelle du tambour par `suggestScale` (`src/landing/data.ts`). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
 
 L'en-tête porte le mot-symbole **ROSACE** en très grand et centré, à la manière d'un masthead ; une barre fine prend le relais dès que l'on descend. La page n'utilise qu'une seule famille typographique, la moderne de la marque : pas d'italique classique, l'emphase passe par la graisse et la couleur.
 
@@ -144,6 +144,17 @@ Les projets **version 1** sont migrés explicitement vers v2 lorsque leur forme 
 - `saveProgress` fusionne les écritures concurrentes entre onglets au lieu d'écraser silencieusement.
 - `hashchange` / `popstate` appliquent les liens de recette et le retour/avant du navigateur.
 - Stockage corrompu ou quota dépassé : l'application reste utilisable et avertit l'utilisatrice.
+
+### Broder, en vrai
+
+- **Affichage** : symboles, couleurs, les deux, ou toile (`aime-rosace-broder-affichage-v1`), même grille, même progression.
+- **Fil conducteur** : le fil choisi est conservé entre deux ouvertures ; à défaut, c'est celui de la dernière croix cochée. « Suivante » va à la zone la plus proche du même fil.
+- **Séances** (`src/lib/sessions.ts`) : les croix cochées s'agrègent en séances (écart > 20 min = nouvelle séance), rangées dans la progression et le projet. Le rythme n'est annoncé qu'à partir de 30 croix sur 10 minutes ; la prévision est une **fourchette** (±30 %) et une date probable, jamais une promesse.
+- **Broder ensemble** : un projet ROSACE de la même empreinte s'affiche en calque (`PEER_KEY`), sans jamais écrire dans la progression locale ; un autre ouvrage est refusé.
+- **Boîte à fils** (`src/lib/threadbox.ts`, `aime-rosace-boite-a-fils-v1`) : codes DMC possédés, liste de courses des manquants en échevettes, export CSV.
+- **Tambour** (`src/lib/hoop.ts`) : pour un diamètre donné, la plus grande échelle qui tient avec 1,5 cm de marge ; sinon un aïda plus fin est suggéré.
+- **Fiche réimportable** : la couverture de la fiche PDF porte `ROSACE-FICHE <empreinte> r=<recette> FIN-FICHE` ; l'import la reconnaît, régénère la recette et **compare l'empreinte** avant d'accepter (`src/lib/import-pdf/worksheet.ts`).
+- **Texte brodé** (`src/lib/text.ts`) : police 5 × 7 dessinée pour l'aïda (capitales, chiffres, accents courants), un fil de texte et une ombre facultative ; les caractères inconnus sont annoncés.
 
 ## Limites connues
 

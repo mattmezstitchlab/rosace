@@ -1,17 +1,84 @@
 import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowRight, Check, Download, FileText, Grid3x3, Heart, Layers, MousePointer2, Redo2, Share2, Undo2 } from "lucide-react";
+import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Layers, MousePointer2, Navigation, Package, Printer, Redo2, Share2, Timer, Type, Undo2, Users } from "lucide-react";
 import { EmbroideryHoop } from "../components/RosaceCanvas";
 import { SYMBOLS, formatDuration } from "../lib/rosace";
+import { formatMinutes } from "../lib/sessions";
 import aida from "../assets/aida-macro.jpg";
-import { HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, USED_THREADS, decimal, nombre } from "./data";
+import { DEMO_FORECAST, DEMO_HOOP, HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
 import { DmcCrown, RosaceRender } from "./media";
+
+/* ------------------------------------------------------------------ Entrées */
+/**
+ * Les trois portes de l'atelier. Chaque image sort du moteur : la rosace du hero,
+ * sa grille découpée en pages comme l'import la recompose, un texte dans la police brodée.
+ */
+const PAGES = [
+  { n: 1, style: { left: "6%", top: "6%" } },
+  { n: 2, style: { left: "50%", top: "6%" } },
+  { n: 3, style: { left: "6%", top: "50%" } },
+  { n: 4, style: { left: "50%", top: "50%" } },
+];
+
+function Entrees() {
+  return (
+    <section id="entrees" className="section" aria-labelledby="titre-entrees">
+      <div className="section-tete" data-reveal>
+        <p className="surtitre">01 — Un atelier, trois portes</p>
+        <h2 id="titre-entrees">Composez, importez ou écrivez : la suite est la même.</h2>
+        <p className="section-chapeau">
+          Une rosace calculée, un patron PDF acheté ailleurs ou un prénom en lettres brodées entrent par des portes
+          différentes et arrivent au même endroit : <strong>une grille, une palette DMC, une progression suivie croix par croix.</strong>
+        </p>
+      </div>
+
+      <ul className="entrees" data-reveal>
+        <li className="entree">
+          <div className="entree-image">
+            <RosaceRender pattern={HERO_PATTERN} resolution={640} label="Une rosace composée dans l'atelier" />
+          </div>
+          <div className="entree-texte">
+            <p className="entree-sur"><Circle size={13} strokeWidth={2} aria-hidden="true" /> Créer</p>
+            <h3>Une rosace à vous</h3>
+            <p>Six géométries, une couronne de {nombre(489)} fils DMC, le patron calculé en direct : croix, métrages, dimensions, temps.</p>
+            <a className="lien-souligne" href="#atelier">Créer ma rosace</a>
+          </div>
+        </li>
+        <li className="entree">
+          <div className="entree-image entree-image--pages" aria-label="La grille d'un patron, découpée en quatre pages que l'import recompose" role="img">
+            <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={640} decorative />
+            {PAGES.map((page) => (
+              <span key={page.n} className="entree-page" style={page.style} aria-hidden="true"><b>p. {page.n}</b></span>
+            ))}
+          </div>
+          <div className="entree-texte">
+            <p className="entree-sur"><FileText size={13} strokeWidth={2} aria-hidden="true" /> Importer</p>
+            <h3>Un patron PDF, page par page</h3>
+            <p>Les pages sont lues, assemblées comme un puzzle, les recouvrements vérifiés. Ce qui n'a pas pu être relu est compté et annoncé — jamais inventé.</p>
+            <a className="lien-souligne" href="#atelier-importer">Importer un patron PDF</a>
+          </div>
+        </li>
+        <li className="entree">
+          <div className="entree-image entree-image--texte">
+            <RosaceRender pattern={TEXT_WORK} mode="color-chart" resolution={640} label={`Le mot ROSACE en lettres brodées, ${nombre(TEXT_WORK.stitches.length)} croix sur deux fils`} />
+          </div>
+          <div className="entree-texte">
+            <p className="entree-sur"><Type size={13} strokeWidth={2} aria-hidden="true" /> Écrire</p>
+            <h3>Un prénom, une date, un mot doux</h3>
+            <p>Une police de croix dessinée pour l'aïda, un fil pour le texte et un pour l'ombre : {nombre(TEXT_WORK.stitches.length)} croix ici, prêtes à broder.</p>
+            <a className="lien-souligne" href="#atelier-importer">Écrire un texte brodé</a>
+          </div>
+        </li>
+      </ul>
+    </section>
+  );
+}
 
 /* ------------------------------------------------------------------ Formes */
 function Formes() {
   return (
     <section id="formes" className="section" aria-labelledby="titre-formes">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">01 — La promesse</p>
+        <p className="surtitre">02 — La promesse</p>
         <h2 id="titre-formes">
           Une création, pas un modèle prédéfini.
         </h2>
@@ -61,7 +128,7 @@ function Couleurs() {
   return (
     <section id="couleurs" className="section section--papier" aria-labelledby="titre-couleurs">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">02 — La couleur devient matière</p>
+        <p className="surtitre">03 — La couleur devient matière</p>
         <h2 id="titre-couleurs">
           Choisissez avec vos yeux.
           <br />
@@ -157,7 +224,7 @@ function Realisation() {
   return (
     <section id="realisation" className="section" aria-labelledby="titre-realisation">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">03 — Du motif au patron</p>
+        <p className="surtitre">04 — Du motif au patron</p>
         <h2 id="titre-realisation">
           Ce que vous créez à l'écran
           <br />
@@ -288,100 +355,94 @@ function Realisation() {
   );
 }
 
-/* ------------------------------------------------------------------- Vues */
-const VUES = [
-  { id: "textile", label: "Textile", legende: "Le rendu brodé, fil par fil, sur l'aïda." },
-  { id: "tambour", label: "Tambour", legende: "L'ouvrage dans son cadre, tel qu'il sera tenu." },
-  { id: "grille", label: "Grille", legende: "La lecture technique : symboles, repères et coordonnées." },
-  { id: "zoom", label: "Zoom", legende: "Le détail d'une zone, croix par croix." },
+/* ----------------------------------------------------------------- Broder */
+const AFFICHAGES = [
+  { id: "chart", label: "Symboles", legende: "La lecture classique : un symbole par fil, les repères tous les dix points." },
+  { id: "color", label: "Couleurs", legende: "Chaque case dans la teinte de son fil, pour voir l'ouvrage prendre forme." },
+  { id: "color-chart", label: "Les deux", legende: "La couleur sous le symbole : on ne se trompe ni de fil ni de case." },
+  { id: "fabric", label: "Toile", legende: "L'aïda et les croix brodées, telles qu'elles seront sous vos doigts." },
 ] as const;
 
-type VueId = (typeof VUES)[number]["id"];
+type AffichageId = (typeof AFFICHAGES)[number]["id"];
 
-function Vues() {
-  const [vue, setVue] = useState<VueId>("textile");
+const VIVANT = [
+  { icone: Navigation, titre: "Fil conducteur", texte: "Le fil enfilé reste en main. « Suivante » emmène à la prochaine zone du même fil, la plus proche de l'aiguille." },
+  { icone: Timer, titre: "Rythme et prévision", texte: "Vos séances sont comptées sans rien saisir. Dès trente croix, une fourchette honnête de temps restant et une date probable." },
+  { icone: Users, titre: "Broder ensemble", texte: "Le projet d'une amie sur le même ouvrage devient un calque : ses croix et les vôtres, sans jamais se mélanger." },
+  { icone: Package, titre: "Boîte à fils et courses", texte: "Dites quels DMC vous possédez : la liste de courses ne garde que les manquants, échevettes comptées." },
+  { icone: Circle, titre: "Tambour sur mesure", texte: `Pour un tambour de 20 cm, ROSACE calcule l'échelle la plus grande qui tient : ici ×${DEMO_HOOP.scale}, soit ${decimal(DEMO_HOOP.motifCm)} cm de motif.` },
+  { icone: Printer, titre: "Fiche réimportable", texte: "La fiche PDF imprimée porte sa recette et son empreinte : réimportée un jour, elle redonne la rosace exacte, vérifiée." },
+];
+
+function Broder() {
+  const [affichage, setAffichage] = useState<AffichageId>("color-chart");
   const base = useId();
-  const active = VUES.find((entry) => entry.id === vue)!;
+  const active = AFFICHAGES.find((entry) => entry.id === affichage)!;
+  const prevision = DEMO_FORECAST.forecast;
 
   return (
-    <section id="vues" className="section section--papier" aria-labelledby="titre-vues">
+    <section id="broder" className="section section--sombre" aria-labelledby="titre-broder">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">04 — Une interface pour créer, une grille pour broder</p>
-        <h2 id="titre-vues">
-          Deux vues,
+        <p className="surtitre">05 — Broder, en vrai</p>
+        <h2 id="titre-broder">
+          Une grille vivante,
           <br />
-          un même motif.
+          qui vous suit croix par croix.
         </h2>
         <p className="section-chapeau">
-          Travaillez dans une vue expressive, puis passez à la grille technique lorsque vous commencez à broder.
-          La forme reste la même. Seule la lecture change.
+          Le mode Broder affiche la grille comme vous la lisez — symboles, couleurs, les deux ou la toile — et cocher une croix
+          suffit : le reste se calcule.
         </p>
       </div>
 
-      <div className="vues" data-reveal>
-        <div className="vues-onglets" role="tablist" aria-label="Vues du patron">
-          {VUES.map((entree) => (
+      <div className="vivant-bloc" data-reveal>
+        <div className="vivant-onglets" role="tablist" aria-label="Affichages du mode Broder">
+          {AFFICHAGES.map((entree) => (
             <button
               key={entree.id}
               id={`${base}-onglet-${entree.id}`}
               type="button"
               role="tab"
-              aria-selected={vue === entree.id}
+              aria-selected={affichage === entree.id}
               aria-controls={`${base}-panneau`}
-              tabIndex={vue === entree.id ? 0 : -1}
-              className={vue === entree.id ? "est-active" : ""}
-              onClick={() => setVue(entree.id)}
+              tabIndex={affichage === entree.id ? 0 : -1}
+              className={affichage === entree.id ? "est-active" : ""}
+              onClick={() => setAffichage(entree.id)}
             >
               {entree.label}
             </button>
           ))}
         </div>
 
-        <div
-          className="vues-scene"
-          id={`${base}-panneau`}
-          role="tabpanel"
-          aria-labelledby={`${base}-onglet-${vue}`}
-        >
-          {vue === "tambour" ? (
-            <div className="vues-tambour">
-              <EmbroideryHoop pattern={HERO_PATTERN} />
-            </div>
-          ) : (
-            <div className={`vues-cadre vues-cadre--${vue}`}>
-              {vue === "zoom" ? (
-                <div className="vues-zoom">
-                  <RosaceRender pattern={HERO_PATTERN} resolution={1500} label="Détail brodé, grossi" />
-                </div>
-              ) : (
-                <RosaceRender
-                  pattern={HERO_PATTERN}
-                  mode={vue === "grille" ? "chart" : "fabric"}
-                  resolution={900}
-                  label={vue === "grille" ? "Grille technique du patron" : "Rendu textile du patron"}
-                />
-              )}
-            </div>
-          )}
+        <div className="vivant-scene" id={`${base}-panneau`} role="tabpanel" aria-labelledby={`${base}-onglet-${affichage}`}>
+          <div className={`vivant-cadre vivant-cadre--${affichage}`}>
+            <RosaceRender
+              key={affichage}
+              pattern={HERO_PATTERN}
+              mode={affichage}
+              resolution={1000}
+              label={`${active.label} : ${active.legende}`}
+            />
+          </div>
 
-          <div className="vues-lecture">
-            <p className="vues-surtitre">Lecture du patron</p>
+          <div className="vivant-lecture">
+            <p className="vivant-surtitre">Affichage · {active.label}</p>
             <p>{active.legende}</p>
-            <dl>
+            <dl className="vivant-exemple" aria-label="Exemple de prévision, calculé par le moteur des séances sur des séances fictives">
               <div>
-                <dt>Grille</dt>
-                <dd>
-                  {HERO_STATS.grid} × {HERO_STATS.grid}
-                </dd>
+                <dt>Brodées</dt>
+                <dd>{nombre(DEMO_FORECAST.done)} / {nombre(HERO_STATS.stitches)}</dd>
               </div>
               <div>
-                <dt>Croix</dt>
-                <dd>{nombre(HERO_STATS.stitches)}</dd>
+                <dt>Rythme</dt>
+                <dd>{nombre(DEMO_FORECAST.rhythm.stitchesPerHour)} croix / h</dd>
               </div>
-              <div>
-                <dt>Fils DMC</dt>
-                <dd>{HERO_STATS.threads}</dd>
-              </div>
+              {prevision && (
+                <div>
+                  <dt>Reste</dt>
+                  <dd>{formatMinutes(prevision.low)} – {formatMinutes(prevision.high)}</dd>
+                </div>
+              )}
             </dl>
             <ul className="vues-legende" aria-label="Fils et symboles du patron">
               {PALETTE.map((thread, index) => (
@@ -395,10 +456,24 @@ function Vues() {
                 </li>
               ))}
             </ul>
-            <p className="vues-note">
-              La grille et le rendu sortent du même patron : ce ne sont pas deux motifs différents.
+            <p className="vivant-note">
+              Exemple : quatre soirées fictives de 40 minutes, sur une semaine. Chez vous, la prévision n'apparaît qu'avec vos propres croix, en fourchette, jamais à la minute.
             </p>
           </div>
+        </div>
+
+        <ul className="vivant" aria-label="Ce que le mode Broder fait pour vous">
+          {VIVANT.map(({ icone: Icone, titre, texte }) => (
+            <li key={titre}>
+              <Icone size={20} strokeWidth={1.7} aria-hidden="true" />
+              <h3>{titre}</h3>
+              <p>{texte}</p>
+            </li>
+          ))}
+        </ul>
+
+        <div className="vivant-tambour" aria-hidden="true">
+          <EmbroideryHoop pattern={HERO_PATTERN} />
         </div>
       </div>
     </section>
@@ -411,12 +486,13 @@ const EXPORTS = [
   { id: "pdf", titre: "PDF", usage: "Imprimer le patron", icone: FileText },
   { id: "csv", titre: "CSV", usage: "Retrouver les fils et les métrages", icone: Grid3x3 },
   { id: "svg", titre: "SVG", usage: "Conserver le motif vectoriel", icone: Download },
-  { id: "projet", titre: "Projet ROSACE", usage: "Reprendre plus tard", icone: Heart },
+  { id: "fiche", titre: "Fiche réimportable", usage: "Imprimer, et retrouver la rosace exacte", icone: Printer },
+  { id: "projet", titre: "Projet ROSACE", usage: "Reprendre, ou broder ensemble", icone: Heart },
 ];
 
 const GARDE = [
   { icone: Heart, titre: "Collection", texte: "Vos rosaces enregistrées, prêtes à être rouvertes." },
-  { icone: Check, titre: "Progression", texte: "Les croix déjà brodées, conservées séparément du motif." },
+  { icone: Check, titre: "Progression", texte: "Les croix déjà brodées et vos séances, conservées séparément du motif — rosace ou patron importé." },
   { icone: Undo2, titre: "Annuler / rétablir", texte: "Essayez une forme, revenez en arrière, comparez." },
   { icone: Share2, titre: "Lien de partage", texte: "La signature et la palette voyagent avec le lien." },
 ];
@@ -425,11 +501,11 @@ function Progression() {
   return (
     <section id="progression" className="section" aria-labelledby="titre-progression">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">05 — Gardez votre progression</p>
+        <p className="surtitre">06 — Gardez votre progression</p>
         <h2 id="titre-progression">Votre rosace vous appartient.</h2>
         <p className="section-chapeau">
-          Sauvegardez une création, reprenez votre progression, comparez plusieurs palettes et exportez votre
-          projet quand vous êtes prêt.
+          Sauvegardez une création, reprenez votre progression d'un appareil à l'autre, comparez plusieurs palettes et
+          exportez votre projet quand vous êtes prêt. Un patron importé se garde de la même façon.
         </p>
       </div>
 
@@ -495,7 +571,7 @@ const PUBLICS = [
   },
   {
     titre: "J'ai déjà un patron PDF",
-    texte: "Importer ses pages, recomposer la grille dans l'atelier et suivre chaque croix jusqu'à la dernière.",
+    texte: "Importer ses pages, recomposer la grille dans l'atelier et suivre chaque croix jusqu'à la dernière — ou broder un prénom en quelques lettres.",
     href: "#atelier-importer",
   },
 ];
@@ -504,7 +580,7 @@ function Public() {
   return (
     <section id="public" className="section section--papier" aria-labelledby="titre-public">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">06 — Pour qui</p>
+        <p className="surtitre">07 — Pour qui</p>
         <h2 id="titre-public">
           Pour celles et ceux qui aiment créer avec leurs mains.
         </h2>
@@ -536,10 +612,11 @@ function Public() {
 export function LandingSections() {
   return (
     <>
+      <Entrees />
       <Formes />
       <Couleurs />
       <Realisation />
-      <Vues />
+      <Broder />
       <Progression />
       <Public />
     </>
