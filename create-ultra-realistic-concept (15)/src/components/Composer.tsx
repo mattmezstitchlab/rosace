@@ -126,6 +126,7 @@ export function Composer() {
         </section>
       )}
 
+      <span id="dock-alerte-aide" className="sr-only">Contraste à vérifier dans les couleurs</span>
       <nav className="studio-dock" aria-label="Catégories d'outils">
         {CATEGORIES.map((category, index) => {
           const Icon = category.icon;
@@ -139,13 +140,13 @@ export function Composer() {
               type="button"
               className={`dock-categorie ${isPanel || isBroder ? "is-active" : ""}`}
               aria-pressed={isPanel || isBroder}
-              aria-label={`${category.label}${hasAlert ? " (contraste à vérifier)" : ""}`}
+              aria-describedby={hasAlert ? "dock-alerte-aide" : undefined}
               onClick={() => choose(category.id)}
             >
               <Icon size={21} strokeWidth={1.7} aria-hidden="true" />
               <span>{category.label}</span>
               {hasAlert && <span className="dock-alerte" aria-hidden="true" />}
-              <kbd aria-hidden="true">{index + 1}</kbd>
+              <kbd>{index + 1}</kbd>
             </button>
           );
         })}

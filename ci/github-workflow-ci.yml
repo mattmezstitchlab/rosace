@@ -57,14 +57,14 @@ jobs:
           npx playwright install --with-deps chromium
           echo "CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
 
-      - name: Parcours navigateur + accessibilité sur le serveur de dev
+      - name: Parcours navigateur + accessibilité bloquante sur le serveur de dev
         working-directory: create-ultra-realistic-concept (15)
         run: |
           npm run dev -- --host 127.0.0.1 --port 5173 --strictPort > /tmp/rosace-dev.log 2>&1 &
           echo $! > /tmp/rosace-dev.pid
           for i in $(seq 1 60); do curl -fsS http://127.0.0.1:5173 > /dev/null && break; sleep 1; done
           BASE_URL=http://127.0.0.1:5173 npm run test:browser
-          BASE_URL=http://127.0.0.1:5173 npm run test:a11y || echo "Accessibilité non bloquante : rapport conservé dans les artefacts"
+          BASE_URL=http://127.0.0.1:5173 npm run test:a11y
           kill "$(cat /tmp/rosace-dev.pid)" || true
 
       - name: Fumage du build servi par npm run preview

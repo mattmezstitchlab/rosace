@@ -4,11 +4,11 @@ import { CROWN_THREADS } from "../src/data/crown";
 import { computeMaterials, estimateTime, perStitchNeedleMeters, SKEIN_STRAND_METERS } from "../src/lib/materials";
 import { chartRegions, countRegionStitches } from "../src/lib/chart";
 import { patternFingerprint } from "../src/lib/pattern-id";
-import { patternToSvg } from "../src/lib/exporters";
+import { patternToSvg, printWorksheet } from "../src/lib/exporters";
 import { chartGeometry, paintPattern } from "../src/lib/paint";
 import {
   DEFAULT_CONFIG, GEOMETRY_COUNT, GEOMETRY_NAMES, PRESETS, SYMBOLS, decodeConfig, encodeConfig,
-  generateRosace, getPatternName, normalizeConfig,
+  generateRosace, getPatternName, normalizeConfig, type RosaceConfig,
 } from "../src/lib/rosace";
 import {
   LEGACY_PROJECT_VERSION, MAX_ZOOM, MIN_ZOOM, PROJECT_FORMAT, PROJECT_VERSION, buildProject,
@@ -181,6 +181,8 @@ test("géométries : six familles distinctes, corolle d'origine bit à bit prés
       const combined = generateRosace({ ...DEFAULT_CONFIG, geometry, structure });
       assert.ok(combined.stitches.length > 0, `géométrie ${geometry} incompatible avec la structure ${structure}`);
       assert.equal(combined.usage.reduce((sum, line) => sum + line.count, 0), combined.stitches.length);
+      assert.equal(combined.mirrorSymmetric, true, `géométrie ${geometry}, structure ${structure} : symétrie perdue`);
+      assert.equal(combined.cleaned, 0, `géométrie ${geometry}, structure ${structure} : nettoyage détériore le motif`);
       const cells = [...combined.cells];
       if (structure === 1) firstStructureCells = cells;
       else assert.notDeepEqual(cells, firstStructureCells, `géométrie ${geometry} ignore la structure ${structure}`);
@@ -195,6 +197,53 @@ test("géométries : six familles distinctes, corolle d'origine bit à bit prés
   assert.equal(normalizeConfig({ ...DEFAULT_CONFIG, geometry: 99 }).geometry, GEOMETRY_COUNT);
   assert.equal(decodeConfig(encodeConfig({ ...DEFAULT_CONFIG, geometry: 4 }))?.geometry, 4);
   assert.equal(PRESETS.filter((preset) => preset.config.geometry > 1).length, GEOMETRY_COUNT - 1);
+});
+
+test("anciennes créations : lien sans champ géométrie retombe sur la corolle d'origine", () => {
+  const legacy = { ...DEFAULT_CONFIG } as Partial<RosaceConfig>;
+  delete legacy.geometry;
+  const encoded = Buffer.from(JSON.stringify(legacy))
+    .toString("base64")
+    .replace(/\+/g, "-")
+    .replace(/\//g, "_")
+    .replace(/=/g, "");
+  const decoded = decodeConfig(encoded);
+  assert.equal(decoded?.geometry, 1, "une ancienne recette doit être normalisée vers la corolle");
+  assert.equal(patternFingerprint(generateRosace(decoded!)), "353C357F12EC80D5");
+});
+
+test("PDF : aperçu et planches sont générés depuis la même matrice pour les six géométries", () => {
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const previousWindow = scope.window;
+  let html = "";
+  scope.window = {
+    open: () => ({
+      opener: null,
+      document: {
+        write: (content: string) => { html = content; },
+        close: () => {},
+      },
+    }),
+  };
+  try {
+    for (let geometry = 1; geometry <= GEOMETRY_COUNT; geometry += 1) {
+      const variant = generateRosace({ ...DEFAULT_CONFIG, geometry });
+      html = "";
+      assert.equal(printWorksheet(variant), true);
+      const expectedPreview = patternToSvg(variant, false).replace(/^<\?xml[^>]*>\s*/, "");
+      const preview = html.match(/<div class="preview">([\s\S]*?)<\/div>/)?.[1];
+      assert.equal(preview, expectedPreview, `géométrie ${geometry} : aperçu PDF différent de la prévisualisation`);
+      assert.equal((html.match(/class="tile-page"/g) ?? []).length, 4);
+      assert.match(html, /Imprimer \/ PDF · 5 pages/);
+      assert.ok(html.includes(patternFingerprint(variant)), "empreinte absente de la fiche");
+      const symbols = [...html.matchAll(/<text[^>]*>([^<]+)<\/text>/g)]
+        .map((match) => match[1])
+        .filter((text) => SYMBOLS.includes(text));
+      assert.equal(symbols.length, variant.stitches.length, `géométrie ${geometry} : les planches ne couvrent pas chaque croix une fois`);
+    }
+  } finally {
+    scope.window = previousWindow;
+  }
 });
 
 test("catalogue étendu : 328 ajouts et couronne de 489 références sans doublon", () => {

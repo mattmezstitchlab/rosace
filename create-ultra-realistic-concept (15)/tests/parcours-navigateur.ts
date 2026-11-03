@@ -13,7 +13,7 @@ import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { chromium, type BrowserContext, type Page } from "playwright-core";
+import { chromium, firefox, webkit, type BrowserContext, type Page } from "playwright-core";
 import { DMC_ALL_THREADS, FAMILY_LABELS } from "../src/data/dmc";
 import { shortFingerprint, patternFingerprint } from "../src/lib/pattern-id";
 import { chartGeometry } from "../src/lib/paint";
@@ -28,21 +28,40 @@ import {
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ?? path.join(os.tmpdir(), "rosace-browser-artifacts");
+const BROWSER = process.env.BROWSER ?? "chromium";
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH ?? [
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
   "/usr/bin/google-chrome",
 ].find(existsSync);
+const BROWSER_EXECUTABLE = process.env.BROWSER_EXECUTABLE ?? (BROWSER === "chromium" ? CHROMIUM_PATH : undefined);
 const BROWSER_ARGS = (process.env.BROWSER_ARGS ?? "--no-sandbox --disable-dev-shm-usage --disable-gpu").split(" ").filter(Boolean);
+const browserType = BROWSER === "firefox" ? firefox : BROWSER === "webkit" ? webkit : chromium;
 
 const pattern = generateRosace(DEFAULT_CONFIG);
+const fractale = generateRosace({ ...DEFAULT_CONFIG, geometry: GEOMETRY_COUNT });
 const fingerprint = patternFingerprint(pattern);
+const fractaleFingerprint = patternFingerprint(fractale);
 const shortId = shortFingerprint(fingerprint);
 const expectedKeys = new Set(pattern.stitches.map((stitch) => `${stitch.x}:${stitch.y}:${stitch.color}`));
 const pageErrors: string[] = [];
 
 function keyOf(x: number, y: number, color: number) {
   return `${x}:${y}:${color}`;
+}
+
+/** Signature sémantique d'un SVG : insensible à la sérialisation auto-fermante du navigateur. */
+function svgSignature(svg: string) {
+  return {
+    width: svg.match(/<svg[^>]*\bwidth="([^"]+)"/)?.[1] ?? "",
+    height: svg.match(/<svg[^>]*\bheight="([^"]+)"/)?.[1] ?? "",
+    viewBox: svg.match(/<svg[^>]*\bviewBox="([^"]+)"/)?.[1] ?? "",
+    title: svg.match(/<title>([\s\S]*?)<\/title>/)?.[1] ?? "",
+    desc: svg.match(/<desc>([\s\S]*?)<\/desc>/)?.[1] ?? "",
+    metadata: svg.match(/<metadata>([\s\S]*?)<\/metadata>/)?.[1] ?? "",
+    groups: [...svg.matchAll(/<g fill="none" stroke="([^"]+)"/g)].map((match) => match[1]),
+    paths: [...svg.matchAll(/<path d="([^"]+)"/g)].map((match) => match[1]),
+  };
 }
 
 async function captureDownload(page: Page, action: () => unknown, filename: string) {
@@ -238,10 +257,14 @@ function traceMatrix(trace: Trace) {
 }
 
 async function main() {
-  assert.ok(CHROMIUM_PATH, "CHROMIUM_PATH doit désigner un binaire Chromium.");
+  if (BROWSER === "chromium") assert.ok(BROWSER_EXECUTABLE, "CHROMIUM_PATH doit désigner un binaire Chromium.");
   await mkdir(ARTIFACT_DIR, { recursive: true });
-  const browser = await chromium.launch({ headless: true, executablePath: CHROMIUM_PATH, args: BROWSER_ARGS });
-  console.log(`Chromium ${browser.version()} · ${BASE_URL} · artefacts ${ARTIFACT_DIR}`);
+  const browser = await browserType.launch({
+    headless: true,
+    ...(BROWSER_EXECUTABLE ? { executablePath: BROWSER_EXECUTABLE } : {}),
+    args: BROWSER_ARGS,
+  });
+  console.log(`${BROWSER} ${browser.version()} · ${BASE_URL} · artefacts ${ARTIFACT_DIR}`);
 
   try {
     /* ---------------- Contexte mobile principal ---------------- */
@@ -327,6 +350,12 @@ async function main() {
     assert.equal(await popup.locator(".tile-page").count(), 4);
     assert.equal(await popup.locator(".chart svg").count(), 4);
     assert.equal(await popup.locator(".preview svg").count(), 1);
+    const pdfPreviewSvg = await popup.locator(".preview svg").evaluate((svg) => svg.outerHTML);
+    assert.deepEqual(
+      svgSignature(pdfPreviewSvg),
+      svgSignature(motifSvg.replace(/^<\?xml[^>]*>\s*/, "")),
+      "l'aperçu PDF ne correspond pas au SVG motif exporté",
+    );
     assert.match((await popup.locator("button.print").textContent()) ?? "", /5 pages/);
     const tileText = await popup.locator(".tile-head").allTextContents();
     assert.ok(tileText.some((line) => line.includes("Colonnes 1–51")));
@@ -535,7 +564,7 @@ async function main() {
     await recipeContext.close();
 
     /* ---------------- Six familles géométriques, sur les cinq structures ---------------- */
-    const geometryContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+    const geometryContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1, acceptDownloads: true });
     const geometryPage = await geometryContext.newPage();
     trackErrors(geometryPage, "geometries");
     await geometryPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
@@ -562,6 +591,33 @@ async function main() {
     await geometrySlider.fill("1");
     await geometryPage.waitForTimeout(120);
     assert.match((await geometryPage.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/, "retour à la corolle classique impossible");
+
+    /* Export / réimport d'une géométrie non classique avec progression conservée */
+    await geometrySlider.fill(String(GEOMETRY_COUNT));
+    await geometryPage.waitForTimeout(120);
+    await closePanel(geometryPage);
+    await openBroder(geometryPage);
+    await clickStitch(geometryPage, fractale.stitches[0]);
+    await waitProgress(geometryPage, "1 /");
+    await closeBroder(geometryPage);
+    await openDock(geometryPage, "Export");
+    const fractaleProject = await captureDownload(
+      geometryPage,
+      () => geometryPage.getByRole("button", { name: /Exporter le projet/ }).click(),
+      "projet-fractale.json",
+    );
+    const fractaleJson = JSON.parse(await readFile(fractaleProject.filePath, "utf8"));
+    assert.equal(fractaleJson.format, PROJECT_FORMAT);
+    assert.equal(fractaleJson.version, PROJECT_VERSION);
+    assert.equal(fractaleJson.config.geometry, GEOMETRY_COUNT);
+    assert.equal(fractaleJson.fingerprint, fractaleFingerprint, "l'empreinte ne suit pas la géométrie");
+    assert.ok(String(fractaleJson.progress.completedRuns).length > 0, "progression absente du projet exporté");
+    await geometryPage.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(fractaleProject.filePath);
+    await geometryPage.locator(".toast").filter({ hasText: "Projet importé" }).waitFor({ state: "visible" });
+    await closePanel(geometryPage);
+    await openBroder(geometryPage);
+    await waitProgress(geometryPage, "1 /");
+    await closeBroder(geometryPage);
     await geometryContext.close();
 
     /* ---------------- hashchange, popstate, retour / avant ---------------- */

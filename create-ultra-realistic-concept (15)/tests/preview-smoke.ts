@@ -7,24 +7,31 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import { chromium, type Browser } from "playwright-core";
+import { chromium, firefox, webkit, type Browser } from "playwright-core";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:4173";
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ?? path.join(os.tmpdir(), "rosace-browser-artifacts");
+const BROWSER = process.env.BROWSER ?? "chromium";
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH ?? [
   "/usr/bin/chromium",
   "/usr/bin/chromium-browser",
   "/usr/bin/google-chrome",
 ].find(existsSync);
+const BROWSER_EXECUTABLE = process.env.BROWSER_EXECUTABLE ?? (BROWSER === "chromium" ? CHROMIUM_PATH : undefined);
 const BROWSER_ARGS = (process.env.BROWSER_ARGS ?? "--no-sandbox --disable-dev-shm-usage --disable-gpu").split(" ").filter(Boolean);
+const browserType = BROWSER === "firefox" ? firefox : BROWSER === "webkit" ? webkit : chromium;
 
-assert.ok(CHROMIUM_PATH, "CHROMIUM_PATH doit désigner un binaire Chromium.");
+if (BROWSER === "chromium") assert.ok(BROWSER_EXECUTABLE, "CHROMIUM_PATH doit désigner un binaire Chromium.");
 
 async function main() {
   await mkdir(ARTIFACT_DIR, { recursive: true });
   let browser: Browser | null = null;
   try {
-    browser = await chromium.launch({ headless: true, executablePath: CHROMIUM_PATH, args: BROWSER_ARGS });
+    browser = await browserType.launch({
+      headless: true,
+      ...(BROWSER_EXECUTABLE ? { executablePath: BROWSER_EXECUTABLE } : {}),
+      args: BROWSER_ARGS,
+    });
     const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
     const page = await context.newPage();
     const errors: string[] = [];

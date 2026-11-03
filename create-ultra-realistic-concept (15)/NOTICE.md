@@ -2,6 +2,17 @@
 
 Ce fichier rassemble les mentions requises par les données, polices et dépendances tierces utilisées par ROSACE. **Il n'attribue aucune licence au code applicatif** : ce choix appartient au propriétaire du dépôt et reste volontairement ouvert (voir `RAPPORT-CONSOLIDATION-FINALE.md`).
 
+## Séparation des droits
+
+| Élément | Régime | Conséquence |
+|---|---|---|
+| **Code applicatif ROSACE** (`src/`, `scripts/`, `tests/`, `ci/`, `galerie/`, rapports) | Aucun `LICENSE`, aucune licence MIT / GPL / Apache / CC attribuée. Tous droits réservés par défaut. | Toute redistribution ou réutilisation du code nécessite une décision explicite du propriétaire. |
+| Données DMC (MakeBead) | CC BY 4.0 | Attribution obligatoire, y compris dans les exports. |
+| Police Bodoni Moda | OFL 1.1 | Attribution et respect de la licence de police. |
+| Dépendances npm | Licences déclarées dans `LICENSES.md` | Chaque paquet reste soumis à sa propre licence. |
+
+Les licences tierces ne s'étendent pas au code ROSACE et ne valent pas choix de licence pour ce code. Aucun fichier `LICENSE` n'a été créé lors de cette revue.
+
 ## Données DMC — 489 références
 
 - Œuvre : *craft-color-codes*, jeu de données `data/json/dmc-floss.json`.

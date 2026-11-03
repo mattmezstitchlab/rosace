@@ -1,7 +1,7 @@
 # Inventaire des licences — dépendances, polices et données
 
 Généré par `npm run licenses` depuis `package-lock.json` et les `package.json` installés.
-Date de génération : 2026-11-03T03:40:20.224Z
+Date de génération : 2026-11-03T04:56:50.539Z
 
 ## Application
 

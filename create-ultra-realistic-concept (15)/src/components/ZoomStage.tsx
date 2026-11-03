@@ -115,7 +115,7 @@ export function ZoomStage({ children }: { children: ReactNode }) {
               <button type="button" className="zoom-bouton" onClick={() => zoomBy(0.8)} disabled={view.k <= 1} aria-label="Zoom arrière">
                 <Minus size={16} aria-hidden="true" />
               </button>
-              <button type="button" className="zoom-bouton zoom-recentre" onClick={reset} disabled={view.k === 1 && view.x === 0 && view.y === 0} aria-label="Recentrer la vue">
+              <button type="button" className="zoom-bouton zoom-recentre" onClick={reset} disabled={view.k === 1 && view.x === 0 && view.y === 0} aria-label={`Recentrer la vue, ${Math.round(view.k * 100)} %`}>
                 <Expand size={15} aria-hidden="true" />
                 <span>{Math.round(view.k * 100)} %</span>
               </button>

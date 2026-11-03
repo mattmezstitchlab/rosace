@@ -48,6 +48,8 @@
 .studio-stats p { flex: 1; margin: 0; color: var(--encre-3); font-size: 12.5px; text-align: center; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .studio-stats strong { color: var(--encre); font-weight: 700; }
 .studio-stats span { margin: 0 7px; color: var(--trait-2); }
+/* Le séparateur reste discret, mais la valeur « 17,2 cm » doit rester lisible (axe color-contrast). */
+.studio-stats .stat-cm:not([aria-hidden="true"]) { color: var(--encre-2); }
 @media (max-width: 560px) { .studio-stats p { font-size: 11.5px; } .studio-stats .stat-cm { display: none; } }
 
 /* ---------- Panneau coulissant ---------- */

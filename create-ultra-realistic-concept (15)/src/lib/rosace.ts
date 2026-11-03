@@ -528,8 +528,11 @@ export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
     }
   }
 
-  // Brodabilité : une croix de contour ou de remplissage sans aucune voisine est un accident de calcul, pas un détail à broder.
+  // Brodabilité : une croix isolée asymétrique est un accident de calcul.
+  // Les points isolés qui forment une paire miroir (ou le point central) sont des détails
+  // volontaires : le nettoyage ne doit pas les retirer et donc pas détériorer le motif.
   let cleaned = 0;
+  const isolated: number[] = [];
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const index = y * size + x;
@@ -544,11 +547,23 @@ export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
           if (cells[yy * size + xx] >= 0) neighbours += 1;
         }
       }
-      if (neighbours === 0) {
-        cells[index] = -1;
-        cleaned += 1;
-      }
+      if (neighbours === 0) isolated.push(index);
     }
+  }
+  const isolatedSet = new Set(isolated);
+  const preserved = new Set<number>();
+  for (const index of isolated) {
+    const x = index % size;
+    const y = Math.floor(index / size);
+    const mirrorIndex = y * size + (size - 1 - x);
+    if (mirrorIndex === index || (isolatedSet.has(mirrorIndex) && roles[mirrorIndex] === roles[index])) {
+      preserved.add(index);
+    }
+  }
+  for (const index of isolated) {
+    if (preserved.has(index)) continue;
+    cells[index] = -1;
+    cleaned += 1;
   }
 
   let mirrorSymmetric = true;

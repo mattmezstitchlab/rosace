@@ -29,15 +29,15 @@ Node 22 est utilisé pour la validation. Vite sert l'application sur `0.0.0.0` a
 | `npm run dev` | serveur de développement |
 | `npm run build` | singlefile de production dans `dist/index.html` |
 | `npm run preview` | sert le build réel |
-| `npm test` | 24 assertions Node/tsx |
+| `npm test` | 26 assertions Node/tsx |
 | `npm run typecheck` | TypeScript strict, `src` + `tests` + `vite.config.ts` |
 | `npm run test:browser` | parcours Playwright mobile + bureau |
 | `npm run test:preview` | fumage du build servi |
-| `npm run test:a11y` | accessibilité, clavier, réduction des animations (non bloquant) |
+| `npm run test:a11y` | accessibilité, clavier, réduction des animations sur 4 configurations — **bloquant, 0 violation axe** |
 | `npm run licenses` | régénère `LICENSES.md` |
 | `npm run test:all` | tests, typecheck, build, navigateur, preview |
 
-`test:browser`, `test:preview` et `test:a11y` nécessitent un binaire Chromium externe via `CHROMIUM_PATH` ; `BASE_URL` et `ARTIFACT_DIR` sont optionnels. Le workflow GitHub Actions est fourni dans `ci/github-workflow-ci.yml` : copiez-le vers `.github/workflows/ci.yml` une fois la permission `workflows` accordée à l'intégration GitHub pour activer la CI distante. Exemple :
+`test:browser`, `test:preview` et `test:a11y` utilisent Chromium par défaut via `CHROMIUM_PATH` ; `BASE_URL` et `ARTIFACT_DIR` sont optionnels. `BROWSER=firefox|webkit` (avec `npx playwright install firefox webkit`) prépare les mêmes parcours pour Firefox et Safari/WebKit — **ces navigateurs ne sont pas encore exécutés**. Le workflow GitHub Actions est fourni dans `ci/github-workflow-ci.yml` : copiez-le vers `.github/workflows/ci.yml` une fois la permission `workflows` accordée à l'intégration GitHub pour activer la CI distante. Exemple :
 
 ```bash
 CHROMIUM_PATH=/chemin/vers/chromium BASE_URL=http://127.0.0.1:5173 npm run test:browser
@@ -72,6 +72,8 @@ Le curseur **Géométrie** propose six familles dans le même moteur, disponible
 
 Cinq nouvelles études (`PRESETS`) les présentent. La valeur 1 reste le défaut : anciens liens, projets version 1 et progressions existantes retrouvent exactement le même patron. Il n'existe toujours qu'un seul `generateRosace`.
 
+Galerie comparative à paramètres identiques (graine 7, grille 101×101, structure 2, tracé 3, densité 3) : [`galerie/index.html`](../galerie/index.html).
+
 ## Formats d'export
 
 | Format | Contenu | Réimportable |
@@ -97,7 +99,8 @@ Les projets **version 1** sont migrés explicitement vers v2 lorsque leur forme 
 ## Limites connues
 
 - Validation terrain humaine (5 brodeuses, 3 recettes) encore à organiser ; les six familles géométriques sont vérifiées en Chromium headless, pas sur appareil réel.
-- Couverture navigateur automatisée : Chromium ; Safari, Firefox, appareils réels et gestes tactiles matériels restent à valider.
+- Couverture navigateur exécutée : Chromium 153 headless uniquement. Safari/WebKit et Firefox sont **préparés** via `BROWSER=webkit|firefox`, mais non exécutés ; appareils réels et gestes tactiles matériels restent à valider.
+- La CI GitHub distante n'est pas encore active : le workflow est prêt dans `ci/github-workflow-ci.yml`, en attente de la permission `workflows`.
 - Couleurs écran indicatives ; métrages et temps sont des estimations.
 - Le lien de partage ne transporte pas la progression.
 - Aucune licence de code n'est attribuée sans décision explicite ; voir `NOTICE.md`, `LICENSES.md` et le rapport final.
