@@ -1,7 +1,7 @@
 import { useId, useState } from "react";
 import { ArrowRight, Check, Download, FileText, Grid3x3, Heart, Layers, Redo2, Share2, Undo2 } from "lucide-react";
 import { EmbroideryHoop } from "../components/RosaceCanvas";
-import { formatDuration } from "../lib/rosace";
+import { SYMBOLS, formatDuration } from "../lib/rosace";
 import aida from "../assets/aida-macro.jpg";
 import { HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, USED_THREADS, decimal, nombre } from "./data";
 import { DmcCrown, RosaceRender } from "./media";
@@ -319,6 +319,7 @@ function Vues() {
           )}
 
           <div className="vues-lecture">
+            <p className="vues-surtitre">Lecture du patron</p>
             <p>{active.legende}</p>
             <dl>
               <div>
@@ -336,6 +337,18 @@ function Vues() {
                 <dd>{HERO_STATS.threads}</dd>
               </div>
             </dl>
+            <ul className="vues-legende" aria-label="Fils et symboles du patron">
+              {PALETTE.map((thread, index) => (
+                <li key={thread.code}>
+                  <b aria-hidden="true">{SYMBOLS[index]}</b>
+                  <i style={{ background: thread.hex }} aria-hidden="true" />
+                  <span>
+                    DMC {thread.code}
+                    <small>{thread.name}</small>
+                  </span>
+                </li>
+              ))}
+            </ul>
             <p className="vues-note">
               La grille et le rendu sortent du même patron : ce ne sont pas deux motifs différents.
             </p>

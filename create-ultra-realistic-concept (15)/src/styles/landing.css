@@ -376,13 +376,21 @@ html[data-mode="nuit"] body.est-presentation { background: #f7f3ea; }
 .presentation .vues-zoom canvas { width: 100%; height: 100%; }
 .presentation .vues-tambour { display: grid; aspect-ratio: 1 / 1; place-items: center; padding: 30px 8px 18px; }
 .presentation .vues-tambour .hoop { width: min(100%, 560px); }
-.presentation .vues-lecture { display: flex; flex-direction: column; gap: 14px; padding: 8px 6px; }
+.presentation .vues-lecture { display: flex; flex-direction: column; justify-content: flex-start; gap: 16px; padding: 22px 6px 8px; }
+/* Le surtitre est aussi un paragraphe : on rétablit son style juste après la règle générale. */
+.presentation .vues-lecture > .vues-surtitre { font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--l-encre-3); }
 .presentation .vues-lecture > p { margin: 0; font-size: 14.5px; line-height: 1.5; color: var(--l-encre-2); }
 .presentation .vues-lecture dl { display: grid; gap: 8px; margin: 0; padding: 14px 0; border-top: 1px solid var(--l-trait); border-bottom: 1px solid var(--l-trait); }
 .presentation .vues-lecture dl > div { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
 .presentation .vues-lecture dt { font-size: 11px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: var(--l-encre-3); }
 .presentation .vues-lecture dd { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
-.presentation .vues-lecture > .vues-note { margin-top: auto; font-size: 12.5px; line-height: 1.5; color: var(--l-encre-3); }
+.presentation .vues-legende { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 14px; margin: 0; padding: 0; list-style: none; }
+.presentation .vues-legende li { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.presentation .vues-legende b { flex: none; width: 16px; font-size: 14px; font-weight: 700; text-align: center; }
+.presentation .vues-legende i { flex: none; width: 12px; height: 12px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .22); }
+.presentation .vues-legende span { display: flex; flex-direction: column; min-width: 0; font-size: 11.5px; font-weight: 600; line-height: 1.25; }
+.presentation .vues-legende small { overflow: hidden; font-size: 10.5px; font-weight: 400; color: var(--l-encre-3); text-overflow: ellipsis; white-space: nowrap; }
+.presentation .vues-lecture > .vues-note { margin-top: 0; font-size: 12.5px; line-height: 1.5; color: var(--l-encre-3); }
 @media (max-width: 820px) {
   .presentation .vues-scene { grid-template-columns: 1fr; }
   .presentation .vues-tambour .hoop { width: min(100%, 340px); }
