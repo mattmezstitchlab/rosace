@@ -1,7 +1,7 @@
 # Inventaire des licences — dépendances, polices et données
 
 Généré par `npm run licenses` depuis `package-lock.json` et les `package.json` installés.
-Date de génération : 2026-11-03T04:56:50.539Z
+Date de génération : 2026-11-03T20:25:06.781Z
 
 ## Application
 
@@ -16,7 +16,7 @@ Date de génération : 2026-11-03T04:56:50.539Z
 
 ## Dépendances npm
 
-Total : 203 paquets installés (directs et transitifs). Les textes complets se trouvent dans chaque dossier `node_modules/<paquet>/LICENSE*`.
+Total : 216 paquets installés (directs et transitifs). Les textes complets se trouvent dans chaque dossier `node_modules/<paquet>/LICENSE*`.
 
 | Paquet | Version | Licence | Dev |
 |---|---|---|---|
@@ -98,6 +98,18 @@ Total : 203 paquets installés (directs et transitifs). Les textes complets se t
 | `@jridgewell/resolve-uri` | 3.1.2 | MIT | oui |
 | `@jridgewell/sourcemap-codec` | 1.6.0 | MIT | oui |
 | `@jridgewell/trace-mapping` | 0.3.31 | MIT | oui |
+| `@napi-rs/canvas` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-android-arm64` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-darwin-arm64` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-darwin-x64` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-linux-arm-gnueabihf` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-linux-arm64-gnu` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-linux-arm64-musl` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-linux-riscv64-gnu` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-linux-x64-gnu` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-linux-x64-musl` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-win32-arm64-msvc` | 1.1.0 | MIT | non |
+| `@napi-rs/canvas-win32-x64-msvc` | 1.1.0 | MIT | non |
 | `@napi-rs/lzma-linux-x64-gnu` | 1.5.1 | MIT | oui |
 | `@rolldown/pluginutils` | 1.0.0-beta.47 | MIT | oui |
 | `@rollup/rollup-android-arm-eabi` | 4.67.4 | MIT | oui |
@@ -197,6 +209,7 @@ Total : 203 paquets installés (directs et transitifs). Les textes complets se t
 | `ms` | 2.1.3 | MIT | oui |
 | `nanoid` | 3.3.20 | MIT | oui |
 | `node-releases` | 2.0.63 | MIT | oui |
+| `pdfjs-dist` | 6.4.299 | Apache-2.0 | non |
 | `picocolors` | 1.1.1 | ISC | oui |
 | `picomatch` | 2.3.2 | MIT | oui |
 | `picomatch` | 4.0.7 | MIT | oui |
@@ -226,10 +239,10 @@ Total : 203 paquets installés (directs et transitifs). Les textes complets se t
 
 ## Répartition
 
-- **MIT** : 173 paquet(s)
+- **MIT** : 185 paquet(s)
 - **MPL-2.0** : 14 paquet(s)
 - **ISC** : 7 paquet(s)
-- **Apache-2.0** : 5 paquet(s)
+- **Apache-2.0** : 6 paquet(s)
 - **OFL-1.1** : 1 paquet(s)
 - **CC-BY-4.0** : 1 paquet(s)
 - **BSD-3-Clause** : 1 paquet(s)

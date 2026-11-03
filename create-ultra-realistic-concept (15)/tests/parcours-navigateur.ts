@@ -279,7 +279,7 @@ async function main() {
     await page.waitForFunction(() => (window as any).__rosaceTrace().pathCanvas.some(([, width]: [number, number]) => width === 1200));
 
     assert.equal(await page.locator(".crown-seg").count(), 489, "couronne chromatique incomplète");
-    assert.equal(await page.locator(".dock-categorie").count(), 6);
+    assert.equal(await page.locator(".dock-categorie").count(), 7, "sept verbes dans le dock : Composer, Colorer, Ajuster, Broder, Sauvegarder, Exporter, Importer");
     assert.match((await page.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/);
     const noScroll = await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1);
     assert.ok(noScroll, "la page défile sur mobile");
@@ -473,7 +473,7 @@ async function main() {
 
     /* ---------------- Paramètres textiles : même empreinte ---------------- */
     await openDock(page, "Ajuster");
-    await page.getByRole("button", { name: "Aïda 18" }).click();
+    await page.getByRole("button", { name: "Aïda 18", exact: true }).click();
     await page.getByRole("button", { name: "5 brins" }).click();
     await page.locator('input[type="range"][aria-label^="Marge de sécurité"]').fill("30");
     await closePanel(page);

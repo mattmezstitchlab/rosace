@@ -39,7 +39,7 @@ const CROWN_PATHS = CROWN_THREADS.map((thread, index) => ({
 
 export function Disque() {
   const api = useRosaceApi();
-  const { config, pattern, baseCode, inspectedCode, applyColor, inspectThread } = api;
+  const { config, work, baseCode, inspectedCode, applyColor, inspectThread } = api;
   const reduceMotion = useReducedMotion();
   const svgRef = useRef<SVGSVGElement>(null);
 
@@ -112,7 +112,7 @@ export function Disque() {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
         >
-          <EmbroideryHoop pattern={pattern} />
+          <EmbroideryHoop pattern={work} />
           <button className="hoop-touch" onClick={() => api.setLoupeOpen(true)} aria-label="Agrandir la broderie pour compter les points de croix" />
           <span className="hoop-loupe" aria-hidden="true">
             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="M21 21l-4.3-4.3M8 11h6M11 8v6" /></svg>

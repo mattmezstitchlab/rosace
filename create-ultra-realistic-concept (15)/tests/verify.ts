@@ -3,7 +3,11 @@ import { DMC_ADDED_THREADS, DMC_ALL_THREADS, DMC_THREADS, getThread, resolveThre
 import { CROWN_THREADS } from "../src/data/crown";
 import { computeMaterials, estimateTime, perStitchNeedleMeters, SKEIN_STRAND_METERS } from "../src/lib/materials";
 import { chartRegions, countRegionStitches } from "../src/lib/chart";
-import { patternFingerprint } from "../src/lib/pattern-id";
+import { readFileSync } from "node:fs";
+import { patternFingerprint, workFingerprint } from "../src/lib/pattern-id";
+import { decodeCells, encodeCells, fromImport, fromRosace, restoreImportedWork, serializeImportedWork, workIndex, type ImportedGrid } from "../src/lib/work";
+
+const REFERENCE = JSON.parse(readFileSync(new URL("./empreintes-reference.json", import.meta.url), "utf8")) as Record<string, { fingerprint: string; stitches: number; size: number; cleaned: number }>;
 import { patternToSvg, printWorksheet } from "../src/lib/exporters";
 import { chartGeometry, paintPattern } from "../src/lib/paint";
 import {
@@ -548,5 +552,272 @@ function verifyCanvasMatrix() {
 }
 
 test("matrice unique : tambour et grille Broderie peignent exactement les mêmes croix et couleurs", verifyCanvasMatrix);
+
+// ---------------------------------------------------------------------------
+// StitchWork : l'ouvrage canonique commun aux rosaces générées et aux patrons importés.
+// Ces tests prouvent qu'aucune rosace existante ne change (empreintes de référence
+// générées avant toute modification du moteur, tests/empreintes-reference.json).
+// ---------------------------------------------------------------------------
+
+test("non-régression : 161 recettes de référence gardent exactement leur empreinte, leurs croix et leur taille", () => {
+  const keys = Object.keys(REFERENCE);
+  assert.equal(keys.length, 161);
+  for (const key of keys) {
+    const expected = REFERENCE[key];
+    const config = key.startsWith("preset:")
+      ? PRESETS.find((preset) => preset.id === key.slice(7))!.config
+      : (() => {
+          const [g, s, sc] = key.match(/g(\d+)-s(\d+)-scale(\d+)/)!.slice(1).map(Number);
+          return { ...DEFAULT_CONFIG, geometry: g, structure: s, scale: sc, seed: 7 + g * 11 + s };
+        })();
+    const generated = generateRosace(normalizeConfig(config));
+    assert.equal(patternFingerprint(generated), expected.fingerprint, `empreinte modifiée : ${key}`);
+    assert.equal(generated.stitches.length, expected.stitches, `nombre de croix modifié : ${key}`);
+    assert.equal(generated.size, expected.size, `taille modifiée : ${key}`);
+    assert.equal(generated.cleaned, expected.cleaned, `nettoyage modifié : ${key}`);
+  }
+});
+
+test("StitchWork : fromRosace partage la matrice, l'empreinte et les mesures du patron, sans copie", () => {
+  for (const preset of PRESETS) {
+    const generated = generateRosace(normalizeConfig(preset.config));
+    const work = fromRosace(generated);
+    assert.equal(work.origin.kind, "rosace");
+    assert.equal(work.width, generated.size);
+    assert.equal(work.height, generated.size);
+    assert.strictEqual(work.cells, generated.cells, "la matrice doit être partagée, pas copiée");
+    assert.equal(work.fingerprint, patternFingerprint(generated));
+    assert.equal(work.fingerprint, workFingerprint(work.width, work.height, work.cells, generated.config.palette));
+    assert.equal(work.stitches.length, generated.stitches.length);
+    assert.deepEqual(work.usage, generated.usage);
+    assert.deepEqual(work.palette.map((entry) => entry.code), generated.config.palette);
+    assert.deepEqual(work.palette.map((entry) => entry.symbol), SYMBOLS.slice(0, generated.config.palette.length));
+    assert.equal(work.motifWidthCm, generated.motifWidthCm);
+    assert.equal(work.totalSkeins, generated.totalSkeins);
+    assert.equal(work.cutCm, generated.cutCm);
+  }
+  const base = fromRosace(pattern);
+  assert.equal(base.fingerprint, "353C357F12EC80D5");
+  assert.equal(base.stitches.length, 3381);
+});
+
+test("empreinte : une grille rectangulaire et sa transposée ont des empreintes distinctes ; le carré reste historique", () => {
+  const cells = new Int16Array(6 * 4).fill(-1);
+  cells[0] = 0;
+  cells[7] = 1;
+  cells[23] = 0;
+  const wide = workFingerprint(6, 4, cells, ["310", "321"]);
+  const tall = workFingerprint(4, 6, cells, ["310", "321"]);
+  assert.notEqual(wide, tall);
+  assert.notEqual(wide, workFingerprint(6, 4, cells, ["321", "310"]), "l'ordre des fils compte");
+  const square = new Int16Array(5 * 5).fill(-1);
+  square[12] = 0;
+  assert.equal(workFingerprint(5, 5, square, ["310"]), workFingerprint(5, 5, square, ["310"]));
+  assert.match(wide, /^[0-9A-F]{16}$/);
+});
+
+test("planches : chartRegions(largeur, hauteur) couvre exactement toute grille rectangulaire, paire ou impaire", () => {
+  for (const [width, height] of [[1, 1], [2, 3], [7, 4], [10, 10], [11, 10], [10, 11], [101, 77], [180, 240], [999, 1000], [1000, 999]]) {
+    const regions = chartRegions(width, height);
+    assert.equal(regions.reduce((sum, region) => sum + region.width * region.height, 0), width * height, `${width}×${height}`);
+    const counted = new Uint8Array(width * height);
+    for (const region of regions) {
+      for (let y = region.y; y < region.y + region.height; y += 1) {
+        for (let x = region.x; x < region.x + region.width; x += 1) counted[y * width + x] += 1;
+      }
+    }
+    assert.ok(counted.every((value) => value === 1), `chaque case une seule fois : ${width}×${height}`);
+  }
+  for (const size of [81, 91, 101, 111, 121]) {
+    assert.deepEqual(chartRegions(size), chartRegions(size, size), "la forme carrée reste identique");
+  }
+});
+
+test("fromImport : accepte une grille rectangulaire valide, calcule mesures et empreinte, n'invente aucune recette", () => {
+  const width = 9;
+  const height = 5;
+  const cells = new Int16Array(width * height).fill(-1);
+  for (let x = 0; x < width; x += 1) cells[2 * width + x] = x % 2;
+  cells[0] = 2;
+  const grid: ImportedGrid = {
+    width,
+    height,
+    cells,
+    colors: [
+      { code: "310", symbol: "◆", fromLegend: true },
+      { code: "blanc", symbol: "○", fromLegend: true },
+      { code: "321", symbol: "▲", fromLegend: false },
+    ],
+    provenance: { file: "patron.pdf", pages: 3, mode: "glyphes" },
+    montage: { tiles: [{ page: 1, x: 0, y: 0, width, height }], overlaps: 0, holes: 0, scaled: false },
+    lost: { halfStitches: 0, quarterStitches: 0, backstitches: 12, knots: 0, blends: 0, unresolved: 0 },
+    declaredSize: { w: 9, h: 5 },
+  };
+  const outcome = fromImport(grid);
+  assert.equal(outcome.ok, true, outcome.ok ? "" : outcome.error);
+  if (!outcome.ok) return;
+  const work = outcome.work;
+  assert.equal(work.origin.kind, "pdf");
+  assert.ok(!("config" in work.origin), "aucune recette fabriquée");
+  assert.equal(work.width, 9);
+  assert.equal(work.height, 5);
+  assert.deepEqual(work.palette.map((entry) => entry.code), ["310", "BLANC", "321"], "code DMC résolu dans sa casse canonique");
+  assert.deepEqual(work.palette.map((entry) => entry.symbol), ["◆", "○", "▲"]);
+  assert.equal(work.stitches.length, 10);
+  assert.equal(work.usage[0].count, 5);
+  assert.equal(work.usage[1].count, 4);
+  assert.equal(work.usage[2].count, 1);
+  assert.equal(work.usage[2].symbol, "▲");
+  assert.equal(work.fingerprint, workFingerprint(9, 5, work.cells, ["310", "BLANC", "321"]));
+  assert.ok(work.cells !== cells, "la matrice importée est copiée et normalisée");
+  assert.equal(work.motifWidthCm, Math.round((9 / (14 / 2.54)) * 10) / 10);
+  assert.equal(work.origin.kind === "pdf" ? work.origin.lost.backstitches : -1, 12, "les pertes sont conservées");
+  assert.equal(workIndex(work, 3, 2), 21);
+});
+
+test("fromImport : refuse un code DMC inconnu, un index hors palette, une grille vide ou trop grande", () => {
+  const base = (over: Partial<ImportedGrid>): ImportedGrid => ({
+    width: 2,
+    height: 2,
+    cells: new Int16Array([0, -1, -1, 0]),
+    colors: [{ code: "310", symbol: "×", fromLegend: true }],
+    provenance: { file: "p.pdf", pages: 1, mode: "auto" },
+    montage: { tiles: [], overlaps: 0, holes: 0, scaled: false },
+    lost: { halfStitches: 0, quarterStitches: 0, backstitches: 0, knots: 0, blends: 0, unresolved: 0 },
+    ...over,
+  });
+  assert.equal(fromImport(base({})).ok, true);
+  const unknown = fromImport(base({ colors: [{ code: "99999", symbol: "×", fromLegend: true }] }));
+  assert.equal(unknown.ok, false);
+  if (!unknown.ok) assert.match(unknown.error, /inconnue/);
+  const outside = fromImport(base({ cells: new Int16Array([0, 3, -1, 0]) }));
+  assert.equal(outside.ok, false);
+  const empty = fromImport(base({ cells: new Int16Array([-1, -1, -1, -1]) }));
+  assert.equal(empty.ok, false);
+  const huge = fromImport(base({ width: 1001, height: 1, cells: new Int16Array(1001) }));
+  assert.equal(huge.ok, false);
+  const mismatch = fromImport(base({ cells: new Int16Array(3) }));
+  assert.equal(mismatch.ok, false);
+  const duplicate = fromImport(base({ colors: [{ code: "310", symbol: "×", fromLegend: true }, { code: "310", symbol: "+", fromLegend: true }] }));
+  assert.equal(duplicate.ok, false);
+});
+
+function importedSample() {
+  const width = 9;
+  const height = 5;
+  const cells = new Int16Array(width * height).fill(-1);
+  for (let x = 0; x < width; x += 1) cells[2 * width + x] = x % 2;
+  cells[0] = 2;
+  cells[width * height - 1] = 2;
+  const grid: ImportedGrid = {
+    width,
+    height,
+    cells,
+    colors: [
+      { code: "310", symbol: "◆", fromLegend: true },
+      { code: "BLANC", symbol: "○", fromLegend: true },
+      { code: "321", symbol: "▲", fromLegend: false },
+    ],
+    provenance: { file: "patron.pdf", title: "Petit patron", pages: 3, mode: "glyphes" },
+    montage: { tiles: [{ page: 1, x: 0, y: 0, width, height }], overlaps: 0, holes: 0, scaled: false },
+    lost: { halfStitches: 0, quarterStitches: 0, backstitches: 12, knots: 0, blends: 1, unresolved: 0 },
+    declaredSize: { w: 9, h: 5 },
+  };
+  const outcome = fromImport(grid);
+  if (!outcome.ok) throw new Error(outcome.error);
+  return outcome.work;
+}
+
+test("rendu : un patron importé rectangulaire est peint avec ses propres symboles, centré dans le canevas carré", () => {
+  const work = importedSample();
+  const scope = globalThis as unknown as Record<string, unknown>;
+  const saved = { document: scope.document, Path2D: scope.Path2D };
+  const symbols: Array<{ text: string; x: number; y: number }> = [];
+  const makeCanvas = () => {
+    const ctx: Record<string, unknown> = {};
+    const canvas = { width: 0, height: 0, getContext: () => ctx };
+    Object.assign(ctx, {
+      canvas, clearRect: () => {}, fillRect: () => {}, strokeRect: () => {}, save: () => {}, restore: () => {},
+      beginPath: () => {}, moveTo: () => {}, lineTo: () => {}, arc: () => {}, fill: () => {}, stroke: () => {},
+      createPattern: () => null, createRadialGradient: () => ({ addColorStop: () => {} }),
+      createImageData: (w: number, h: number) => ({ data: new Uint8ClampedArray(w * h * 4) }), putImageData: () => {},
+      fillText: (text: unknown, x: number, y: number) => { symbols.push({ text: String(text), x, y }); },
+    });
+    return canvas;
+  };
+  scope.Path2D = class { addPath() {} moveTo() {} lineTo() {} };
+  scope.document = { createElement: () => makeCanvas() };
+  try {
+    paintPattern(makeCanvas() as unknown as HTMLCanvasElement, work, "chart", 900);
+  } finally {
+    scope.document = saved.document;
+    scope.Path2D = saved.Path2D;
+  }
+  const geometry = chartGeometry(900, 9, 5, "chart");
+  assert.ok(geometry.originY > geometry.originX, "la grille basse est centrée verticalement");
+  assert.equal(geometry.originX, geometry.origin, "la largeur occupe toute la zone de tracé");
+  const painted = symbols.filter((entry) => ["◆", "○", "▲"].includes(entry.text));
+  assert.equal(painted.length, work.stitches.length, "chaque croix peinte une fois avec un symbole de la palette importée");
+  const first = painted.find((entry) => entry.text === "▲" && Math.abs(entry.x - geometry.originX) < 1e-6);
+  assert.ok(first, "la croix (0,0) est au coin de la grille");
+  const last = painted.find((entry) => entry.text === "▲" && Math.abs(entry.x - (geometry.originX + 8 * geometry.cell)) < 1e-6);
+  assert.ok(last && Math.abs(last.y - (geometry.originY + 4 * geometry.cell + geometry.cell * 0.04)) < 1e-6, "la croix (8,4) est au coin opposé");
+  const square = chartGeometry(1800, 101, "chart");
+  assert.equal(square.originX, square.origin);
+  assert.equal(square.originY, square.origin);
+});
+
+test("projet v3 : un patron importé fait l'aller-retour avec sa matrice, sa palette et sa progression", () => {
+  const work = importedSample();
+  const done = [stitchIndex(work.width, 0, 0), stitchIndex(work.width, 3, 2), stitchIndex(work.width, 8, 4)];
+  const progress = { ...emptyProgress(work), completedRuns: serializeRuns(done), selectedCode: "321", journal: [{ index: done[1], added: true }] };
+  const project = buildProject(work, progress);
+  assert.equal(project.version, 3);
+  assert.equal(project.format, PROJECT_FORMAT);
+  if (project.version !== 3) return;
+  assert.equal(project.origin, "pdf");
+  assert.equal(project.work.width, 9);
+  assert.deepEqual(project.work.palette.map((entry) => entry.code), ["310", "BLANC", "321"]);
+  const roundTrip = importProject(JSON.parse(JSON.stringify(project)));
+  assert.equal(roundTrip.ok, true, roundTrip.ok ? "" : roundTrip.error);
+  if (!roundTrip.ok) return;
+  assert.equal(roundTrip.config, null, "un patron importé ne reçoit aucune recette");
+  assert.equal(roundTrip.work.origin.kind, "pdf");
+  assert.deepEqual([...roundTrip.work.cells], [...work.cells]);
+  assert.equal(roundTrip.work.fingerprint, work.fingerprint);
+  assert.deepEqual(roundTrip.work.palette, work.palette);
+  assert.equal(roundTrip.progress.completedRuns, serializeRuns(done));
+  assert.equal(roundTrip.progress.selectedCode, "321");
+  assert.equal(roundTrip.work.origin.kind === "pdf" ? roundTrip.work.origin.lost.blends : -1, 1, "les pertes voyagent avec le projet");
+  const tampered = JSON.parse(JSON.stringify(project));
+  tampered.work.cells = tampered.work.cells.slice(0, -4) + "AAA=";
+  assert.equal(importProject(tampered).ok, false, "matrice altérée → empreinte différente → refus");
+  const outside = JSON.parse(JSON.stringify(project));
+  outside.progress.completedRuns = "1";
+  assert.equal(importProject(outside).ok, false, "case vide refusée");
+  // Une rosace reste exportée en version 2, lisible par les versions antérieures.
+  const rosaceProject = buildProject(pattern, emptyProgress(pattern));
+  assert.equal(rosaceProject.version, 2);
+  const reread = importProject(rosaceProject);
+  assert.equal(reread.ok && reread.config !== null && reread.work.origin.kind === "rosace", true);
+});
+
+test("StitchWork : sérialisation locale d'un ouvrage importé (base64) stable et vérifiée", () => {
+  const work = importedSample();
+  const record = serializeImportedWork(work);
+  assert.ok(record);
+  assert.equal(decodeCells(record.cells, 45)?.length, 45);
+  assert.equal(decodeCells(record.cells, 44), null, "longueur incohérente refusée");
+  const restored = restoreImportedWork(JSON.parse(JSON.stringify(record)));
+  assert.equal(restored.ok, true, restored.ok ? "" : restored.error);
+  if (restored.ok) {
+    assert.equal(restored.work.fingerprint, work.fingerprint);
+    assert.equal(restored.work.origin.kind === "pdf" ? restored.work.origin.importedAt : "", work.origin.kind === "pdf" ? work.origin.importedAt : "x");
+  }
+  assert.equal(restoreImportedWork(null).ok, false);
+  assert.equal(serializeImportedWork(fromRosace(pattern)), null, "une rosace n'est jamais sérialisée comme un import");
+  const big = new Int16Array(1000 * 1000).fill(3);
+  assert.equal(decodeCells(encodeCells(big), 1_000_000)?.[999_999], 3, "un million de cases passent");
+});
 
 console.log(`\n${checks} tests réussis.`);

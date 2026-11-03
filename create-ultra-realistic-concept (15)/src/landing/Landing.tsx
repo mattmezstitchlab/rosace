@@ -6,12 +6,16 @@ import { HERO_PATTERN, HERO_STATS, decimal, nombre } from "./data";
 import { EcranAtelier, EcranBroderie, EcranGrille, Ordinateur, Tablette, Telephone } from "./devices";
 
 const LIENS = [
+  { href: "#entrees", label: "Trois portes" },
   { href: "#formes", label: "Formes" },
   { href: "#couleurs", label: "Couleurs" },
-  { href: "#realisation", label: "Réalisation" },
-  { href: "#vues", label: "Deux vues" },
-  { href: "#progression", label: "Progression" },
+  { href: "#realisation", label: "Patron" },
+  { href: "#broder", label: "Broder" },
+  { href: "#progression", label: "Garder" },
+  { href: "#atelier-importer", label: "Importer" },
 ];
+
+const NOUVEAUTES = ["Import PDF page par page", "Texte brodé", "Broder en couleurs", "Prévision de fin", "Boîte à fils", "Broder ensemble"];
 
 const INFOS = [
   { valeur: `${nombre(HERO_STATS.stitches)} croix`, note: "patron calculé" },
@@ -62,7 +66,7 @@ export function Landing() {
 
   return (
     <div className="presentation" id="haut">
-      <a className="lien-evitement" href="#formes">Aller au contenu</a>
+      <a className="lien-evitement" href="#entrees">Aller au contenu</a>
 
       <header className="entete">
         <div className="entete-haut">
@@ -114,21 +118,26 @@ export function Landing() {
               <span className="heros-titre-suite"> devient broderie.</span>
             </h1>
             <p className="heros-chapeau">
-              Composez un motif circulaire, explorez les couleurs, puis donnez-lui une forme réelle sur toile.
-              Chaque rosace devient un patron avec ses croix, ses fils DMC et ses dimensions.
+              Composez une rosace, importez un patron PDF ou écrivez un mot en croix : un seul atelier, une grille vivante,
+              chaque croix suivie jusqu'à la dernière — avec ses fils DMC, ses dimensions et son temps.
             </p>
             <div className="heros-actions">
               <a className="bouton bouton-noir" href="#atelier">
                 Composer une rosace
                 <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
               </a>
-              <a className="bouton bouton-contour" href="#realisation">
-                Voir comment ça marche
+              <a className="bouton bouton-contour" href="#atelier-importer">
+                Importer un patron PDF
               </a>
             </div>
             <p className="heros-mention">
-              Gratuit à essayer <span aria-hidden="true">·</span> Aucun compte nécessaire pour commencer
+              Gratuit à essayer <span aria-hidden="true">·</span> Aucun compte nécessaire pour commencer <span aria-hidden="true">·</span> <a href="#entrees">Voir comment ça marche</a>
             </p>
+            <ul className="heros-nouveautes" aria-label="Nouveautés de l'atelier">
+              {NOUVEAUTES.map((item) => (
+                <li key={item}>{item}</li>
+              ))}
+            </ul>
           </div>
 
           <div className="heros-appareils">
@@ -176,12 +185,17 @@ export function Landing() {
           </div>
           <div className="final-texte" data-reveal>
             <p className="surtitre surtitre-clair">Ouvrir l'atelier</p>
-            <h2 id="titre-final">Votre prochaine rosace commence ici.</h2>
-            <p>Composez une forme. Choisissez une palette. Brodez quelque chose qui vous ressemble.</p>
-            <a className="bouton bouton-clair" href="#atelier">
-              Ouvrir l'atelier
-              <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
-            </a>
+            <h2 id="titre-final">Votre prochain ouvrage commence ici.</h2>
+            <p>Composez une forme, importez un patron ou écrivez un prénom. Puis brodez quelque chose qui vous ressemble.</p>
+            <div className="final-actions">
+              <a className="bouton bouton-clair" href="#atelier">
+                Ouvrir l'atelier
+                <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
+              </a>
+              <a className="bouton bouton-clair bouton-clair--discret" href="#atelier-importer">
+                Importer un PDF
+              </a>
+            </div>
           </div>
         </section>
       </main>
@@ -195,11 +209,13 @@ export function Landing() {
           </div>
         </div>
         <nav className="pied-liens" aria-label="Liens de la présentation">
+          <a href="#entrees">Trois portes</a>
           <a href="#formes">Formes</a>
           <a href="#couleurs">Couleurs</a>
-          <a href="#realisation">Réalisation</a>
-          <a href="#progression">Progression</a>
+          <a href="#broder">Broder</a>
+          <a href="#progression">Garder</a>
           <a href="#atelier">Atelier</a>
+          <a href="#atelier-importer">Importer</a>
         </nav>
         <p className="pied-legal">
           Un atelier par LE MONDE AIME®.<br />

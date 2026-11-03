@@ -1,5 +1,7 @@
 import { DEFAULT_PALETTE, resolveThreadCode } from "../data/dmc";
-import { computeMaterials, estimateTime } from "./materials";
+import { computeWorkStats, type Stitch, type ThreadUsage } from "./stats";
+
+export type { Stitch, ThreadUsage } from "./stats";
 
 export type FabricTone = "naturel" | "craie" | "brume";
 export type AidaCount = 14 | 16 | 18;
@@ -29,25 +31,6 @@ export interface RosaceConfig {
   strands: number;
   /** Marge de sécurité textile en pourcentage (0 à 50). N'affecte pas la géométrie. */
   wastePercent: number;
-}
-
-export interface Stitch {
-  x: number;
-  y: number;
-  color: number;
-}
-
-export interface ThreadUsage {
-  paletteIndex: number;
-  code: string;
-  count: number;
-  /** Longueur du faisceau enfilé, marge comprise. */
-  meters: number;
-  /** Somme de tous les brins individuels consommés. */
-  strandMeters: number;
-  skeins: number;
-  usableNeedleMeters: number;
-  symbol: string;
 }
 
 export interface RosacePattern {
@@ -576,50 +559,14 @@ export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
     }
   }
 
-  const stitches: Stitch[] = [];
-  const counts = new Array<number>(paletteLength).fill(0);
-  for (let y = 0; y < size; y += 1) {
-    for (let x = 0; x < size; x += 1) {
-      const paletteIndex = cells[y * size + x];
-      if (paletteIndex >= 0) {
-        stitches.push({ x, y, color: paletteIndex });
-        counts[paletteIndex] += 1;
-      }
-    }
-  }
-
-  const usage = counts.map((count, paletteIndex) => {
-    const material = computeMaterials(count, { aida: config.aida, strands: config.strands, wastePercent: config.wastePercent });
-    return {
-      paletteIndex,
-      code: config.palette[paletteIndex],
-      count,
-      meters: material.needleMeters,
-      strandMeters: material.strandMeters,
-      skeins: material.skeins,
-      usableNeedleMeters: material.skeinUsableNeedleMeters,
-      symbol: SYMBOLS[paletteIndex],
-    };
+  // Mesures : le même calcul que pour un patron importé (src/lib/stats.ts).
+  const stats = computeWorkStats(cells, size, size, config.palette, SYMBOLS, {
+    aida: config.aida,
+    strands: config.strands,
+    wastePercent: config.wastePercent,
   });
-  const pointsPerCm = config.aida / 2.54;
-  const bounds = stitches.reduce((extent, stitch) => ({
-    minX: Math.min(extent.minX, stitch.x),
-    maxX: Math.max(extent.maxX, stitch.x),
-    minY: Math.min(extent.minY, stitch.y),
-    maxY: Math.max(extent.maxY, stitch.y),
-  }), { minX: size, maxX: 0, minY: size, maxY: 0 });
-  const motifPoints = stitches.length ? Math.max(bounds.maxX - bounds.minX + 1, bounds.maxY - bounds.minY + 1) : size;
-  const motifCm = Math.round((motifPoints / pointsPerCm) * 10) / 10;
-  const cutCm = Math.ceil(motifCm + 12);
-  const timeEstimate = estimateTime(stitches.length);
-  const minutes = timeEstimate.median;
-  const totalNeedleMeters = Math.round(usage.reduce((sum, line) => sum + line.meters, 0) * 10) / 10;
-  const totalStrandMeters = Math.round(usage.reduce((sum, line) => sum + line.strandMeters, 0) * 10) / 10;
-  const totalSkeins = usage.reduce((sum, line) => sum + line.skeins, 0);
-  const motifWidthCm = stitches.length ? Math.round(((bounds.maxX - bounds.minX + 1) / pointsPerCm) * 10) / 10 : 0;
-  const motifHeightCm = stitches.length ? Math.round(((bounds.maxY - bounds.minY + 1) / pointsPerCm) * 10) / 10 : 0;
 
-  return { config, size, cells, stitches, usage, motifPoints, motifCm, cutCm, minutes, timeEstimate, totalNeedleMeters, totalStrandMeters, totalSkeins, motifWidthCm, motifHeightCm, cleaned, mirrorSymmetric };
+  return { config, size, cells, ...stats, cleaned, mirrorSymmetric };
 }
 
 export function getSymmetry(config: RosaceConfig) {

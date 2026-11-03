@@ -1,7 +1,10 @@
-import { Check, Copy, Dices, Download, FileCode2, FileImage, FileText, Plus, RotateCcw, Search, Table2, TriangleAlert, X } from "lucide-react";
-import { useEffect, useRef, useState, type ComponentType, type CSSProperties } from "react";
+import { Check, Copy, Dices, Download, FileCode2, FileImage, FileText, Package, Plus, RotateCcw, Search, ShoppingBag, Table2, TriangleAlert, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState, type ComponentType, type CSSProperties } from "react";
 import { DMC_ALL_THREADS, getThread } from "../data/dmc";
+import { downloadBlob, safeName } from "../lib/exporters";
+import { HOOP_DIAMETERS_CM, HOOP_MARGIN_CM, suggestScale } from "../lib/hoop";
 import { patternFingerprint, shortFingerprint } from "../lib/pattern-id";
+import { parseThreadCodes, readThreadBox, shoppingCsv, shoppingList, writeThreadBox } from "../lib/threadbox";
 import { HARMONY_HINT, HARMONY_LABELS, ROLE_LABELS, type Harmony } from "../lib/harmony";
 import { DIMENSION_NAMES, FABRIC_COLORS, SYMBOLS, type AidaCount, type FabricTone } from "../lib/rosace";
 import { THEME_LABELS, THEME_ORDER, readThemeChoice, saveThemeChoice, type ThemeChoice } from "../lib/theme";
@@ -124,6 +127,7 @@ export function ColorsPanel() {
         {activeRole > 0 && <p className="sr-only">Fil de départ : emplacement {activeRole + 1}</p>}
       </div>
 
+      <ThreadBoxPanel />
       {warnings.length > 0 && (
         <ul className="panneau-alertes" aria-label="Contrôle des contrastes">
           {warnings.map((warning) => (
@@ -185,6 +189,8 @@ export function SettingsPanel() {
         </div>
         <p className="panneau-aide">Motif fini {String(pattern.motifCm).replace(".", ",")} cm · toile à couper {pattern.cutCm} × {pattern.cutCm} cm.</p>
       </div>
+
+      <HoopPanel />
 
       <div className="panneau-groupe">
         <p className="panneau-label">Fils et métrage · {pattern.config.strands} brins, marge {config.wastePercent} %</p>
@@ -273,6 +279,7 @@ export function ExportPanel() {
         <button onClick={() => actions.svg(false)}><FileCode2 size={20} aria-hidden="true" /><span><strong>SVG · motif</strong><small>Croix vectorielles</small></span><Download size={14} aria-hidden="true" /></button>
         <button onClick={() => actions.svg(true)}><FileCode2 size={20} aria-hidden="true" /><span><strong>SVG · grille</strong><small>Patron symbolique</small></span><Download size={14} aria-hidden="true" /></button>
         <button onClick={actions.csv}><Table2 size={20} aria-hidden="true" /><span><strong>CSV · fournitures</strong><small>Croix, métrages, échevettes</small></span><Download size={14} aria-hidden="true" /></button>
+        <ShoppingExport />
         <button onClick={actions.print}><FileText size={20} aria-hidden="true" /><span><strong>PDF · fiche technique</strong><small>Fournitures + 4 planches A4</small></span><Download size={14} aria-hidden="true" /></button>
       </div>
       <div className="panneau-groupe">
@@ -293,3 +300,96 @@ export const PANEL_COMPONENTS: Record<PanelId, ComponentType> = {
   reglages: SettingsPanel,
   export: ExportPanel,
 };
+
+
+/* ---------- Ma boîte à fils ---------- */
+export function ThreadBoxPanel() {
+  const { work, notify } = useRosaceApi();
+  const [box, setBox] = useState<Set<string>>(() => readThreadBox());
+  const [draft, setDraft] = useState("");
+  const [open, setOpen] = useState(false);
+  const list = useMemo(() => shoppingList(work, box), [work, box]);
+  const save = (next: Set<string>) => {
+    try { setBox(writeThreadBox(next)); } catch { notify("Boîte à fils non enregistrée", "Le stockage du navigateur est plein ou indisponible."); }
+  };
+  const add = () => {
+    const parsed = parseThreadCodes(draft);
+    if (!parsed.codes.length) { notify("Aucune référence reconnue", "Écrivez des codes DMC : 310, 321, blanc…"); return; }
+    save(new Set([...box, ...parsed.codes]));
+    setDraft("");
+    notify(`${parsed.codes.length} fil${parsed.codes.length > 1 ? "s" : ""} ajouté${parsed.codes.length > 1 ? "s" : ""} à votre boîte`, parsed.unknown.length ? `Non reconnus : ${parsed.unknown.join(", ")}` : undefined);
+  };
+  const addAll = () => save(new Set([...box, ...list.lines.map((line) => line.code)]));
+  return (
+    <div className="panneau-groupe boite-fils">
+      <p className="panneau-label"><Package size={13} aria-hidden="true" /> Ma boîte à fils · {box.size} référence{box.size > 1 ? "s" : ""}</p>
+      {box.size > 0 ? (
+        <p className="panneau-aide">
+          Pour cet ouvrage : <strong>{list.owned}</strong> fil{list.owned > 1 ? "s" : ""} dans votre boîte, <strong>{list.missing}</strong> manquant{list.missing > 1 ? "s" : ""}
+          {list.missing > 0 && ` (${list.skeinsToBuy} échevette${list.skeinsToBuy > 1 ? "s" : ""} à acheter : ${list.lines.filter((line) => !line.owned).map((line) => line.code).join(", ")})`}.
+        </p>
+      ) : (
+        <p className="panneau-aide">Dites à ROSACE quels fils DMC vous possédez : chaque ouvrage vous dira ce qui manque et combien d'échevettes acheter.</p>
+      )}
+      <div className="panneau-rangee">
+        <label className="champ-fils">
+          <span className="sr-only">Codes DMC à ajouter à votre boîte</span>
+          <input value={draft} onChange={(event) => setDraft(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); add(); } }} placeholder="310, 321, blanc…" inputMode="text" />
+        </label>
+        <button className="bouton bouton-petit" onClick={add}><Plus size={15} aria-hidden="true" /> Ajouter</button>
+        <button className="bouton bouton-petit" onClick={addAll} title="Je possède tous les fils de cet ouvrage">J'ai tout</button>
+        <button className="bouton bouton-petit" aria-expanded={open} onClick={() => setOpen((value) => !value)}>{open ? "Masquer" : "Voir ma boîte"}</button>
+      </div>
+      {open && (
+        <ul className="boite-liste" aria-label="Fils de votre boîte">
+          {[...box].sort().map((code) => (
+            <li key={code}>
+              <i style={{ background: getThread(code).hex }} aria-hidden="true" />
+              <span>DMC {code}</span>
+              <button type="button" className="icone" aria-label={`Retirer DMC ${code} de ma boîte`} onClick={() => { const next = new Set(box); next.delete(code); save(next); }}><X size={13} aria-hidden="true" /></button>
+            </li>
+          ))}
+          {!box.size && <li className="boite-vide">Votre boîte est vide.</li>}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function ShoppingExport() {
+  const { work, notify } = useRosaceApi();
+  const box = readThreadBox();
+  const list = shoppingList(work, box);
+  return (
+    <button onClick={() => {
+      if (!box.size) { notify("Boîte à fils vide", "Renseignez d'abord vos fils dans Colorer · Ma boîte à fils ; sinon le CSV fournitures liste tout."); return; }
+      downloadBlob(new Blob([shoppingCsv(work, box)], { type: "text/csv;charset=utf-8" }), `${safeName(work)}-courses.csv`);
+      notify("Liste de courses exportée", `${list.missing} fil${list.missing > 1 ? "s" : ""} manquant${list.missing > 1 ? "s" : ""}, ${list.skeinsToBuy} échevette${list.skeinsToBuy > 1 ? "s" : ""}`);
+    }}><ShoppingBag size={20} aria-hidden="true" /><span><strong>CSV · liste de courses</strong><small>{box.size ? `${list.missing} fil${list.missing > 1 ? "s" : ""} manquant${list.missing > 1 ? "s" : ""} · ${list.skeinsToBuy} échevette${list.skeinsToBuy > 1 ? "s" : ""}` : "D'après votre boîte à fils"}</small></span><Download size={14} aria-hidden="true" /></button>
+  );
+}
+
+/* ---------- Sur mesure du tambour ---------- */
+function HoopPanel() {
+  const api = useRosaceApi();
+  const { config } = api;
+  const [diameter, setDiameter] = useState<number>(() => { try { return Number(localStorage.getItem("aime-rosace-tambour-cm")) || 15; } catch { return 15; } });
+  const fit = useMemo(() => suggestScale(config, diameter), [config, diameter]);
+  const names = ["Miniature", "Fin", "Moyen", "Ample", "Monumental"];
+  const pick = (value: number) => { setDiameter(value); try { localStorage.setItem("aime-rosace-tambour-cm", String(value)); } catch { /* préférence seulement */ } };
+  return (
+    <div className="panneau-groupe">
+      <p className="panneau-label">Sur mesure du tambour · {String(diameter).replace(".", ",")} cm</p>
+      <div className="options" role="group" aria-label="Diamètre du tambour en centimètres">
+        {HOOP_DIAMETERS_CM.map((value) => (
+          <button key={value} className={`option ${diameter === value ? "is-active" : ""}`} aria-pressed={diameter === value} onClick={() => pick(value)}>{String(value).replace(".", ",")} cm</button>
+        ))}
+      </div>
+      <p className="panneau-aide">
+        {fit.fits
+          ? <>Échelle conseillée : <strong>{names[fit.scale - 1]}</strong> ({String(fit.motifCm).replace(".", ",")} cm de motif, {Math.round(fit.fill * 100)} % du cercle utile, marge {String(HOOP_MARGIN_CM).replace(".", ",")} cm).{config.scale !== fit.scale && <> <button type="button" className="lien-souligne" onClick={() => api.commit({ ...config, scale: fit.scale })}>Appliquer</button></>}</>
+          : <>Même en Miniature ({String(fit.motifCm).replace(".", ",")} cm), la rosace déborde d'un tambour de {diameter} cm.{fit.aidaHint ? <> Sur aïda {fit.aidaHint}, elle tient. <button type="button" className="lien-souligne" onClick={() => api.commit({ ...config, scale: 1, aida: fit.aidaHint! })}>Passer en aïda {fit.aidaHint}, Miniature</button></> : " Choisissez un tambour plus grand."}</>}
+      </p>
+    </div>
+  );
+}

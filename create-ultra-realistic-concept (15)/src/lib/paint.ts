@@ -1,20 +1,33 @@
 import { getThread } from "../data/dmc";
 import { hexToRgb, luminance, mix } from "./color";
-import { FABRIC_COLORS, SYMBOLS, type FabricTone, type RosacePattern } from "./rosace";
+import { FABRIC_COLORS, type FabricTone, type RosacePattern } from "./rosace";
+import { toWork, type StitchWork } from "./work";
 
 /**
- * Couche de rendu : transforme un ouvrage calculé (RosacePattern) en pixels.
+ * Couche de rendu : transforme un ouvrage (StitchWork, ou RosacePattern enveloppé) en pixels.
  * Une seule fonction sert le tambour, la grille, les vignettes et l'export PNG.
+ * Le canevas reste carré : une grille rectangulaire est centrée dans la zone de tracé,
+ * et une grille carrée est dessinée exactement comme avant.
  * Le réalisme vient de trois détails : le tissage réel de l'aïda, les trous aux
  * intersections, et du fil bombé avec son brin inférieur, son brin supérieur et sa soie.
  */
-export type CanvasMode = "fabric" | "chart";
+/**
+ * `fabric` : la toile et ses croix bombées (tambour) · `chart` : la grille à symboles (lecture classique) ·
+ * `color` : la grille à cases pleines de la couleur du fil · `color-chart` : cases pleines + symbole en contraste.
+ */
+export type CanvasMode = "fabric" | "chart" | "color" | "color-chart";
 
-export function chartGeometry(side: number, size: number, mode: CanvasMode) {
-  const origin = side * (mode === "chart" ? 0.075 : 0.055);
+/** `chartGeometry(side, size, mode)` reste valide pour une grille carrée ; `(side, width, height, mode)` pour une grille rectangulaire. */
+export function chartGeometry(side: number, width: number, heightOrMode: number | CanvasMode, modeArg?: CanvasMode) {
+  const height = typeof heightOrMode === "number" ? heightOrMode : width;
+  const mode: CanvasMode = typeof heightOrMode === "number" ? (modeArg ?? "chart") : heightOrMode;
+  const origin = side * (mode === "fabric" ? 0.055 : 0.075);
   const plot = side - origin * 2;
-  const cell = plot / (size - 1);
-  return { origin, plot, cell };
+  const longest = Math.max(width, height);
+  const cell = longest > 1 ? plot / (longest - 1) : plot;
+  const originX = origin + (plot - (width - 1) * cell) / 2;
+  const originY = origin + (plot - (height - 1) * cell) / 2;
+  return { origin, originX, originY, plot, cell };
 }
 
 function makeFabricTile(base: string, warp: string) {
@@ -136,33 +149,72 @@ function drawFabric(context: CanvasRenderingContext2D, side: number, tone: Fabri
   context.fillRect(0, 0, side, side);
 }
 
-function drawChart(context: CanvasRenderingContext2D, side: number, origin: number, plot: number, size: number, cell: number) {
+/** Lignes de la grille seules (fines et repères lourds toutes les 10 cases), réutilisées par-dessus les cases colorées. */
+function drawChartLines(context: CanvasRenderingContext2D, originX: number, originY: number, width: number, height: number, cell: number, over = false) {
+  context.save();
+  const left = originX - cell / 2;
+  const top = originY - cell / 2;
+  const right = originX + (width - 1) * cell + cell / 2;
+  const bottom = originY + (height - 1) * cell + cell / 2;
+  const minor = over ? "rgba(76,49,66,0.22)" : "rgba(76,49,66,0.12)";
+  const majorColor = over ? "rgba(30,18,26,0.72)" : "rgba(76,49,66,0.38)";
+  for (let i = 0; i <= width; i += 1) {
+    const position = left + i * cell;
+    const major = i % 10 === 0;
+    context.strokeStyle = major ? majorColor : minor;
+    context.lineWidth = major ? 1.35 : 0.65;
+    context.beginPath();
+    context.moveTo(position, top);
+    context.lineTo(position, bottom);
+    context.stroke();
+  }
+  for (let i = 0; i <= height; i += 1) {
+    const position = top + i * cell;
+    const major = i % 10 === 0;
+    context.strokeStyle = major ? majorColor : minor;
+    context.lineWidth = major ? 1.35 : 0.65;
+    context.beginPath();
+    context.moveTo(left, position);
+    context.lineTo(right, position);
+    context.stroke();
+  }
+  context.restore();
+}
+
+function drawChart(context: CanvasRenderingContext2D, side: number, originX: number, originY: number, width: number, height: number, cell: number) {
   context.fillStyle = "#fffefa";
   context.fillRect(0, 0, side, side);
   context.save();
-  for (let i = 0; i <= size; i += 1) {
-    const position = origin - cell / 2 + i * cell;
+  const left = originX - cell / 2;
+  const top = originY - cell / 2;
+  const right = originX + (width - 1) * cell + cell / 2;
+  const bottom = originY + (height - 1) * cell + cell / 2;
+  for (let i = 0; i <= width; i += 1) {
+    const position = left + i * cell;
     const major = i % 10 === 0;
     context.strokeStyle = major ? "rgba(76,49,66,0.38)" : "rgba(76,49,66,0.12)";
     context.lineWidth = major ? 1.35 : 0.65;
     context.beginPath();
-    context.moveTo(position, origin - cell / 2);
-    context.lineTo(position, origin + plot + cell / 2);
+    context.moveTo(position, top);
+    context.lineTo(position, bottom);
     context.stroke();
+  }
+  for (let i = 0; i <= height; i += 1) {
+    const position = top + i * cell;
+    const major = i % 10 === 0;
+    context.strokeStyle = major ? "rgba(76,49,66,0.38)" : "rgba(76,49,66,0.12)";
+    context.lineWidth = major ? 1.35 : 0.65;
     context.beginPath();
-    context.moveTo(origin - cell / 2, position);
-    context.lineTo(origin + plot + cell / 2, position);
+    context.moveTo(left, position);
+    context.lineTo(right, position);
     context.stroke();
   }
   context.fillStyle = "#766c72";
   context.font = `${Math.max(10, cell * 0.85)}px "Inter Tight", Arial, sans-serif`;
   context.textAlign = "center";
   context.textBaseline = "middle";
-  for (let i = 0; i < size; i += 10) {
-    const position = origin + i * cell;
-    context.fillText(String(i + 1), position, origin - cell * 1.35);
-    context.fillText(String(i + 1), origin - cell * 1.6, position);
-  }
+  for (let i = 0; i < width; i += 10) context.fillText(String(i + 1), originX + i * cell, originY - cell * 1.35);
+  for (let i = 0; i < height; i += 10) context.fillText(String(i + 1), originX - cell * 1.6, originY + i * cell);
   context.restore();
 }
 
@@ -172,17 +224,43 @@ function jitter(x: number, y: number, salt: number) {
   return (n - Math.floor(n) - 0.5) * 2;
 }
 
-export function paintPattern(canvas: HTMLCanvasElement, pattern: RosacePattern, mode: CanvasMode, resolution: number) {
+export function paintPattern(canvas: HTMLCanvasElement, source: RosacePattern | StitchWork, mode: CanvasMode, resolution: number) {
+  const pattern = toWork(source);
   canvas.width = resolution;
   canvas.height = resolution;
   const context = canvas.getContext("2d");
   if (!context) return;
   const side = resolution;
-  const { origin, plot, cell } = chartGeometry(side, pattern.size, mode);
+  const { originX, originY, cell } = chartGeometry(side, pattern.width, pattern.height, mode);
   context.clearRect(0, 0, side, side);
 
-  if (mode === "fabric") drawFabric(context, side, pattern.config.fabric, cell);
-  else drawChart(context, side, origin, plot, pattern.size, cell);
+  if (mode === "fabric") drawFabric(context, side, pattern.textile.fabric, cell);
+  else drawChart(context, side, originX, originY, pattern.width, pattern.height, cell);
+
+  if (mode === "color" || mode === "color-chart") {
+    // Cases pleines : la couleur du fil remplit la case, la grille fine reste visible par-dessus.
+    const hexes = pattern.palette.map((entry) => getThread(entry.code).hex);
+    context.save();
+    pattern.stitches.forEach((stitch) => {
+      context.fillStyle = hexes[stitch.color];
+      context.fillRect(originX + stitch.x * cell - cell / 2, originY + stitch.y * cell - cell / 2, cell + 0.2, cell + 0.2);
+    });
+    context.restore();
+    drawChartLines(context, originX, originY, pattern.width, pattern.height, cell, true);
+    if (mode === "color-chart") {
+      context.save();
+      context.textAlign = "center";
+      context.textBaseline = "middle";
+      context.font = `600 ${Math.max(7, cell * 0.86)}px "Inter Tight", Arial, sans-serif`;
+      pattern.stitches.forEach((stitch) => {
+        const hex = hexes[stitch.color];
+        context.fillStyle = luminance(hex) > 150 ? "rgba(20,14,18,0.82)" : "rgba(255,255,255,0.88)";
+        context.fillText(pattern.palette[stitch.color].symbol, originX + stitch.x * cell, originY + stitch.y * cell + cell * 0.04);
+      });
+      context.restore();
+    }
+    return;
+  }
 
   if (mode === "chart") {
     context.save();
@@ -190,10 +268,10 @@ export function paintPattern(canvas: HTMLCanvasElement, pattern: RosacePattern, 
     context.textBaseline = "middle";
     context.font = `600 ${Math.max(7, cell * 0.96)}px "Inter Tight", Arial, sans-serif`;
     pattern.stitches.forEach((stitch) => {
-      const hex = getThread(pattern.config.palette[stitch.color]).hex;
+      const hex = getThread(pattern.palette[stitch.color].code).hex;
       const light = luminance(hex);
       context.fillStyle = light > 205 ? mix(hex, "#000000", 0.72) : light > 160 ? mix(hex, "#000000", 0.42) : hex;
-      context.fillText(SYMBOLS[stitch.color], origin + stitch.x * cell, origin + stitch.y * cell + cell * 0.04);
+      context.fillText(pattern.palette[stitch.color].symbol, originX + stitch.x * cell, originY + stitch.y * cell + cell * 0.04);
     });
     context.restore();
     return;
@@ -201,7 +279,7 @@ export function paintPattern(canvas: HTMLCanvasElement, pattern: RosacePattern, 
 
   // Une croix de point de croix occupe toute sa case : deux brins diagonaux.
   const half = cell * 0.44;
-  const paths = pattern.config.palette.map(() => ({
+  const paths = pattern.palette.map(() => ({
     shadow: new Path2D(),
     under: new Path2D(),
     underLight: new Path2D(),
@@ -212,8 +290,8 @@ export function paintPattern(canvas: HTMLCanvasElement, pattern: RosacePattern, 
   pattern.stitches.forEach((stitch) => {
     const jx = jitter(stitch.x, stitch.y, 1) * cell * 0.045;
     const jy = jitter(stitch.x, stitch.y, 2) * cell * 0.045;
-    const x = origin + stitch.x * cell + jx;
-    const y = origin + stitch.y * cell + jy;
+    const x = originX + stitch.x * cell + jx;
+    const y = originY + stitch.y * cell + jy;
     const path = paths[stitch.color];
     if (!path) return;
     const r = half * (1 + jitter(stitch.x, stitch.y, 3) * 0.05);
@@ -256,7 +334,7 @@ export function paintPattern(canvas: HTMLCanvasElement, pattern: RosacePattern, 
   context.restore();
 
   paths.forEach((path, paletteIndex) => {
-    const hex = getThread(pattern.config.palette[paletteIndex]).hex;
+    const hex = getThread(pattern.palette[paletteIndex].code).hex;
     const dark = mix(hex, "#241018", 0.34);
     const silk = mix(hex, "#ffffff", 0.62);
     const layers: Array<[Path2D, string, number, number]> = [

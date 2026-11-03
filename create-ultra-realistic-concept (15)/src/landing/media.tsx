@@ -2,6 +2,7 @@ import { useEffect, useRef, type CSSProperties } from "react";
 import { CROWN_INDEX, CROWN_THREADS } from "../data/crown";
 import { paintPattern, type CanvasMode } from "../lib/paint";
 import type { RosacePattern } from "../lib/rosace";
+import type { StitchWork } from "../lib/work";
 
 /**
  * Rendu d'un ouvrage dans la présentation. La toile n'est peinte qu'à l'approche du
@@ -13,13 +14,16 @@ export function RosaceRender({
   resolution = 720,
   className,
   label,
+  decorative = false,
   style,
 }: {
-  pattern: RosacePattern;
+  pattern: RosacePattern | StitchWork;
   mode?: CanvasMode;
   resolution?: number;
   className?: string;
   label?: string;
+  /** Image purement décorative (son sens est porté par un parent) : cachée des lecteurs d'écran. */
+  decorative?: boolean;
   style?: CSSProperties;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -54,10 +58,11 @@ export function RosaceRender({
       ref={ref}
       className={className}
       style={style}
-      role="img"
-      aria-label={
+      role={decorative ? undefined : "img"}
+      aria-hidden={decorative || undefined}
+      aria-label={decorative ? undefined :
         label ??
-        `${mode === "chart" ? "Grille technique" : "Broderie sur aïda"} de ${pattern.stitches.length.toLocaleString("fr-FR")} croix, ${pattern.size} par ${pattern.size} points`
+        `${mode === "chart" ? "Grille technique" : "Broderie sur aïda"} de ${pattern.stitches.length.toLocaleString("fr-FR")} croix, ${"size" in pattern ? `${pattern.size} par ${pattern.size}` : `${pattern.width} par ${pattern.height}`} points`
       }
     />
   );
