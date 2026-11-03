@@ -134,7 +134,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 }
 .presentation .heros-titre-suite {
   display: block; font-family: inherit; font-style: normal; font-weight: 700;
-  letter-spacing: -0.05em; color: var(--l-grenat);
+  letter-spacing: -0.05em; color: var(--l-encre);
 }
 .presentation .heros-chapeau {
   max-width: 56ch; margin: 24px auto 0; font-size: clamp(16.5px, 1.3vw, 19.5px); line-height: 1.55; color: var(--l-encre-2);
@@ -343,6 +343,49 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .ecran-grille-pied > span { display: inline-flex; align-items: center; gap: .35em; font-size: .68em; color: #4c453c; white-space: nowrap; }
 .presentation .ecran-grille-pied i { width: .85em; height: .85em; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .18); }
 
+/* Tablette : l'import d'un patron PDF, la table de montage */
+.presentation .ecran-import { background: #fbf9f5; }
+.presentation .ecran-import-etapes {
+  display: flex; flex: none; gap: .35em; margin: 0; padding: .45em .8em; list-style: none;
+  border-bottom: 1px solid rgba(20, 17, 15, .09); background: #fff;
+}
+.presentation .ecran-import-etapes li {
+  display: inline-flex; align-items: center; gap: .35em; padding: .25em .6em .25em .3em; border-radius: 999px;
+  font-size: .62em; font-weight: 600; color: #5d5449; white-space: nowrap;
+}
+.presentation .ecran-import-etapes li b {
+  display: grid; width: 1.5em; height: 1.5em; place-items: center; border-radius: 50%;
+  background: rgba(20, 17, 15, .1); color: #4c453c; font-size: .9em; font-weight: 700;
+}
+.presentation .ecran-import-etapes li.est-faite b { background: #14110f; color: #fff; }
+.presentation .ecran-import-etapes li.est-active { background: #f2ece3; color: #14110f; }
+.presentation .ecran-import-etapes li.est-active b { background: #7b1f33; color: #fff; }
+.presentation .ecran-import-corps { display: grid; flex: 1; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: .7em; min-height: 0; padding: .7em; }
+.presentation .ecran-import-table {
+  position: relative; aspect-ratio: 1; align-self: center; border-radius: .5em;
+  background-color: #fff; background-image: linear-gradient(rgba(20, 17, 15, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 17, 15, .07) 1px, transparent 1px);
+  background-size: 10% 10%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .1);
+}
+.presentation .ecran-carte {
+  position: absolute; width: 50%; height: 50%; overflow: hidden; background: #fff;
+  box-shadow: 0 0 0 1px rgba(20, 17, 15, .14), 0 .35em .9em -.4em rgba(20, 17, 15, .6);
+}
+.presentation .ecran-carte canvas { position: absolute; top: 0; left: 0; width: 200%; height: 200%; aspect-ratio: auto; }
+.presentation .ecran-carte.est-prise { transform: translate(3%, 3%) rotate(-1.2deg); box-shadow: 0 0 0 1.5px #7b1f33, 0 .8em 1.4em -.5em rgba(20, 17, 15, .7); z-index: 2; }
+.presentation .ecran-carte em {
+  position: absolute; top: .3em; left: .3em; display: inline-flex; align-items: baseline; gap: .3em; padding: .15em .45em; border-radius: 999px;
+  background: #14110f; color: #fff; font-size: .58em; font-style: normal; font-weight: 700; letter-spacing: .04em;
+}
+.presentation .ecran-carte em i { font-style: normal; font-weight: 500; opacity: .75; }
+.presentation .ecran-import-cote { display: flex; flex-direction: column; gap: .5em; min-width: 0; padding: .5em .6em; border-radius: .5em; background: #fff; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .09); }
+.presentation .ecran-import-titre { margin: 0; font-size: .6em; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #7a6f61; }
+.presentation .ecran-import-cote ul { display: flex; flex-direction: column; gap: .25em; margin: 0; padding: 0; list-style: none; }
+.presentation .ecran-import-cote li { display: flex; justify-content: space-between; gap: .5em; font-size: .66em; color: #4c453c; font-variant-numeric: tabular-nums; }
+.presentation .ecran-import-cote li b { font-weight: 600; color: #14110f; }
+.presentation .ecran-import-cote li:nth-child(4) span { color: #7b1f33; font-weight: 600; }
+.presentation .ecran-import-note { margin: auto 0 0; font-size: .58em; line-height: 1.4; color: #6f6455; }
+.presentation .ecran-import .ecran-bouton { display: inline-flex; align-items: center; justify-content: center; gap: .4em; }
+
 /* Téléphone : la broderie en cours */
 .presentation .ecran-broderie { background: #fff; }
 .presentation .ecran-barre--tel { justify-content: space-between; }
@@ -436,16 +479,9 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .entree:hover { transform: translateY(-4px); border-color: var(--l-trait-2); box-shadow: 0 22px 40px -32px rgba(20, 17, 15, .8); }
 .presentation .entree-image { position: relative; aspect-ratio: 1 / 1; border-radius: 14px; overflow: hidden; background: var(--l-fond-2); }
 .presentation .entree-image > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
-.presentation .entree-image--pages { background: #fbf7ee; }
-.presentation .entree-image--pages > canvas { inset: 6%; width: 88%; height: 88%; }
-.presentation .entree-page {
-  position: absolute; width: 44%; height: 44%; border: 1.5px dashed rgba(123, 31, 51, .55); border-radius: 6px;
-  box-shadow: 0 0 0 1px rgba(255, 255, 255, .6) inset;
-}
-.presentation .entree-page b {
-  position: absolute; top: 6px; left: 6px; padding: 2px 7px; border-radius: 999px; background: var(--l-grenat); color: #fff;
-  font-size: 10px; font-weight: 700; letter-spacing: .06em;
-}
+.presentation .entree-image--pages { display: grid; place-items: center; padding: 5%; container-type: inline-size; background: radial-gradient(circle at 50% 40%, #f7f1e7, #ebe3d6); }
+.presentation .entree-tablette { width: 100%; }
+.presentation .entree-tablette .tablette .ecran { font-size: clamp(5.2px, 2.1cqw, 9px); }
 .presentation .entree-image--texte { background: #fbf7ee; display: grid; place-items: center; }
 .presentation .entree-image--texte > canvas { position: static; width: 100%; height: auto; aspect-ratio: auto; }
 .presentation .entree-texte { padding: 14px 6px 0; }

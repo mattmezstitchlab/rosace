@@ -3,7 +3,7 @@ import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { RosaceLogo } from "../components/RosaceLogo";
 import { LandingSections } from "./Sections";
 import { HERO_PATTERN, HERO_STATS, decimal, nombre } from "./data";
-import { EcranAtelier, EcranBroderie, EcranGrille, Ordinateur, Tablette, Telephone } from "./devices";
+import { EcranAtelier, EcranBroderie, EcranImport, Ordinateur, Tablette, Telephone } from "./devices";
 
 const LIENS = [
   { href: "#entrees", label: "Trois portes" },
@@ -145,14 +145,14 @@ export function Landing() {
             <div
               className="heros-ecrans"
               role="img"
-              aria-label="ROSACE sur ordinateur, tablette et téléphone : l'atelier de composition, la grille technique et le suivi de la broderie."
+              aria-label="ROSACE sur ordinateur, tablette et téléphone : l'atelier de composition, l'import d'un patron PDF et le suivi de la broderie."
             >
               <Ordinateur className="heros-ordi">
                 <EcranAtelier pattern={HERO_PATTERN} />
               </Ordinateur>
               <div className="heros-mobiles">
                 <Tablette className="heros-tablette">
-                  <EcranGrille pattern={HERO_PATTERN} />
+                  <EcranImport pattern={HERO_PATTERN} />
                 </Tablette>
                 <Telephone className="heros-tel">
                   <EcranBroderie pattern={HERO_PATTERN} compact />
@@ -169,7 +169,7 @@ export function Landing() {
             ))}
           </ul>
           <p className="heros-legende">
-            Le même patron, de l'atelier à la broderie <span aria-hidden="true">·</span> ordinateur, tablette et téléphone.
+            Composer, importer un PDF, broder <span aria-hidden="true">·</span> le même atelier sur ordinateur, tablette et téléphone.
           </p>
         </section>
 

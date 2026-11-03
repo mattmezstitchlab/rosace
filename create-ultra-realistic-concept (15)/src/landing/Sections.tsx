@@ -5,6 +5,7 @@ import { SYMBOLS, formatDuration } from "../lib/rosace";
 import { formatMinutes } from "../lib/sessions";
 import aida from "../assets/aida-macro.jpg";
 import { DEMO_FORECAST, DEMO_HOOP, HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
+import { EcranImport, Tablette } from "./devices";
 import { DmcCrown, RosaceRender } from "./media";
 
 /* ------------------------------------------------------------------ Entrées */
@@ -12,12 +13,6 @@ import { DmcCrown, RosaceRender } from "./media";
  * Les trois portes de l'atelier. Chaque image sort du moteur : la rosace du hero,
  * sa grille découpée en pages comme l'import la recompose, un texte dans la police brodée.
  */
-const PAGES = [
-  { n: 1, style: { left: "6%", top: "6%" } },
-  { n: 2, style: { left: "50%", top: "6%" } },
-  { n: 3, style: { left: "6%", top: "50%" } },
-  { n: 4, style: { left: "50%", top: "50%" } },
-];
 
 function Entrees() {
   return (
@@ -44,11 +39,12 @@ function Entrees() {
           </div>
         </li>
         <li className="entree">
-          <div className="entree-image entree-image--pages" aria-label="La grille d'un patron, découpée en quatre pages que l'import recompose" role="img">
-            <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={640} decorative />
-            {PAGES.map((page) => (
-              <span key={page.n} className="entree-page" style={page.style} aria-hidden="true"><b>p. {page.n}</b></span>
-            ))}
+          <div className="entree-image entree-image--pages">
+            <div className="entree-tablette" role="img" aria-label="L'atelier d'import : les quatre pages d'un patron PDF calées sur la table de montage, grille et fils vérifiés">
+              <Tablette>
+                <EcranImport pattern={HERO_PATTERN} />
+              </Tablette>
+            </div>
           </div>
           <div className="entree-texte">
             <p className="entree-sur"><FileText size={13} strokeWidth={2} aria-hidden="true" /> Importer</p>
