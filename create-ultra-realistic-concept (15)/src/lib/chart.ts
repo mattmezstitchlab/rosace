@@ -10,15 +10,20 @@ export interface ChartRegion {
   height: number;
 }
 
-export function chartRegions(size: number): ChartRegion[] {
-  if (!Number.isFinite(size) || size < 1) return [];
-  const cutX = Math.ceil(size / 2);
-  const cutY = Math.ceil(size / 2);
+/**
+ * `chartRegions(size)` découpe une grille carrée ; `chartRegions(width, height)` une grille
+ * rectangulaire (patron importé). Les deux formes produisent la même découpe en quatre
+ * quadrants, chaque case appartenant à exactement une planche.
+ */
+export function chartRegions(width: number, height: number = width): ChartRegion[] {
+  if (!Number.isFinite(width) || width < 1 || !Number.isFinite(height) || height < 1) return [];
+  const cutX = Math.ceil(width / 2);
+  const cutY = Math.ceil(height / 2);
   return [
     { x: 0, y: 0, width: cutX, height: cutY },
-    { x: cutX, y: 0, width: size - cutX, height: cutY },
-    { x: 0, y: cutY, width: cutX, height: size - cutY },
-    { x: cutX, y: cutY, width: size - cutX, height: size - cutY },
+    { x: cutX, y: 0, width: width - cutX, height: cutY },
+    { x: 0, y: cutY, width: cutX, height: height - cutY },
+    { x: cutX, y: cutY, width: width - cutX, height: height - cutY },
   ].filter((region) => region.width > 0 && region.height > 0);
 }
 
