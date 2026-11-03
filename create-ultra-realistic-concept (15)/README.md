@@ -28,7 +28,11 @@ Les liens `#atelier…` sont remplacés dès l'ouverture par la recette courante
 
 La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
 
-Fond blanc, sections alternées en gris très clair, deux temps sombres (la carte des exports, l'appel final). L'atelier est **mis en situation** dans des châssis d'ordinateur, de tablette et de téléphone (`src/landing/devices.tsx`) : chaque écran est composé avec le moteur du produit — la même rosace, la même palette, le même dock en six verbes — jamais une capture d'image. Sur ordinateur, l'écran suit la largeur du châssis (`container-type: inline-size`) pour rester lisible du grand écran au mobile, où les trois appareils passent en colonne : ordinateur, puis tablette et téléphone côte à côte.
+L'en-tête porte le mot-symbole **ROSACE** en très grand, à la manière d'un masthead ; une barre fine prend le relais dès que l'on descend.
+
+Le comparateur motif/grille se balaie à la main : on attrape le trait dans l'image (souris, doigt), ou on le déplace au clavier (flèches, `Maj` pour aller plus vite, `Début`/`Fin`). Le trait porte `role="slider"`, avec sa valeur annoncée en pourcentage de grille.
+
+Fond blanc, sections alternées en gris très clair, deux temps sombres (la carte des exports, l'appel final). L'atelier est **mis en situation** dans des châssis d'ordinateur, de tablette et de téléphone (`src/landing/devices.tsx`) : chaque écran est composé avec le moteur du produit — la même rosace, la même palette, le même dock en six verbes — jamais une capture d'image. L'écran d'ordinateur reprend la composition réelle de l'atelier : barre de marque, tambour dans sa couronne DMC, bande de mesures avec son zoom, dock. Sur ordinateur, l'écran suit la largeur du châssis (`container-type: inline-size`) pour rester lisible du grand écran au mobile, où les trois appareils passent en colonne : ordinateur, puis tablette et téléphone côte à côte.
 
 ## Dock de l'atelier
 

@@ -11,10 +11,11 @@ import {
   SlidersHorizontal,
   Undo2,
 } from "lucide-react";
+import { EmbroideryHoop } from "../components/RosaceCanvas";
 import { RosaceLogo } from "../components/RosaceLogo";
 import type { RosacePattern } from "../lib/rosace";
 import { HERO_STATS, PALETTE, USED_THREADS, decimal, nombre } from "./data";
-import { RosaceRender } from "./media";
+import { DmcCrown, RosaceRender } from "./media";
 
 /**
  * Les appareils de la présentation.
@@ -98,21 +99,9 @@ function Barre({ titre, icone: Icone, note }: { titre: string; icone: typeof Flo
   );
 }
 
-function Curseur({ label, valeur, part }: { label: string; valeur: string; part: number }) {
-  return (
-    <div className="ecran-champ">
-      <span>
-        {label}
-        <strong>{valeur}</strong>
-      </span>
-      <i>
-        <b style={{ width: `${part}%` }} />
-      </i>
-    </div>
-  );
-}
-
-/* ------------------------------------------------------ Ordinateur : atelier */
+/* ---------------------------------------------- Ordinateur : l'atelier réel
+   Même composition que l'application : barre de marque, tambour dans sa
+   couronne DMC, bande de mesures, dock. Rien d'inventé. */
 export function EcranAtelier({ pattern }: { pattern: RosacePattern }) {
   return (
     <div className="ecran ecran-atelier">
@@ -124,44 +113,40 @@ export function EcranAtelier({ pattern }: { pattern: RosacePattern }) {
         <span className="ecran-barre-actions">
           <Undo2 size={11} strokeWidth={1.9} />
           <Redo2 size={11} strokeWidth={1.9} />
+          <span className="ecran-barre-sep" aria-hidden="true" />
           <Heart size={11} strokeWidth={1.9} />
           <Share2 size={11} strokeWidth={1.9} />
         </span>
       </div>
 
-      <div className="ecran-corps">
-        <div className="ecran-scene">
-          <span className="ecran-pastille">La rosace 007 · {nombre(HERO_STATS.stitches)} croix</span>
-          <div className="ecran-tambour">
-            <RosaceRender pattern={pattern} resolution={720} label="La rosace en cours de composition" />
-          </div>
-          <span className="ecran-echelle">17,2 cm</span>
+      <div className="ecran-scene">
+        <div className="ecran-couronne">
+          <DmcCrown palette={pattern.config.palette} />
         </div>
+        <div className="ecran-tambour">
+          <EmbroideryHoop pattern={pattern} />
+        </div>
+      </div>
 
-        <aside className="ecran-panneau">
-          <p className="ecran-panneau-titre">Composer la forme</p>
-          <Curseur label="Pétales" valeur="8" part={62} />
-          <Curseur label="Densité" valeur="0,74" part={74} />
-          <Curseur label="Symétrie" valeur="6" part={46} />
-          <div className="ecran-fils">
-            <span className="ecran-panneau-titre">Fils retenus</span>
-            <div>
-              {PALETTE.map((thread) => (
-                <span key={thread.code} style={{ background: thread.hex }} />
-              ))}
-            </div>
-          </div>
-          <div className="ecran-mesures">
-            <span>
-              <strong>{decimal(HERO_STATS.widthCm)} cm</strong>
-              aïda {HERO_STATS.aida}
-            </span>
-            <span>
-              <strong>{HERO_STATS.duration}</strong>
-              temps estimé
-            </span>
-          </div>
-        </aside>
+      <div className="ecran-mesures-bande">
+        <p>
+          <span>{nombre(HERO_STATS.stitches)} croix</span>
+          <i aria-hidden="true">·</i>
+          <span>{HERO_STATS.threads} fils</span>
+          <i aria-hidden="true">·</i>
+          <span>
+            {HERO_STATS.grid} × {HERO_STATS.grid}
+          </span>
+          <i aria-hidden="true">·</i>
+          <span>{decimal(HERO_STATS.widthCm)} cm</span>
+          <i aria-hidden="true">·</i>
+          <span>{HERO_STATS.duration}</span>
+        </p>
+        <span className="ecran-zoom">
+          <b>−</b>
+          <em>⤢ 100 %</em>
+          <b>+</b>
+        </span>
       </div>
 
       <Dock actif="Composer" />

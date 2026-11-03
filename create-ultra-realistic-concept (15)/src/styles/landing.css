@@ -58,27 +58,80 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .bouton-contour:hover { background: rgba(20, 17, 15, .05); border-color: rgba(20, 17, 15, .4); }
 .presentation .bouton-large { width: 100%; margin-top: 22px; }
 
-/* ---------- Barre de navigation ---------- */
-.presentation .nav {
-  position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 20px;
-  padding: 12px var(--l-gouttiere);
-  border-bottom: 1px solid rgba(20, 17, 15, .08);
-  background: color-mix(in srgb, #ffffff 84%, transparent);
-  backdrop-filter: blur(16px) saturate(1.2);
+/* ---------- En-tête : le mot-symbole en très grand ---------- */
+.presentation .entete { padding: clamp(16px, 2.6vw, 30px) var(--l-gouttiere) 0; background: var(--l-fond); }
+.presentation .entete-haut {
+  display: flex; align-items: flex-end; justify-content: space-between; gap: clamp(12px, 3vw, 40px);
 }
-.presentation .nav-marque { display: flex; align-items: center; gap: 11px; min-height: 44px; text-decoration: none; }
-.presentation .nav-nom { font-size: 21px; font-weight: 800; letter-spacing: -0.02em; line-height: 1; }
-.presentation .nav-nom sup { margin-left: 1px; font-size: .36em; font-weight: 500; vertical-align: .9em; }
-.presentation .nav-liens { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.presentation .nav-liens a {
-  padding: 9px 12px; border-radius: 999px; font-size: 14px; font-weight: 500; color: var(--l-encre-2);
-  text-decoration: none; transition: color .15s ease, background .15s ease;
+.presentation .entete-marque { display: block; color: var(--l-encre); text-decoration: none; }
+.presentation .entete-nom {
+  display: block; font-size: clamp(64px, 14.6vw, 224px); font-weight: 800; line-height: .76;
+  letter-spacing: -.055em;
 }
-.presentation .nav-liens a:hover { background: rgba(20, 17, 15, .06); color: var(--l-encre); }
-.presentation .nav-cta { height: 44px; padding: 0 18px; font-size: 14px; }
-@media (max-width: 1020px) {
-  .presentation .nav-liens { display: none; }
-  .presentation .nav-cta { margin-left: auto; }
+.presentation .entete-nom sup {
+  margin-left: .06em; font-size: .085em; font-weight: 500; letter-spacing: 0; vertical-align: top;
+}
+.presentation .entete-droite {
+  display: flex; flex-direction: column; align-items: flex-end; gap: clamp(8px, 1.6vw, 18px);
+  padding-bottom: .3em; color: var(--l-encre);
+}
+.presentation .entete-droite .rosace-logo { flex: none; }
+.presentation .entete-baseline {
+  max-width: 19ch; margin: 0; font-family: var(--serif); font-style: italic;
+  font-size: clamp(14px, 1.7vw, 24px); line-height: 1.18; color: var(--l-encre-3); text-align: right;
+}
+.presentation .entete-bas {
+  display: flex; align-items: center; justify-content: space-between; gap: 18px;
+  margin-top: clamp(16px, 2.4vw, 30px); padding: 10px 0;
+  border-top: 1px solid var(--l-trait); border-bottom: 1px solid var(--l-trait);
+}
+.presentation .entete-liens { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 24px; }
+.presentation .entete-liens a {
+  font-size: 11px; font-weight: 600; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--l-encre-2); text-decoration: none;
+}
+.presentation .entete-liens a:hover { color: var(--l-encre); }
+.presentation .entete-cta { height: 42px; padding: 0 18px; font-size: 13.5px; }
+@media (max-width: 860px) {
+  .presentation .entete-baseline { display: none; }
+  .presentation .entete-droite { padding-bottom: 0; }
+  .presentation .entete-droite .rosace-logo { width: 52px !important; height: 52px !important; }
+}
+@media (max-width: 700px) {
+  .presentation .entete-bas { flex-wrap: wrap; gap: 12px; }
+  .presentation .entete-liens { gap: 6px 16px; }
+  .presentation .entete-liens a { font-size: 10px; letter-spacing: .12em; }
+  .presentation .entete-cta { display: none; }
+}
+
+/* ---------- Barre fine, une fois le masthead dépassé ---------- */
+.presentation .barre {
+  position: fixed; z-index: 70; inset: 0 0 auto;
+  display: flex; align-items: center; gap: 16px;
+  padding: 9px var(--l-gouttiere);
+  border-bottom: 1px solid var(--l-trait);
+  background: rgba(255, 255, 255, .94);
+  backdrop-filter: blur(18px) saturate(1.2);
+  box-shadow: 0 12px 28px -26px rgba(20, 17, 15, .55);
+  transform: translateY(-104%); visibility: hidden;
+  transition: transform .32s cubic-bezier(.22, 1, .36, 1), visibility .32s;
+}
+.presentation .barre.est-visible { transform: none; visibility: visible; }
+.presentation .barre-marque {
+  display: inline-flex; align-items: baseline; font-size: 21px; font-weight: 800;
+  letter-spacing: -.04em; line-height: 1; color: var(--l-encre); text-decoration: none;
+}
+.presentation .barre-marque sup { margin-left: 1px; font-size: .38em; font-weight: 500; }
+.presentation .barre-liens { display: flex; gap: 2px; margin-left: auto; }
+.presentation .barre-liens a {
+  padding: 8px 11px; border-radius: 999px; font-size: 12px; font-weight: 500;
+  color: var(--l-encre-2); text-decoration: none; transition: background .15s ease, color .15s ease;
+}
+.presentation .barre-liens a:hover { background: rgba(20, 17, 15, .06); color: var(--l-encre); }
+.presentation .barre-cta { height: 38px; padding: 0 15px; font-size: 13px; }
+@media (max-width: 1080px) {
+  .presentation .barre-liens { display: none; }
+  .presentation .barre-cta { margin-left: auto; }
 }
 
 /* ---------- Hero ---------- */
@@ -233,60 +286,52 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .ecran-barre-actions { display: inline-flex; gap: .7em; color: #6f6455; }
 .presentation .ecran-barre-note { font-size: .62em; font-weight: 600; letter-spacing: .06em; color: #6f6455; }
 
-/* Atelier : scène + panneau + dock */
-.presentation .ecran-corps { display: grid; flex: 1; grid-template-columns: minmax(0, 1fr) 33%; min-height: 0; }
+/* Atelier (ordinateur) : tambour dans sa couronne, bande de mesures, dock */
+.presentation .ecran-atelier { background: #fbf9f5; }
+.presentation .ecran-barre-sep { width: 1px; height: 1.1em; background: rgba(20, 17, 15, .16); }
 .presentation .ecran-scene {
-  position: relative; display: grid; place-items: center; padding: 1.3em 1.6em;
-  background: radial-gradient(circle at 50% 42%, #fbf7f1, #f2ebe1);
+  position: relative; display: grid; flex: 1; place-items: center; min-height: 0;
+  overflow: hidden; background: radial-gradient(circle at 50% 46%, #f7f1e7, #efe7db);
 }
-.presentation .ecran-tambour {
-  width: min(100%, 64%); border-radius: 50%;
-  box-shadow: 0 14px 24px -14px rgba(20, 17, 15, .55), 0 0 0 1px rgba(20, 17, 15, .1);
+.presentation .ecran-couronne {
+  position: absolute; top: 50%; left: 50%; width: 92%; aspect-ratio: 1;
+  transform: translate(-50%, -50%); color: #14110f; opacity: .92;
 }
-.presentation .ecran-tambour canvas { border-radius: 50%; }
-.presentation .ecran-pastille,
-.presentation .ecran-echelle {
-  position: absolute; padding: .35em .6em; border-radius: 999px;
-  background: rgba(255, 255, 255, .86); font-size: .58em; font-weight: 600; color: #4c453c;
-  box-shadow: 0 1px 3px rgba(20, 17, 15, .12);
+.presentation .ecran-couronne svg { display: block; width: 100%; height: 100%; }
+.presentation .ecran-tambour { position: relative; width: 37%; }
+.presentation .ecran-tambour .hoop { filter: drop-shadow(0 1.2em 1.6em rgba(36, 24, 16, .28)); }
+.presentation .ecran-mesures-bande {
+  position: relative; display: flex; flex: none; align-items: center; justify-content: center;
+  padding: .5em .6em; border-top: 1px solid rgba(20, 17, 15, .09); background: #fff;
 }
-.presentation .ecran-pastille { top: .8em; left: .9em; }
-.presentation .ecran-echelle { right: .9em; bottom: .8em; }
-.presentation .ecran-panneau {
-  display: flex; flex-direction: column; gap: .8em; padding: .9em;
-  border-left: 1px solid rgba(20, 17, 15, .09); background: #fff;
+.presentation .ecran-mesures-bande > p {
+  display: flex; align-items: center; gap: .5em; margin: 0;
+  font-size: .72em; color: #4c453c; font-variant-numeric: tabular-nums;
 }
-.presentation .ecran-panneau-titre {
-  margin: 0; font-size: .58em; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6f6455;
+.presentation .ecran-mesures-bande > p span { white-space: nowrap; }
+.presentation .ecran-mesures-bande > p i { font-style: normal; opacity: .45; }
+.presentation .ecran-zoom {
+  position: absolute; right: .5em; display: inline-flex; align-items: center; gap: .45em;
+  font-size: .68em; color: #4c453c;
 }
-.presentation .ecran-champ > span { display: flex; align-items: baseline; justify-content: space-between; gap: .5em; font-size: .68em; color: #4c453c; }
-.presentation .ecran-champ > span strong { font-weight: 700; color: #14110f; font-variant-numeric: tabular-nums; }
-.presentation .ecran-champ > i {
-  position: relative; display: block; height: .3em; margin-top: .4em;
-  border-radius: 999px; background: rgba(20, 17, 15, .1);
+.presentation .ecran-zoom b {
+  display: grid; width: 1.9em; height: 1.9em; place-items: center;
+  border: 1px solid rgba(20, 17, 15, .14); border-radius: .45em; background: #fff; font-weight: 500;
 }
-.presentation .ecran-champ > i > b { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: #14110f; }
-.presentation .ecran-champ > i > b::after {
-  content: ""; position: absolute; top: 50%; right: -.4em; width: .8em; height: .8em;
-  transform: translateY(-50%); border-radius: 50%; background: #fff;
-  box-shadow: 0 0 0 1px rgba(20, 17, 15, .35);
+.presentation .ecran-zoom em {
+  display: inline-flex; align-items: center; gap: .3em; padding: .35em .5em;
+  border: 1px solid rgba(20, 17, 15, .1); border-radius: .45em; font-style: normal; background: #fff;
 }
-.presentation .ecran-fils { display: flex; flex-direction: column; gap: .5em; padding-top: .75em; border-top: 1px solid rgba(20, 17, 15, .09); }
-.presentation .ecran-fils > div { display: flex; gap: .3em; }
-.presentation .ecran-fils > div > span { width: 1.15em; height: 1.15em; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .16); }
-.presentation .ecran-mesures {
-  display: flex; gap: 1em; margin-top: auto; padding-top: .8em; border-top: 1px solid rgba(20, 17, 15, .09);
-}
-.presentation .ecran-mesures > span { display: flex; flex-direction: column; gap: .1em; font-size: .56em; color: #6f6455; }
-.presentation .ecran-mesures strong { font-size: 1.55em; font-weight: 700; letter-spacing: -.02em; color: #14110f; }
+
+/* Le dock, tel qu'il est dans l'atelier : six verbes en capitales. */
 .presentation .ecran-dock {
   display: grid; flex: none; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .15em;
-  padding: .5em .4em; border-top: 1px solid rgba(20, 17, 15, .09); background: #fff;
+  padding: .45em .4em; border-top: 1px solid rgba(20, 17, 15, .09); background: #fff;
 }
 .presentation .ecran-dock > span {
-  display: flex; flex-direction: column; align-items: center; gap: .35em; padding: .3em .1em; overflow: hidden;
-  border-radius: .5em; font-size: .68em; font-weight: 700; letter-spacing: .05em;
-  text-transform: uppercase; color: #6f6455; white-space: nowrap;
+  display: flex; flex-direction: column; align-items: center; gap: .35em; padding: .3em .1em;
+  border-radius: .5em; font-size: .66em; font-weight: 600; letter-spacing: .05em;
+  text-transform: uppercase; color: #6f6455; white-space: nowrap; overflow: hidden;
 }
 .presentation .ecran-dock > span.est-actif { background: #f2ece3; color: #14110f; }
 
@@ -496,48 +541,57 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .comparateur-tete p { margin: 0; max-width: 46ch; font-size: 13.5px; line-height: 1.5; color: var(--l-encre-3); }
 .presentation .comparateur-cadre {
   position: relative; width: min(100%, 720px); margin-inline: auto; aspect-ratio: 1 / 1;
-  border-radius: 18px; overflow: hidden; background: var(--l-fond-2); box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .1);
+  border-radius: 18px; overflow: hidden; background: var(--l-fond-2);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .1);
+  cursor: ew-resize; touch-action: pan-y; user-select: none;
 }
 .presentation .comparateur-cadre > canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
+.presentation .comparateur-cadre.est-glisse { cursor: grabbing; }
 .presentation .comparateur-grille { position: absolute; inset: 0; }
 .presentation .comparateur-aligne { position: absolute; inset: 0; transform: translate(-2.353%, -2.353%) scale(1.04706); transform-origin: 0 0; }
 .presentation .comparateur-aligne canvas { width: 100%; height: 100%; }
-.presentation .comparateur-trait { position: absolute; top: 0; bottom: 0; width: 0; pointer-events: none; }
-.presentation .comparateur-trait::before {
-  content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px;
-  background: #fffdf8; box-shadow: 0 0 0 1px rgba(20, 17, 15, .18);
-}
-.presentation .comparateur-trait span {
-  position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; transform: translate(-50%, -50%);
-  border-radius: 50%; background: #fffdf8; box-shadow: 0 6px 18px -6px rgba(20, 17, 15, .65), inset 0 0 0 1px rgba(20, 17, 15, .14);
-}
-.presentation .comparateur-trait span::before,
-.presentation .comparateur-trait span::after {
-  content: ""; position: absolute; top: 50%; width: 7px; height: 7px; margin-top: -3.5px;
-  border-top: 1.5px solid var(--l-encre); border-left: 1.5px solid var(--l-encre);
-}
-.presentation .comparateur-trait span::before { left: 10px; transform: rotate(-45deg); }
-.presentation .comparateur-trait span::after { right: 10px; transform: rotate(135deg); }
 .presentation .comparateur-etiquette {
   position: absolute; top: 12px; padding: 5px 10px; border-radius: 999px;
-  background: rgba(13, 11, 12, .6); backdrop-filter: blur(6px);
+  background: rgba(13, 11, 12, .6); backdrop-filter: blur(6px); pointer-events: none;
   font-size: 10.5px; font-weight: 600; letter-spacing: .1em; text-transform: uppercase; color: #f4efe4;
 }
 .presentation .comparateur-etiquette--gauche { left: 12px; }
 .presentation .comparateur-etiquette--droite { right: 12px; }
-.presentation .comparateur-commande { width: min(100%, 720px); margin: 14px auto 0; }
-.presentation .comparateur-commande label { display: block; margin-bottom: 2px; font-size: 12px; letter-spacing: .04em; color: var(--l-encre-3); }
-.presentation input[type="range"] { -webkit-appearance: none; appearance: none; width: 100%; height: 32px; background: transparent; }
-.presentation input[type="range"]::-webkit-slider-runnable-track { height: 2px; border-radius: 2px; background: var(--l-trait-2); }
-.presentation input[type="range"]::-moz-range-track { height: 2px; border-radius: 2px; background: var(--l-trait-2); }
-.presentation input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none; width: 22px; height: 22px; margin-top: -10px; border: 2px solid var(--l-fond);
-  border-radius: 50%; background: var(--l-encre); box-shadow: 0 3px 8px rgba(20, 17, 15, .3);
+
+/* La poignée : un trait à prendre à la main, au clavier comme au doigt. */
+.presentation .comparateur-poignee {
+  position: absolute; top: 0; bottom: 0; width: 0; z-index: 3;
+  cursor: ew-resize; outline: none;
 }
-.presentation input[type="range"]::-moz-range-thumb {
-  width: 18px; height: 18px; border: 2px solid var(--l-fond); border-radius: 50%; background: var(--l-encre);
+.presentation .comparateur-poignee::before {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -1px; width: 2px;
+  background: #fffdf8; box-shadow: 0 0 0 1px rgba(20, 17, 15, .18);
 }
-.presentation input[type="range"]:focus-visible { outline: 2px solid var(--l-encre); outline-offset: 4px; }
+.presentation .comparateur-poignee::after {
+  content: ""; position: absolute; top: 0; bottom: 0; left: -22px; width: 44px;
+}
+.presentation .comparateur-poignee > span {
+  position: absolute; top: 50%; left: 50%; width: 46px; height: 46px; transform: translate(-50%, -50%);
+  border-radius: 50%; background: #fffdf8;
+  box-shadow: 0 8px 20px -6px rgba(20, 17, 15, .45), inset 0 0 0 1px rgba(20, 17, 15, .14);
+  transition: transform .16s ease;
+}
+.presentation .comparateur-cadre:hover .comparateur-poignee > span,
+.presentation .comparateur-cadre.est-glisse .comparateur-poignee > span { transform: translate(-50%, -50%) scale(1.08); }
+.presentation .comparateur-poignee > span::before,
+.presentation .comparateur-poignee > span::after {
+  content: ""; position: absolute; top: 50%; width: 8px; height: 8px; margin-top: -4px;
+  border-top: 1.6px solid var(--l-encre); border-left: 1.6px solid var(--l-encre);
+}
+.presentation .comparateur-poignee > span::before { left: 11px; transform: rotate(-45deg); }
+.presentation .comparateur-poignee > span::after { right: 11px; transform: rotate(135deg); }
+.presentation .comparateur-poignee:focus-visible > span {
+  outline: 2px solid var(--l-encre); outline-offset: 3px;
+}
+.presentation .comparateur-aide {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  margin: 16px auto 0; font-size: 13px; line-height: 1.4; color: var(--l-encre-3); text-align: center;
+}
 
 .presentation .chiffres {
   display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 2px;

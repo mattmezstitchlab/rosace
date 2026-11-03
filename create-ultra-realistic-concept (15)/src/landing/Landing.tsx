@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { RosaceLogo } from "../components/RosaceLogo";
 import { LandingSections } from "./Sections";
@@ -25,6 +25,15 @@ const INFOS = [
  * pas l'interface. L'atelier s'ouvre par le bouton, jamais par défaut.
  */
 export function Landing() {
+  const [barre, setBarre] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => setBarre(window.scrollY > 180);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   useEffect(() => {
     document.body.classList.add("est-presentation");
     return () => document.body.classList.remove("est-presentation");
@@ -52,30 +61,54 @@ export function Landing() {
   }, []);
 
   return (
-    <div className="presentation">
+    <div className="presentation" id="haut">
       <a className="lien-evitement" href="#formes">Aller au contenu</a>
 
-      <header className="nav">
-        <a className="nav-marque" href="#haut" aria-label="ROSACE, retour en haut de la présentation">
-          <RosaceLogo size={40} />
-          <span className="nav-nom">
-            ROSACE<sup>®</sup>
-          </span>
+      <header className="entete">
+        <div className="entete-haut">
+          <a className="entete-marque" href="#haut" aria-label="ROSACE, retour en haut de la présentation">
+            <span className="entete-nom">
+              ROSACE<sup>®</sup>
+            </span>
+          </a>
+          <div className="entete-droite">
+            <RosaceLogo size={78} variant="nu" />
+            <p className="entete-baseline">La géométrie devient broderie.</p>
+          </div>
+        </div>
+        <div className="entete-bas">
+          <nav className="entete-liens" aria-label="Sections de la présentation">
+            {LIENS.map((lien) => (
+              <a key={lien.href} href={lien.href}>
+                {lien.label}
+              </a>
+            ))}
+          </nav>
+          <a className="bouton bouton-noir entete-cta" href="#atelier">
+            Ouvrir l'atelier
+            <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" />
+          </a>
+        </div>
+      </header>
+
+      {/* La barre fine n'apparaît qu'une fois le masthead passé. */}
+      <div className={`barre${barre ? " est-visible" : ""}`}>
+        <a className="barre-marque" href="#haut" aria-label="ROSACE, retour en haut de la présentation">
+          ROSACE<sup>®</sup>
         </a>
-        <nav className="nav-liens" aria-label="Sections de la présentation">
+        <nav className="barre-liens" aria-label="Sections de la présentation (raccourci)">
           {LIENS.map((lien) => (
             <a key={lien.href} href={lien.href}>
               {lien.label}
             </a>
           ))}
         </nav>
-        <a className="bouton bouton-noir nav-cta" href="#atelier">
+        <a className="bouton bouton-noir barre-cta" href="#atelier">
           Ouvrir l'atelier
-          <ArrowUpRight size={16} strokeWidth={2} aria-hidden="true" />
         </a>
-      </header>
+      </div>
 
-      <main id="haut">
+      <main>
         {/* ---------------------------------------------------------------- Hero */}
         <section className="heros" aria-labelledby="titre-heros">
           <div className="heros-texte">

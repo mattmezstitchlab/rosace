@@ -1,5 +1,5 @@
-import { useId, useState } from "react";
-import { ArrowRight, Check, Download, FileText, Grid3x3, Heart, Layers, Redo2, Share2, Undo2 } from "lucide-react";
+import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
+import { ArrowRight, Check, Download, FileText, Grid3x3, Heart, Layers, MousePointer2, Redo2, Share2, Undo2 } from "lucide-react";
 import { EmbroideryHoop } from "../components/RosaceCanvas";
 import { SYMBOLS, formatDuration } from "../lib/rosace";
 import aida from "../assets/aida-macro.jpg";
@@ -132,7 +132,27 @@ function Couleurs() {
 
 /* ---------------------------------------------------------------- Réalisation */
 function Realisation() {
-  const [split, setSplit] = useState(48);
+  const [split, setSplit] = useState(50);
+  const [glisse, setGlisse] = useState(false);
+  const cadre = useRef<HTMLDivElement>(null);
+
+  /* Le balayage se fait sur le cadre lui-même : on attrape le trait, pas un curseur à distance. */
+  const viser = useCallback((clientX: number) => {
+    const rect = cadre.current?.getBoundingClientRect();
+    if (!rect) return;
+    const part = ((clientX - rect.left) / rect.width) * 100;
+    setSplit(Math.max(0, Math.min(100, part)));
+  }, []);
+
+  const auClavier = (event: KeyboardEvent<HTMLDivElement>) => {
+    const pas = event.shiftKey ? 10 : 2;
+    if (event.key === "ArrowLeft") setSplit((valeur) => Math.max(0, valeur - pas));
+    else if (event.key === "ArrowRight") setSplit((valeur) => Math.min(100, valeur + pas));
+    else if (event.key === "Home") setSplit(0);
+    else if (event.key === "End") setSplit(100);
+    else return;
+    event.preventDefault();
+  };
 
   return (
     <section id="realisation" className="section" aria-labelledby="titre-realisation">
@@ -181,9 +201,29 @@ function Realisation() {
       <div className="comparateur" data-reveal>
         <div className="comparateur-tete">
           <h3>Un seul patron, deux lectures.</h3>
-          <p>Glissez pour passer du motif à la grille : la forme ne change pas, seule la lecture change.</p>
+          <p>Attrapez le trait et faites-le glisser : la forme ne change pas, seule la lecture change.</p>
         </div>
-        <div className="comparateur-cadre">
+
+        <div
+          className={`comparateur-cadre${glisse ? " est-glisse" : ""}`}
+          ref={cadre}
+          onPointerDown={(event) => {
+            if (event.pointerType === "mouse" && event.button !== 0) return;
+            event.currentTarget.setPointerCapture(event.pointerId);
+            setGlisse(true);
+            viser(event.clientX);
+          }}
+          onPointerMove={(event) => {
+            if (glisse) viser(event.clientX);
+          }}
+          onPointerUp={(event) => {
+            setGlisse(false);
+            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+              event.currentTarget.releasePointerCapture(event.pointerId);
+            }
+          }}
+          onPointerCancel={() => setGlisse(false)}
+        >
           <RosaceRender pattern={HERO_PATTERN} resolution={900} label="La rosace brodée" />
           <div className="comparateur-grille" style={{ clipPath: `inset(0 0 0 ${split}%)` }}>
             {/* La grille a sa propre marge technique : on la recale sur le rendu textile
@@ -192,23 +232,29 @@ function Realisation() {
               <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={900} label="La grille technique du même patron" />
             </div>
           </div>
-          <span className="comparateur-trait" style={{ left: `${split}%` }} aria-hidden="true">
-            <span />
-          </span>
           <span className="comparateur-etiquette comparateur-etiquette--gauche" aria-hidden="true">Motif</span>
           <span className="comparateur-etiquette comparateur-etiquette--droite" aria-hidden="true">Grille</span>
+          <div
+            className="comparateur-poignee"
+            style={{ left: `${split}%` }}
+            role="slider"
+            tabIndex={0}
+            aria-label="Balayer entre le motif brodé et la grille technique"
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-valuenow={Math.round(split)}
+            aria-valuetext={`${Math.round(split)} % de grille`}
+            aria-orientation="horizontal"
+            onKeyDown={auClavier}
+          >
+            <span aria-hidden="true" />
+          </div>
         </div>
-        <div className="comparateur-commande">
-          <label htmlFor="curseur-comparaison">Comparer le motif et la grille</label>
-          <input
-            id="curseur-comparaison"
-            type="range"
-            min={0}
-            max={100}
-            value={split}
-            onChange={(event) => setSplit(Number(event.target.value))}
-          />
-        </div>
+
+        <p className="comparateur-aide">
+          <MousePointer2 size={14} strokeWidth={1.9} aria-hidden="true" />
+          Glissez le trait — ou les flèches du clavier — pour passer du motif à la grille.
+        </p>
       </div>
 
       <ul className="chiffres" data-reveal aria-label="Le patron calculé">
