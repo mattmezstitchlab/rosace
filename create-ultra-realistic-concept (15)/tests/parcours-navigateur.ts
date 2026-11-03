@@ -17,7 +17,10 @@ import { chromium, type BrowserContext, type Page } from "playwright-core";
 import { DMC_ALL_THREADS, FAMILY_LABELS } from "../src/data/dmc";
 import { shortFingerprint, patternFingerprint } from "../src/lib/pattern-id";
 import { chartGeometry } from "../src/lib/paint";
-import { DEFAULT_CONFIG, SYMBOLS, decodeConfig, encodeConfig, generateRosace, normalizeConfig } from "../src/lib/rosace";
+import {
+  DEFAULT_CONFIG, GEOMETRY_COUNT, GEOMETRY_NAMES, SYMBOLS, decodeConfig, encodeConfig,
+  generateRosace, normalizeConfig,
+} from "../src/lib/rosace";
 import {
   LEGACY_PROGRESS_STORAGE_PREFIXES, LEGACY_PROJECT_VERSION, PROJECT_FORMAT, PROJECT_VERSION,
   progressStorageKey, serializeRuns, stitchIndex,
@@ -530,6 +533,36 @@ async function main() {
     await recipePage.keyboard.press("Escape");
     await recipePage.locator(".studio-panel").waitFor({ state: "detached" });
     await recipeContext.close();
+
+    /* ---------------- Six familles géométriques, sur les cinq structures ---------------- */
+    const geometryContext = await browser.newContext({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 1 });
+    const geometryPage = await geometryContext.newPage();
+    trackErrors(geometryPage, "geometries");
+    await geometryPage.goto(BASE_URL, { waitUntil: "domcontentloaded" });
+    await geometryPage.locator(".hoop-canvas").waitFor({ state: "visible" });
+    await openDock(geometryPage, "Forme");
+    const geometrySlider = geometryPage.locator('input[aria-label="Géométrie"]');
+    assert.equal(await geometrySlider.getAttribute("max"), String(GEOMETRY_COUNT));
+    assert.equal(await geometryPage.locator('input[type="range"]').count(), 7);
+    const geometryStats = new Set<string>();
+    for (let geometry = 1; geometry <= GEOMETRY_COUNT; geometry += 1) {
+      await geometrySlider.fill(String(geometry));
+      await geometryPage.waitForTimeout(120);
+      assert.equal(await geometrySlider.inputValue(), String(geometry));
+      assert.match((await geometrySlider.getAttribute("aria-valuetext")) ?? "", new RegExp(GEOMETRY_NAMES[geometry - 1]));
+      const stats = (await geometryPage.locator(".studio-stats p").textContent())?.trim() ?? "";
+      geometryStats.add(stats);
+      await geometryPage.keyboard.press("Escape");
+      await geometryPage.locator(".studio-panel").waitFor({ state: "detached" });
+      await geometryPage.locator(".hoop-canvas").screenshot({ path: path.join(ARTIFACT_DIR, `geometrie-${geometry}.png`) });
+      if (geometry < GEOMETRY_COUNT) await openDock(geometryPage, "Forme");
+    }
+    assert.equal(geometryStats.size, GEOMETRY_COUNT, "deux familles affichent le même nombre de croix");
+    await openDock(geometryPage, "Forme");
+    await geometrySlider.fill("1");
+    await geometryPage.waitForTimeout(120);
+    assert.match((await geometryPage.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/, "retour à la corolle classique impossible");
+    await geometryContext.close();
 
     /* ---------------- hashchange, popstate, retour / avant ---------------- */
     const navContext = await browser.newContext({ viewport: { width: 390, height: 844 } });

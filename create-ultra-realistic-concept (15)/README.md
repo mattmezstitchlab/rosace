@@ -6,7 +6,7 @@ ROSACE est un atelier de point de croix à écran fixe : une recette produit **u
 
 ## Concept
 
-- Six réglages de forme, cinq harmonies, 489 références DMC, couronne chromatique complète.
+- Sept réglages de forme, dont **six familles géométriques**, cinq harmonies, 489 références DMC, couronne chromatique complète.
 - Recette reproductible par signature et liens `#r=`.
 - **Tambour** = vue textile ; **Broder** = vue technique de la même grille.
 - Progression séparée du motif, indexée par empreinte du patron, jamais mélangée à la recette.
@@ -29,7 +29,7 @@ Node 22 est utilisé pour la validation. Vite sert l'application sur `0.0.0.0` a
 | `npm run dev` | serveur de développement |
 | `npm run build` | singlefile de production dans `dist/index.html` |
 | `npm run preview` | sert le build réel |
-| `npm test` | 23 assertions Node/tsx |
+| `npm test` | 24 assertions Node/tsx |
 | `npm run typecheck` | TypeScript strict, `src` + `tests` + `vite.config.ts` |
 | `npm run test:browser` | parcours Playwright mobile + bureau |
 | `npm run test:preview` | fumage du build servi |
@@ -57,6 +57,21 @@ RosaceConfig ──normalizeConfig──► generateRosace ──► pattern
 
 Fichiers structurants : `src/lib/rosace.ts` (moteur), `src/lib/paint.ts` (rendu partagé), `src/lib/progress.ts` (progression et projets), `src/state/rosace-store.tsx` (état unique), `src/components/EmbroideryView.tsx` (Broderie), `src/data/dmc.ts` (catalogue), `src/data/crown.ts` (couronne).
 
+## Familles géométriques
+
+Le curseur **Géométrie** propose six familles dans le même moteur, disponibles pour les cinq structures de pétales (6, 8, 10, 12, 14), les cinq tracés, densités, échelles, tourbillons et ondulations :
+
+| Valeur | Famille | Lecture |
+|---|---|---|
+| 1 | Corolle | rosace d'origine, strictement préservée (`353C357F12EC80D5`, 3 381 croix) |
+| 2 | Mandala | anneaux concentriques, rayons et losanges |
+| 3 | Arabesque | ogives entrecroisées et festons |
+| 4 | Kaléidoscope | miroirs en coins, facettes et losanges |
+| 5 | Entrelacs | trame tissée et nœuds réguliers |
+| 6 | Fractale | étoile emboîtée à plusieurs échelles |
+
+Cinq nouvelles études (`PRESETS`) les présentent. La valeur 1 reste le défaut : anciens liens, projets version 1 et progressions existantes retrouvent exactement le même patron. Il n'existe toujours qu'un seul `generateRosace`.
+
 ## Formats d'export
 
 | Format | Contenu | Réimportable |
@@ -81,7 +96,7 @@ Les projets **version 1** sont migrés explicitement vers v2 lorsque leur forme 
 
 ## Limites connues
 
-- Validation terrain humaine (5 brodeuses, 3 recettes) encore à organiser.
+- Validation terrain humaine (5 brodeuses, 3 recettes) encore à organiser ; les six familles géométriques sont vérifiées en Chromium headless, pas sur appareil réel.
 - Couverture navigateur automatisée : Chromium ; Safari, Firefox, appareils réels et gestes tactiles matériels restent à valider.
 - Couleurs écran indicatives ; métrages et temps sont des estimations.
 - Le lien de partage ne transporte pas la progression.

@@ -107,7 +107,7 @@ export function Disque() {
 
         <motion.div
           className="disque-hoop"
-          key={`${config.seed}-${config.structure}-${config.trace}-${config.density}-${config.scale}-${config.twist}-${config.wave}`}
+          key={`${config.seed}-${config.structure}-${config.trace}-${config.density}-${config.scale}-${config.paletteShift}-${config.geometry}-${config.twist}-${config.wave}`}
           initial={reduceMotion ? { opacity: 0.5 } : { opacity: 0.4, scale: 0.99 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}

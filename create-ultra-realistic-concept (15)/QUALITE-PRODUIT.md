@@ -6,11 +6,12 @@ Ce document distingue strictement ce qui **a été exécuté** de ce qui est **p
 
 | Contrôle | Commande | Résultat | Bloquant ? |
 |---|---|---|---|
-| Suite unitaire | `npm test` | 23 tests réussis | non |
+| Suite unitaire | `npm test` | 24 tests réussis | non |
 | Typecheck strict | `npm run typecheck` | exit 0 | oui en CI |
 | Build singlefile | `npm run build` | 2506 modules, `dist/index.html` | oui en CI |
 | Parcours navigateur Chromium | `npm run test:browser` | mobile 390×844 + bureau 1440×900, exit 0 | oui en CI |
 | Build de production servi | `npm run test:preview` | exit 0 : HTTP 200, singlefile sans `/@vite/client` ni `/src/`, couronne 489, Broderie ouverte | oui en CI |
+| Six familles géométriques | `npm test` + `npm run test:browser` | 6 empreintes distinctes, 5 structures × 6 familles, tous les curseurs actifs, corolle d'origine bit à bit préservée, 6 captures | oui en CI |
 | Accessibilité automatisée | `npm run test:a11y` | axe : **2 violations sérieuses**, 37 passes, 1 incomplet | **non** |
 | Navigation clavier | `npm run test:a11y` | 1er focus = lien, `Entrée` ouvre un panneau, `Échap` le ferme | non |
 | Préférence de réduction des animations | `npm run test:a11y` | `prefers-reduced-motion: reduce` respecté par le contexte | non |
@@ -31,7 +32,7 @@ Elles sont documentées comme limites, pas corrigées dans cette phase, afin de 
 | Gestes tactiles réels | alternatives clavier et boutons déjà testées | cinq appareils physiques, pincement réel, `pointercancel` | non |
 | Impression physique du PDF | PDF 5 pages validé en navigateur | impression papier, vérification des repères et des marges | non |
 | Ouverture des exports externes | signatures PNG, SVG, CSV, PDF vérifiées | ouvrir CSV dans Excel/LibreOffice, SVG dans un logiciel vectoriel, PNG avec DPI | non |
-| Tests terrain cinq brodeuses | protocole au §10 du rapport final | recruter 5 profils, 3 recettes, 30 min, grille de critères | non |
+| Tests terrain cinq brodeuses | protocole au §6 du rapport final | recruter 5 profils, 3 recettes, 30 min, grille de critères | non |
 | Correctifs axe | rapport JSON versionné hors dépôt | décider si les 2 violations doivent être corrigées | non |
 
 ## Matrice de couverture navigateur
@@ -46,4 +47,4 @@ Elles sont documentées comme limites, pas corrigées dans cette phase, afin de 
 
 ## Parcours couverts par `npm run test:browser`
 
-Création d'une rosace, modification des réglages, annuler/rétablir de recette, export PNG/SVG/CSV/PDF, export et réimport de projet v2, migration et refus clair de projet v1, mode Broderie, marquage de croix, annuler/rétablir, fermeture et reprise, zoom, filtres, catalogue 489 fils, liens legacy, `hashchange`/`popstate`/retour-avant, concurrence entre deux onglets, stockage corrompu, ancienne clé v1, quota dépassé, `Échap` avec focus dans un champ, dock bureau.
+Création d'une rosace, modification des réglages, annuler/rétablir de recette, curseur Géométrie 1–6 avec six captures et retour à la corolle, export PNG/SVG/CSV/PDF, export et réimport de projet v2, migration et refus clair de projet v1, mode Broderie, marquage de croix, annuler/rétablir, fermeture et reprise, zoom, filtres, catalogue 489 fils, liens legacy, `hashchange`/`popstate`/retour-avant, concurrence entre deux onglets, stockage corrompu, ancienne clé v1, quota dépassé, `Échap` avec focus dans un champ, dock bureau.

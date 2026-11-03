@@ -57,7 +57,7 @@ Détails : clé canonique `aime-rosace-progress-v2:<empreinte>` ; anciennes clé
 
 - `README.md` : concept, installation, commandes, architecture, formats d'export, progression, limites.
 - `NOTICE.md` : attribution MakeBead `craft-color-codes` / DMC **CC BY 4.0** (489 références cross-checkées, Blanc/B5200, DMC 309, hex RVB, modifications locales) et Bodoni Moda **OFL 1.1**.
-- `scripts/inventaire-licences.mjs` + `npm run licenses` → `LICENSES.md` généré le `2026-11-03T02:48:22.268Z` : **203 paquets, 8 licences distinctes** — MIT 173, MPL-2.0 14, ISC 7, Apache-2.0 5, OFL-1.1 1, CC-BY-4.0 1, BSD-3-Clause 1, 0BSD 1.
+- `scripts/inventaire-licences.mjs` + `npm run licenses` → `LICENSES.md` généré le `2026-11-03T03:40:20.224Z` : **203 paquets, 8 licences distinctes** — MIT 173, MPL-2.0 14, ISC 7, Apache-2.0 5, OFL-1.1 1, CC-BY-4.0 1, BSD-3-Clause 1, 0BSD 1.
 - **Aucune licence de code applicatif n'a été attribuée.** Le dépôt reste `license=null`, conformément à la consigne explicite.
 
 ### Options de licence du code — décision utilisateur requise
@@ -94,16 +94,16 @@ Le workflow est fourni dans `ci/github-workflow-ci.yml`. Une fois copié vers `.
 
 ### Parcours couverts dans Chromium
 
-Création de rosace, réglages, annuler/rétablir de recette, export PNG/SVG/CSV/PDF, export/réimport projet v2, migration v1 et refus clair, mode Broderie, marquage de croix, annuler/rétablir, zoom, filtres, catalogue 489 fils, fermeture/reprise, `hashchange`/`popstate`/retour-avant, concurrence deux onglets, stockage corrompu / clé v1 / quota, `Échap` avec focus champ, dock bureau, liens legacy.
+Création de rosace, réglages, annuler/rétablir de recette, curseur Géométrie 1–6 et retour à la corolle, export PNG/SVG/CSV/PDF, export/réimport projet v2, migration v1 et refus clair, mode Broderie, marquage de croix, annuler/rétablir, zoom, filtres, catalogue 489 fils, fermeture/reprise, `hashchange`/`popstate`/retour-avant, concurrence deux onglets, stockage corrompu / clé v1 / quota, `Échap` avec focus champ, dock bureau, liens legacy.
 
 ### Résultats exécutés localement
 
 | Commande | Résultat |
 |---|---|
 | `npm ci` | 109 paquets installés depuis `package-lock.json` |
-| `npm test` | **23 tests réussis** |
+| `npm test` | **24 tests réussis** |
 | `npm run typecheck` | exit 0 |
-| `npm run build` | 2506 modules, `dist/index.html` 749.47 kB / gzip 335.58 kB, singlefile |
+| `npm run build` | 2506 modules, `dist/index.html` 752.71 kB / gzip 336.52 kB, singlefile |
 | `npm run licenses` | 203 paquets, 8 licences |
 | `npm run test:browser` | `Parcours navigateur réussis · /tmp/rosace-browser/artifacts` |
 | `npm run test:preview` | `Aperçu de production réussi · http://127.0.0.1:4173` |
@@ -117,6 +117,30 @@ FONTCONFIG_PATH=/tmp/rosace-browser/unpack/fonts \
 ARTIFACT_DIR=/tmp/rosace-browser/artifacts \
 BASE_URL=http://127.0.0.1:5173 npm run test:browser
 ```
+
+---
+
+## 5 bis. Enrichissement géométrique — nouvelle demande
+
+Le curseur **Géométrie** ajoute six familles dans le même `generateRosace`, sans second moteur, sans modification du design validé et sans remplacement de la corolle d'origine :
+
+| Valeur | Famille | Lecture |
+|---|---|---|
+| 1 | **Corolle** | rosace d'origine, bit à bit préservée : `353C357F12EC80D5`, 3 381 croix |
+| 2 | **Mandala** | anneaux concentriques, rayons et losanges |
+| 3 | **Arabesque** | ogives entrecroisées et festons |
+| 4 | **Kaléidoscope** | miroirs en coins, facettes et losanges |
+| 5 | **Entrelacs** | trame tissée et nœuds réguliers |
+| 6 | **Fractale** | étoile emboîtée à plusieurs échelles |
+
+- Disponible pour **les cinq structures** (6, 8, 10, 12, 14 pétales), les cinq tracés, densités, échelles, tourbillons et ondulations. C'est le sens retenu pour « sous toutes ces formes ».
+- `geometry=1` est le défaut : anciens liens `#r=`, projets v1, progressions locales et exports conservent exactement le même patron. La valeur est bornée par `normalizeConfig`.
+- Cinq nouvelles études `PRESETS` présentent les familles 2 à 6 ; la fiche PDF, le loupe, les cartes de collection et le nom de recette mentionnent la géométrie.
+- Le rendu reste unique : `paintPattern`, la couronne de 489 fils, les exports, l'empreinte et la progression ne sont pas dupliqués.
+- Validation : **24 tests réussis** dont `géométries : six familles distinctes, corolle d'origine bit à bit préservée` ; parcours Chromium avec six captures `geometrie-1.png` … `geometrie-6.png`, slider 1–6, cinq structures, tous les curseurs actifs, retour à la corolle. Les six familles ont des empreintes distinctes, `cleaned=0` et `mirrorSymmetric=true`.
+- Artefacts visuels : `/tmp/rosace-browser/artifacts/geometrie-*.png` (hors dépôt).
+
+Aucun fichier de design, aucun moteur géométrique parallèle et aucune licence de code n'ont été ajoutés.
 
 ---
 
@@ -145,7 +169,7 @@ Ce protocole est **prévu**, pas réalisé.
 
 ## 7. Fichiers modifiés depuis `main`
 
-32 fichiers : **2 568 insertions / 542 suppressions**, rapport final inclus.
+32 fichiers : **2 903 insertions / 556 suppressions**, rapport final inclus.
 
 | Statut | Fichiers |
 |---|---|
@@ -160,6 +184,7 @@ Aucun `LICENSE` applicatif, aucun fichier de design, aucun fichier du moteur gé
 ## 8. Limites restantes
 
 - Validation navigateur : Chromium 153 headless, 390×844 et 1440×900 ; pas Safari, Firefox, appareil réel, lecteur d'écran ni multi-touch matériel.
+- Les six familles géométriques sont validées en Chromium headless et par 24 assertions, mais pas encore par les cinq brodeuses ni sur appareil réel ; leurs noms et leur nombre restent ajustables.
 - Pincement synthétique sans ancrage au point focal ; `pointercancel` non couvert.
 - Couleurs écran indicatives ; métrages, brins, échevettes et temps restent des estimations.
 - Lien de partage `#r=` transporte la recette, **pas** la progression.
@@ -182,11 +207,12 @@ Aucun `LICENSE` applicatif, aucun fichier de design, aucun fichier du moteur gé
 5. **Fusion et déploiement** : rester interdits jusqu'à validation explicite ; la PR #1 doit rester `OPEN`.
 6. **Binaire Chromium en CI** : stratégie actuelle `npx playwright install --with-deps chromium` sur `ubuntu-latest` ; à confirmer si un cache ou un binaire interne est préféré.
 7. **Permission `workflows`** : accorder ce droit à l'intégration GitHub (ou reconnecter l'app) pour que je puisse copier `ci/github-workflow-ci.yml` vers `.github/workflows/ci.yml` et activer la CI distante ; sinon le faire manuellement depuis l'interface GitHub.
+8. **Familles géométriques** : confirmer les six noms / le nombre de familles, ou demander d'autres types (guillochis, pavage, rosace gothique, etc.) avant validation terrain.
 
 ---
 
 ## 10. Conclusion
 
-La version de ROSACE sur `arena/538bb149-rosace` est **conservée sur GitHub, reproductible, testable et prête pour une validation finale**. La sauvegarde est prouvée, la PR #1 est ouverte et non fusionnée, les six corrections prioritaires sont vérifiées dans un navigateur, le build de production est fumé, la documentation est en place, la CI est préparée en attendant la permission `workflows`, et les contrôles simplement prévus sont explicitement séparés des contrôles exécutés.
+La version de ROSACE sur `arena/538bb149-rosace` est **conservée sur GitHub, reproductible, testable, enrichie de six familles géométriques et prête pour une validation finale**. La sauvegarde est prouvée, la PR #1 est ouverte et non fusionnée, les six corrections prioritaires sont vérifiées dans un navigateur, le build de production est fumé, la corolle d'origine reste bit à bit intacte, la documentation est en place, la CI est préparée en attendant la permission `workflows`, et les contrôles simplement prévus sont explicitement séparés des contrôles exécutés.
 
 Aucune compilation réussie n'a été présentée comme une validation fonctionnelle. Aucun design validé ni moteur géométrique n'a été modifié sans nécessité démontrée. Aucun déploiement ni fusion n'a eu lieu.

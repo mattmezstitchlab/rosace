@@ -3,7 +3,7 @@ import { computeMaterials, estimateTime } from "./materials";
 
 export type FabricTone = "naturel" | "craie" | "brume";
 export type AidaCount = 14 | 16 | 18;
-export type DimensionKey = "structure" | "trace" | "density" | "scale" | "paletteShift";
+export type DimensionKey = "structure" | "trace" | "density" | "scale" | "paletteShift" | "geometry";
 
 export interface RosaceConfig {
   structure: number;
@@ -11,6 +11,12 @@ export interface RosaceConfig {
   density: number;
   scale: number;
   paletteShift: number;
+  /**
+   * Famille géométrique : 1 = corolle classique, 2 = mandala, 3 = arabesque,
+   * 4 = kaléidoscope, 5 = entrelacs, 6 = fractale. Indépendante des cinq structures
+   * (6, 8, 10, 12, 14 pétales) et de tous les autres réglages.
+   */
+  geometry: number;
   /** Tourbillon : décalage angulaire progressif selon le rayon (0 = symétrie stricte). */
   twist: number;
   /** Ondulation : modulation radiale de la fleur, en éventail. */
@@ -88,6 +94,7 @@ export const DEFAULT_CONFIG: RosaceConfig = {
   density: 3,
   scale: 3,
   paletteShift: 1,
+  geometry: 1,
   twist: 1,
   wave: 1,
   seed: 7,
@@ -104,6 +111,7 @@ export const DIMENSION_LABELS: Record<DimensionKey, string> = {
   density: "Densité",
   scale: "Échelle",
   paletteShift: "Palette",
+  geometry: "Géométrie",
 };
 
 export const DIMENSION_NAMES: Record<DimensionKey, string[]> = {
@@ -112,10 +120,13 @@ export const DIMENSION_NAMES: Record<DimensionKey, string[]> = {
   density: ["Ajourée", "Légère", "Équilibrée", "Riche", "Tapisserie"],
   scale: ["Miniature", "Fin", "Moyen", "Ample", "Monumental"],
   paletteShift: ["Douce", "Tournée", "Croisée", "Renversée", "Inversée"],
+  geometry: ["Corolle", "Mandala", "Arabesque", "Kaléidoscope", "Entrelacs", "Fractale"],
 };
 
 export const STRUCTURE_NAMES = DIMENSION_NAMES.structure;
 export const TRACE_NAMES = DIMENSION_NAMES.trace;
+export const GEOMETRY_NAMES = DIMENSION_NAMES.geometry;
+export const GEOMETRY_COUNT = GEOMETRY_NAMES.length;
 export const SYMBOLS = ["×", "•", "◆", "■", "▲", "+"];
 export const GRID_SIZES = [81, 91, 101, 111, 121];
 export const FABRIC_COLORS: Record<FabricTone, { base: string; warp: string; name: string }> = {
@@ -148,6 +159,7 @@ export function normalizeConfig(value: Partial<RosaceConfig> | null | undefined)
     density: clampInt(source.density, 1, 5, 3),
     scale: clampInt(source.scale, 1, 5, 3),
     paletteShift: clampInt(source.paletteShift, 1, 5, 1),
+    geometry: clampInt(source.geometry, 1, GEOMETRY_COUNT, 1),
     twist: clampInt(source.twist, 1, 5, 1),
     wave: clampInt(source.wave, 1, 5, 1),
     seed: clampInt(source.seed, 1, 9999, 7),
@@ -223,6 +235,121 @@ export function paletteIndexForRole(config: RosaceConfig, role: number) {
   return roleToPalette(role, config.palette.length, config.paletteShift);
 }
 
+/**
+ * Familles géométriques supplémentaires. Elles partagent le même moteur, la même
+ * grille, les mêmes couleurs et le même contrôle de brodabilité que la corolle.
+ * Les fonctions angulaires utilisent des cosinus entiers et des valeurs absolues :
+ * la symétrie gauche-droite est conservée pour toutes les structures et tous les tracés.
+ */
+interface GeometryContext {
+  geometry: number;
+  symmetry: number;
+  sector: number;
+  trace: number;
+  density: number;
+  unit: number;
+  phase: number;
+  ringCount: number;
+  weaveFrequency: number;
+  fractalDepth: number;
+  outerWidth: number;
+  exponent: number;
+  innerPhase: number;
+  paletteLength: number;
+}
+
+function geometryRole(
+  ctx: GeometryContext,
+  radius: number,
+  rg: number,
+  theta: number,
+  delta: number,
+  otherDelta: number,
+): number {
+  const absDelta = Math.abs(delta);
+  const fold = Math.min(1, absDelta / (ctx.sector / 2));
+  const foldOther = Math.min(1, Math.abs(otherDelta) / (ctx.sector / 2));
+  const rings = ctx.ringCount;
+  const ringFloat = Math.max(0, Math.min(rings - 0.0001, rg * rings));
+  const ring = Math.floor(ringFloat);
+  const local = ringFloat - ring;
+  const u = rg * Math.cos(absDelta);
+  const v = rg * Math.sin(absDelta);
+  const star = Math.abs(Math.cos(ctx.symmetry * theta / 2));
+  const spoke = Math.abs(Math.cos(ctx.symmetry * theta));
+  const lace = Math.sin(local * (8 + ctx.trace * 2) + fold * 5 + ctx.innerPhase);
+  const accent = ctx.paletteLength > 5 ? 5 : 4;
+  const outer = Math.max(radius, rg);
+  let role = -1;
+
+  if (ctx.geometry === 2) {
+    // Mandala : anneaux, rayons et losanges concentriques.
+    if (local < 0.12 + ctx.unit * 2 || local > 0.88 - ctx.unit * 2) role = 0;
+    if (fold < 0.10 + ctx.density * 0.012) role = 1;
+    const diamond = Math.abs(fold - 0.5) + Math.abs(local - 0.5);
+    if (diamond < 0.28 + ctx.density * 0.02) role = 2;
+    if (ctx.density >= 2 && lace > 0.15) role = 3;
+    if (ctx.density >= 4 && fold > 0.25 && fold < 0.45) role = 1;
+    if (ring % 2 === 0 && ctx.trace >= 3 && fold > 0.72) role = accent;
+    if (rg < 0.09) role = accent;
+    if (outer > 0.92) role = 0;
+  } else if (ctx.geometry === 3) {
+    // Arabesque : ogives entrecroisées et festons.
+    const arc1 = Math.abs(rg - (0.60 + 0.10 * star));
+    const arc2 = Math.abs(rg - (0.40 + 0.08 * spoke));
+    if (arc1 < ctx.unit * 1.3) role = 0;
+    if (arc2 < ctx.unit * 1.3) role = 1;
+    if (foldOther < 0.12 + ctx.density * 0.008) role = 2;
+    const petal = petalField(rg, absDelta, 0.16, 0.84, ctx.outerWidth * 0.9, ctx.exponent, ctx.unit, 0);
+    if (petal.inside) {
+      if (petal.edge) role = 0;
+      else if (ctx.density >= 2 && Math.sin(petal.t * 14 + ctx.innerPhase) > 0.1) role = 3;
+    }
+    if (ctx.density >= 3 && lace > 0.3) role = 2;
+    if (rg < 0.08) role = accent;
+    if (outer > 0.93) role = 0;
+  } else if (ctx.geometry === 4) {
+    // Kaléidoscope : miroirs en coins, losanges et facettes alternées.
+    const facet = Math.abs(Math.sin(ctx.symmetry * theta / 2));
+    const diamond = Math.abs(fold - 0.5) + Math.abs(local - 0.5);
+    if (Math.abs(local - 0.5) < 0.06 + ctx.unit) role = 0;
+    if (fold < 0.07 || fold > 0.93) role = 1;
+    if (diamond < 0.26 + ctx.trace * 0.01) role = 2;
+    if (facet > 0.8 && ctx.density >= 2) role = accent;
+    if (ctx.density >= 3 && lace > 0.55) role = 3;
+    if (ctx.density === 5 && diamond < 0.14) role = accent;
+    if (rg < 0.07) role = accent;
+    if (outer > 0.93) role = 0;
+  } else if (ctx.geometry === 5) {
+    // Entrelacs : trame tissée, nœuds réguliers, croisements lumineux.
+    const weaveA = Math.abs(Math.sin(u * ctx.weaveFrequency + ctx.phase));
+    const weaveB = Math.abs(Math.sin(v * ctx.weaveFrequency - ctx.phase));
+    const line = 0.16 + ctx.density * 0.012 + ctx.trace * 0.004;
+    if (weaveA < line) role = 0;
+    if (weaveB < line) role = 1;
+    if (weaveA < line && weaveB < line) role = accent;
+    if (ctx.density >= 2 && Math.sin((u + Math.abs(v)) * ctx.weaveFrequency * 0.6 + ctx.innerPhase) > 0.2) role = 2;
+    if (ctx.density >= 4 && Math.abs(Math.sin((u - Math.abs(v)) * ctx.weaveFrequency * 0.5)) < 0.18) role = 3;
+    if (rg < 0.07) role = accent;
+    if (outer > 0.94) role = 0;
+  } else {
+    // Fractale : une étoile emboîtée, répétée à chaque changement d'échelle.
+    const level = Math.min(ctx.fractalDepth - 1, Math.max(0, Math.floor(-Math.log2(Math.max(rg, 0.015)))));
+    const scale = Math.pow(2, -level);
+    const localRadius = Math.min(0.999, rg / scale);
+    const starRadius = 0.26 + 0.24 * star + ctx.trace * 0.01;
+    if (Math.abs(localRadius - starRadius) < 0.055 + ctx.unit * 1.5) role = level % 2 === 0 ? 0 : 1;
+    if (fold < 0.06 + level * 0.008) role = 2;
+    if (localRadius < starRadius && ctx.density >= 2 && lace > 0.45) role = 3;
+    if (Math.abs(localRadius - 0.5) < 0.03) role = accent;
+    if (ctx.density >= 4 && localRadius > starRadius && lace > 0.85) role = accent;
+    if (rg < 0.04) role = accent;
+    if (outer > 0.94) role = 0;
+  }
+
+  return Math.min(role, 5);
+}
+
 export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
   const config = normalizeConfig(input);
   const size = GRID_SIZES[config.scale - 1];
@@ -247,6 +374,28 @@ export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
   const paletteLength = config.palette.length;
   const color = (role: number) => roleToPalette(role, paletteLength, config.paletteShift);
 
+  // RNG séparé : les familles géométriques ne consomment pas la séquence aléatoire
+  // de la corolle classique, donc la recette par défaut reste bit à bit identique.
+  const geometryRandom = config.geometry === 1 ? null : seededRandom(config.seed * 104729 + config.geometry * 8191);
+  const geometryContext: GeometryContext | null = geometryRandom
+    ? {
+        geometry: config.geometry,
+        symmetry,
+        sector,
+        trace: config.trace,
+        density: config.density,
+        unit,
+        phase: geometryRandom() * TAU,
+        ringCount: 5 + config.trace + Math.floor(geometryRandom() * 2),
+        weaveFrequency: 18 + Math.floor(geometryRandom() * 8),
+        fractalDepth: 4 + Math.floor(geometryRandom() * 2),
+        outerWidth,
+        exponent,
+        innerPhase,
+        paletteLength,
+      }
+    : null;
+
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       const nx = (x - center) * unit;
@@ -256,14 +405,31 @@ export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
 
       // Tourbillon : chaque rayon est tourné d'un peu plus que le précédent → spirale.
       const twist = (config.twist - 1) * 0.052;
+      const baseTheta = Math.atan2(ny, nx) + Math.PI / 2;
       // Ondulation : le rayon respire en éventail, sans casser la symétrie.
-      const ripple = 1 + (config.wave - 1) * 0.019 * Math.cos(symmetry * (Math.atan2(ny, nx) + Math.PI / 2) * 2 + innerPhase);
-      const theta = Math.atan2(ny, nx) + Math.PI / 2 + twist * radius;
-      const rg = radius * ripple;
-      const delta = wrapCentered(theta, sector);
-      const otherDelta = delta >= 0 ? delta - sector / 2 : delta + sector / 2;
+      const ripple = 1 + (config.wave - 1) * 0.019 * Math.cos(symmetry * baseTheta * 2 + innerPhase);
+      const theta = baseTheta + twist * radius;
+      let rg = radius * ripple;
+      let delta = wrapCentered(theta, sector);
+      let otherDelta = delta >= 0 ? delta - sector / 2 : delta + sector / 2;
+      let geometryTheta = baseTheta;
+      if (geometryContext) {
+        // Angle replié sur le demi-plan droit : les deux moitiés du tambour reçoivent
+        // exactement la même consigne, sans approximation de virgule flottante.
+        geometryTheta = Math.atan2(ny, Math.abs(nx)) + Math.PI / 2;
+        // Les familles géométriques gardent une modulation radiale symétrique
+        // et n'appliquent pas le décalage angulaire du tourbillon classique.
+        delta = wrapCentered(geometryTheta, sector);
+        otherDelta = delta >= 0 ? delta - sector / 2 : delta + sector / 2;
+        const waveMod = 1 + (config.wave - 1) * 0.018 * Math.cos(symmetry * geometryTheta / 2);
+        const twistMod = (config.twist - 1) * 0.03 * Math.cos(symmetry * geometryTheta);
+        rg = Math.max(0, radius * waveMod + twistMod);
+      }
       let role = -1;
 
+      if (geometryContext) {
+        role = geometryRole(geometryContext, radius, rg, geometryTheta, delta, otherDelta);
+      } else {
       // Halo extérieur : croix isolées volontaires, perles et petites étoiles.
       const haloDelta = wrapCentered(theta, sector / 2);
       const haloDistance = Math.abs(radius - (beadRadius + 0.12 + ringOffset));
@@ -352,6 +518,7 @@ export function generateRosace(input: Partial<RosaceConfig>): RosacePattern {
       }
       if (config.trace === 4 && outer.inside && !outer.edge && outer.t > 0.3 && outer.t < 0.75) {
         if (Math.abs(outer.band - (0.28 + 0.08 * Math.sin(outer.t * 22))) < 0.09) role = 3;
+      }
       }
 
       if (role >= 0) {
@@ -445,7 +612,8 @@ export function getSymmetry(config: RosaceConfig) {
 }
 
 export function getPatternName(config: RosaceConfig) {
-  return `${getSymmetry(config)} pétales · tracé ${TRACE_NAMES[config.trace - 1].toLowerCase()}`;
+  const base = `${getSymmetry(config)} pétales · tracé ${TRACE_NAMES[config.trace - 1].toLowerCase()}`;
+  return config.geometry === 1 ? base : `${base} · ${GEOMETRY_NAMES[config.geometry - 1].toLowerCase()}`;
 }
 
 export function formatDuration(minutes: number) {
@@ -497,6 +665,41 @@ export const PRESETS: RosacePreset[] = [
     description: "Bleu marine, delft et violet composent un vitrail textile de douze pétales relevé de vieil or, à broder sur aïda 16.",
     config: { ...DEFAULT_CONFIG, structure: 4, trace: 3, density: 4, scale: 5, seed: 212, palette: ["823", "799", "3752", "550", "677"], aida: 16, fabric: "craie" },
   },
+  {
+    id: "mandala",
+    name: "Mandala de brume",
+    subtitle: "Géométrie · 1/5",
+    description: "Anneaux concentriques et losanges répétés : une lecture radiale du cercle, disponible sur les cinq structures de pétales.",
+    config: { ...DEFAULT_CONFIG, geometry: 2, structure: 3, trace: 2, density: 3, scale: 3, seed: 314, palette: ["3755", "340", "677", "822", "3023"], fabric: "brume" },
+  },
+  {
+    id: "arabesque",
+    name: "Arabesque cuivrée",
+    subtitle: "Géométrie · 2/5",
+    description: "Ogives entrecroisées et festons : une architecture souple qui conserve la symétrie du tambour.",
+    config: { ...DEFAULT_CONFIG, geometry: 3, structure: 4, trace: 4, density: 4, scale: 4, seed: 418, palette: ["918", "921", "3778", "676", "3823"] },
+  },
+  {
+    id: "kaleidoscope",
+    name: "Kaléidoscope boréal",
+    subtitle: "Géométrie · 3/5",
+    description: "Facettes en diamant et miroirs successifs : chaque secteur répond au voisin comme un vitrail taillé.",
+    config: { ...DEFAULT_CONFIG, geometry: 4, structure: 5, trace: 1, density: 5, scale: 4, seed: 520, palette: ["823", "799", "3752", "550", "677"], fabric: "craie" },
+  },
+  {
+    id: "entrelacs",
+    name: "Entrelacs de lin",
+    subtitle: "Géométrie · 4/5",
+    description: "Trame tissée et nœuds réguliers : une rosace pensée comme un ouvrage de passementerie.",
+    config: { ...DEFAULT_CONFIG, geometry: 5, structure: 2, trace: 3, density: 3, scale: 3, seed: 626, palette: ["902", "3607", "3608", "907", "677"], fabric: "craie" },
+  },
+  {
+    id: "fractale",
+    name: "Fractale grenat",
+    subtitle: "Géométrie · 5/5",
+    description: "Étoiles emboîtées du centre vers la couronne : la même règle géométrique se répète à plusieurs échelles.",
+    config: { ...DEFAULT_CONFIG, geometry: 6, structure: 3, trace: 5, density: 4, scale: 5, seed: 732, palette: ["902", "3607", "3608", "907", "310"] },
+  },
 ];
 
 /** Deux recettes sont identiques lorsque tous leurs paramètres normalisés le sont (graine et fils compris). */
@@ -508,7 +711,8 @@ export function sameRecipe(a: RosaceConfig, b: RosaceConfig) {
 export function getRecipeTitle(config: RosaceConfig) {
   const preset = PRESETS.find((entry) => sameRecipe(entry.config, config));
   if (preset) return preset.name;
-  return `${STRUCTURE_NAMES[config.structure - 1]} ${TRACE_NAMES[config.trace - 1].toLowerCase()}`;
+  const base = `${STRUCTURE_NAMES[config.structure - 1]} ${TRACE_NAMES[config.trace - 1].toLowerCase()}`;
+  return config.geometry === 1 ? base : `${GEOMETRY_NAMES[config.geometry - 1]} ${base}`;
 }
 
 export function encodeConfig(config: RosaceConfig) {

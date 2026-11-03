@@ -7,7 +7,8 @@ import { patternFingerprint } from "../src/lib/pattern-id";
 import { patternToSvg } from "../src/lib/exporters";
 import { chartGeometry, paintPattern } from "../src/lib/paint";
 import {
-  DEFAULT_CONFIG, PRESETS, SYMBOLS, decodeConfig, encodeConfig, generateRosace, normalizeConfig,
+  DEFAULT_CONFIG, GEOMETRY_COUNT, GEOMETRY_NAMES, PRESETS, SYMBOLS, decodeConfig, encodeConfig,
+  generateRosace, getPatternName, normalizeConfig,
 } from "../src/lib/rosace";
 import {
   LEGACY_PROJECT_VERSION, MAX_ZOOM, MIN_ZOOM, PROJECT_FORMAT, PROJECT_VERSION, buildProject,
@@ -98,7 +99,7 @@ test("planches : chaque croix apparaît exactement une fois sur les grilles impa
   assert.equal(countRegionStitches(regions, pattern.stitches), pattern.stitches.length);
 });
 
-test("recettes : les six configurations restent reproductibles et cohérentes", () => {
+test(`recettes : les ${PRESETS.length} configurations restent reproductibles et cohérentes`, () => {
   for (const preset of PRESETS) {
     const generated = generateRosace(preset.config);
     assert.equal(generated.usage.reduce((sum, line) => sum + line.count, 0), generated.stitches.length);
@@ -148,13 +149,52 @@ test("progression : restants par fil = total moins cases cochées", () => {
 
 test("aucune régression : chaque réglage de forme change la matrice, palette préservée", () => {
   const base = generateRosace(DEFAULT_CONFIG);
-  for (const key of ["structure", "trace", "density", "scale", "twist", "wave", "paletteShift"] as const) {
+  for (const key of ["structure", "trace", "density", "scale", "geometry", "twist", "wave", "paletteShift"] as const) {
     const changed = generateRosace({ ...DEFAULT_CONFIG, [key]: 5 });
     assert.ok(changed.stitches.length > 0);
     assert.notDeepEqual([...changed.cells], [...base.cells], `${key} ne change pas la matrice`);
   }
   assert.deepEqual(normalizeConfig(DEFAULT_CONFIG).palette, DEFAULT_CONFIG.palette);
   assert.equal(SKEIN_STRAND_METERS, 48);
+});
+
+test("géométries : six familles distinctes, corolle d'origine bit à bit préservée", () => {
+  const base = generateRosace(DEFAULT_CONFIG);
+  assert.equal(patternFingerprint(base), "353C357F12EC80D5", "la recette par défaut a changé");
+  assert.equal(base.stitches.length, 3381);
+  assert.equal(GEOMETRY_COUNT, 6);
+  const fingerprints = new Set<string>();
+  for (let geometry = 1; geometry <= GEOMETRY_COUNT; geometry += 1) {
+    const variant = generateRosace({ ...DEFAULT_CONFIG, geometry });
+    assert.ok(variant.stitches.length > 1000, `géométrie ${geometry} trop pauvre`);
+    assert.equal(variant.mirrorSymmetric, true, `géométrie ${geometry} perd la symétrie miroir`);
+    assert.equal(variant.cleaned, 0, `géométrie ${geometry} génère des croix isolées`);
+    assert.equal(variant.usage.reduce((sum, line) => sum + line.count, 0), variant.stitches.length);
+    fingerprints.add(patternFingerprint(variant));
+    if (geometry > 1) assert.notDeepEqual([...variant.cells], [...base.cells], `géométrie ${geometry} identique à la corolle`);
+    assert.match(
+      getPatternName(variant.config),
+      geometry === 1 ? /pétales/ : new RegExp(GEOMETRY_NAMES[geometry - 1].toLowerCase()),
+    );
+    let firstStructureCells: number[] | null = null;
+    for (let structure = 1; structure <= 5; structure += 1) {
+      const combined = generateRosace({ ...DEFAULT_CONFIG, geometry, structure });
+      assert.ok(combined.stitches.length > 0, `géométrie ${geometry} incompatible avec la structure ${structure}`);
+      assert.equal(combined.usage.reduce((sum, line) => sum + line.count, 0), combined.stitches.length);
+      const cells = [...combined.cells];
+      if (structure === 1) firstStructureCells = cells;
+      else assert.notDeepEqual(cells, firstStructureCells, `géométrie ${geometry} ignore la structure ${structure}`);
+    }
+    for (const key of ["trace", "density", "scale", "twist", "wave"] as const) {
+      const extreme = generateRosace({ ...DEFAULT_CONFIG, geometry, [key]: 5 });
+      assert.notDeepEqual([...extreme.cells], [...variant.cells], `géométrie ${geometry} ignore ${key}`);
+    }
+  }
+  assert.equal(fingerprints.size, GEOMETRY_COUNT, "deux familles partagent la même empreinte");
+  assert.equal(normalizeConfig({ ...DEFAULT_CONFIG, geometry: 0 }).geometry, 1);
+  assert.equal(normalizeConfig({ ...DEFAULT_CONFIG, geometry: 99 }).geometry, GEOMETRY_COUNT);
+  assert.equal(decodeConfig(encodeConfig({ ...DEFAULT_CONFIG, geometry: 4 }))?.geometry, 4);
+  assert.equal(PRESETS.filter((preset) => preset.config.geometry > 1).length, GEOMETRY_COUNT - 1);
 });
 
 test("catalogue étendu : 328 ajouts et couronne de 489 références sans doublon", () => {

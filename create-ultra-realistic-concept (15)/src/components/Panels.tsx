@@ -17,6 +17,7 @@ const FORM_SLIDERS = [
   { key: "trace", label: "Tracé" },
   { key: "density", label: "Densité" },
   { key: "scale", label: "Échelle" },
+  { key: "geometry", label: "Géométrie" },
   { key: "twist", label: "Tourbillon" },
   { key: "wave", label: "Ondulation" },
 ] as const;
@@ -35,22 +36,23 @@ export function FormPanel() {
       {FORM_SLIDERS.map((item) => {
         const value = config[item.key];
         const names = FORM_NAMES[item.key];
+        const max = names.length;
         return (
           <label className="curseur" key={item.key}>
             <span className="curseur-tete">
               <span className="curseur-nom">{item.label}</span>
-              <span className="curseur-valeur">{names[value - 1]} · {value}/5</span>
+              <span className="curseur-valeur">{names[value - 1]} · {value}/{max}</span>
             </span>
             <input
               type="range"
               min="1"
-              max="5"
+              max={max}
               step="1"
               value={value}
               onChange={(event) => api.commit({ ...config, [item.key]: Number(event.target.value) })}
-              style={{ "--curseur": `${((value - 1) / 4) * 100}%` } as CSSProperties}
+              style={{ "--curseur": `${((value - 1) / (max - 1)) * 100}%` } as CSSProperties}
               aria-label={item.label}
-              aria-valuetext={`${names[value - 1]}, ${value} sur 5`}
+              aria-valuetext={`${names[value - 1]}, ${value} sur ${max}`}
             />
           </label>
         );
