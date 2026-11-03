@@ -457,12 +457,12 @@ async function main() {
       assert.deepEqual(panelJson.progress[key], broderJson.progress[key], `divergence progression : ${key}`);
     }
     await page.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(broderProject.filePath);
-    await page.locator(".toast").filter({ hasText: "Projet importé" }).waitFor({ state: "visible" });
+    await page.locator(".toast").filter({ hasText: "Projet importé" }).last().waitFor({ state: "visible" });
     await closePanel(page);
     await openBroder(page);
     await waitProgress(page, "1 / 3");
     await page.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(broderProject.filePath);
-    await page.locator(".toast").filter({ hasText: "Projet importé" }).waitFor({ state: "visible" });
+    await page.locator(".toast").filter({ hasText: "Projet importé" }).last().waitFor({ state: "visible" });
     await page.locator(".broder").waitFor({ state: "detached" });
     await openBroder(page);
     await waitProgress(page, "1 / 3");
@@ -615,7 +615,7 @@ async function main() {
     assert.equal(fractaleJson.fingerprint, fractaleFingerprint, "l'empreinte ne suit pas la géométrie");
     assert.ok(String(fractaleJson.progress.completedRuns).length > 0, "progression absente du projet exporté");
     await geometryPage.locator('input[aria-label="Importer un projet ROSACE"]').setInputFiles(fractaleProject.filePath);
-    await geometryPage.locator(".toast").filter({ hasText: "Projet importé" }).waitFor({ state: "visible" });
+    await geometryPage.locator(".toast").filter({ hasText: "Projet importé" }).last().waitFor({ state: "visible" });
     await closePanel(geometryPage);
     await openBroder(geometryPage);
     await waitProgress(geometryPage, "1 /");
