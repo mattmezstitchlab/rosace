@@ -41,7 +41,18 @@ async function main() {
 
     const response = await page.goto(BASE_URL, { waitUntil: "domcontentloaded" });
     assert.ok(response?.ok(), `le serveur preview répond ${response?.status() ?? "aucun statut"}`);
-    await page.locator(".hoop-canvas").waitFor({ state: "visible" });
+    assert.match(await page.title(), /ROSACE/);
+
+    /* La présentation est la porte d'entrée, et son bouton mène réellement à l'atelier. */
+    await page.locator(".presentation").waitFor({ state: "visible" });
+    assert.match((await page.getByRole("heading", { level: 1 }).innerText()).replace(/\s+/g, " "), /La géométrie devient broderie\./, "titre de la présentation inattendu");
+    assert.ok(await page.getByRole("link", { name: /Composer une rosace/ }).getAttribute("href") === "#atelier");
+    await page.getByRole("link", { name: "Ouvrir l'atelier" }).first().click();
+    /* La présentation a aussi son tambour : on attend l'atelier lui-même, pas un canvas. */
+    await page.locator(".studio-dock").waitFor({ state: "visible" });
+    await page.locator(".crown-seg").first().waitFor({ state: "visible" });
+    /* L'atelier remplace aussitôt le lien par la recette courante (#r=…). */
+    assert.match(page.url(), /#(atelier|r=)/);
     assert.match(await page.title(), /ROSACE/);
     assert.equal(await page.locator(".crown-seg").count(), 489, "couronne chromatique absente du build");
     assert.match((await page.locator(".studio-stats p").textContent()) ?? "", /3\s?381 croix/);

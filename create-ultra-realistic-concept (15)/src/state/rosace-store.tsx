@@ -25,6 +25,22 @@ const FAVORITES_KEY = "aime-rosace-favorites-v1";
 export type FamilyFilter = ThreadFamily | "toutes";
 /** Catégories du dock dont les réglages s'affichent dans le panneau. Grille et Collection sont des actions. */
 export type PanelId = "forme" | "couleurs" | "reglages" | "export";
+
+/**
+ * Liens directs depuis la présentation : `#atelier-forme` ouvre l'atelier sur le panneau
+ * demandé, `#atelier-broder` sur le mode broderie. Le reste de l'URL est inchangé.
+ */
+const PANEL_LINKS: Record<string, PanelId> = {
+  "atelier-forme": "forme",
+  "atelier-couleurs": "couleurs",
+  "atelier-reglages": "reglages",
+  "atelier-export": "export",
+};
+
+export function panelFromHash(): PanelId | null {
+  const hash = window.location.hash.replace(/^#/, "").split("/")[0];
+  return PANEL_LINKS[hash] ?? null;
+}
 export interface CatalogState { open: boolean; intent: "replace" | "add"; family: FamilyFilter }
 
 export function formatSeed(seed: number) {
@@ -88,10 +104,10 @@ function useRosaceState() {
   const [inspectCode, setInspectCode] = useState<string | null>(null);
   const [activeDimension, setActiveDimension] = useState<DimensionKey>("structure");
   const [favorites, setFavorites] = useState<SavedRosace[]>(readFavorites);
-  const [embroideryOpen, setEmbroideryOpen] = useState(false);
+  const [embroideryOpen, setEmbroideryOpen] = useState(() => window.location.hash.startsWith("#atelier-broder"));
   /** Incrémenté après un import : force le mode Broderie à relire la progression canonique. */
   const [progressRevision, setProgressRevision] = useState(0);
-  const [panel, setPanel] = useState<PanelId | null>(null);
+  const [panel, setPanel] = useState<PanelId | null>(panelFromHash);
   const [collectionOpen, setCollectionOpen] = useState(false);
   const [loupeOpen, setLoupeOpen] = useState(false);
   const [harmony, setHarmony] = useState<Harmony>("complementaire");
@@ -163,9 +179,14 @@ function useRosaceState() {
     }
   }, [config]);
 
-  /** hashchange + popstate : liens de recette, retour et avant du navigateur. */
+  /** hashchange + popstate : liens de recette, liens de panneau, retour et avant du navigateur. */
   useEffect(() => {
-    const onNavigate = () => applyLocationRecipe();
+    const onNavigate = () => {
+      const target = panelFromHash();
+      if (target) setPanel(target);
+      if (window.location.hash.startsWith("#atelier-broder")) setEmbroideryOpen(true);
+      applyLocationRecipe();
+    };
     window.addEventListener("hashchange", onNavigate);
     window.addEventListener("popstate", onNavigate);
     return () => {

@@ -4,6 +4,8 @@
 
 ROSACE est un atelier de point de croix à écran fixe : une recette produit **un seul patron**, affiché dans le tambour, puis suivi dans le mode **Broder** jusqu'aux dernières croix. La géométrie, les couleurs, les calculs de fil, les exports et la progression partagent la même matrice.
 
+L'application a deux entrées : une **présentation** (page d'accueil) qui montre le résultat, et l'**atelier** qui le fabrique.
+
 ## Concept
 
 - Sept réglages de forme, dont **six familles géométriques**, cinq harmonies, 489 références DMC, couronne chromatique complète.
@@ -11,6 +13,41 @@ ROSACE est un atelier de point de croix à écran fixe : une recette produit **u
 - **Tambour** = vue textile ; **Broder** = vue technique de la même grille.
 - Progression séparée du motif, indexée par empreinte du patron, jamais mélangée à la recette.
 - Design, couronne chromatique et ergonomie mobile conservés.
+
+## Présentation et atelier
+
+| URL | Écran |
+|---|---|
+| `/` | présentation : « La géométrie devient broderie. » |
+| `/#atelier` | atelier, panneau fermé |
+| `/#atelier-forme`, `/#atelier-couleurs`, `/#atelier-reglages`, `/#atelier-export` | atelier avec le panneau correspondant ouvert |
+| `/#atelier-broder` | atelier en mode broderie |
+| `/#r=…` | atelier sur une recette partagée |
+
+Les liens `#atelier…` sont remplacés dès l'ouverture par la recette courante (`#r=…`), pour que l'URL reste partageable. La marque, en haut de l'atelier, ramène à la présentation.
+
+La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
+
+L'en-tête porte le mot-symbole **ROSACE** en très grand et centré, à la manière d'un masthead ; une barre fine prend le relais dès que l'on descend. La page n'utilise qu'une seule famille typographique, la moderne de la marque : pas d'italique classique, l'emphase passe par la graisse et la couleur.
+
+Le comparateur motif/grille se balaie à la main : on attrape le trait dans l'image (souris, doigt), ou on le déplace au clavier (flèches, `Maj` pour aller plus vite, `Début`/`Fin`). Le trait porte `role="slider"`, avec sa valeur annoncée en pourcentage de grille.
+
+Fond blanc, sections alternées en gris très clair, deux temps sombres (la carte des exports, l'appel final). L'atelier est **mis en situation** dans des châssis d'ordinateur, de tablette et de téléphone (`src/landing/devices.tsx`) : chaque écran est composé avec le moteur du produit — la même rosace, la même palette, le même dock en six verbes — jamais une capture d'image. L'écran d'ordinateur reprend la composition réelle de l'atelier : barre de marque, tambour dans sa couronne DMC, bande de mesures avec son zoom, dock. Sur ordinateur, l'écran suit la largeur du châssis (`container-type: inline-size`) pour rester lisible du grand écran au mobile, où les trois appareils passent en colonne : ordinateur, puis tablette et téléphone côte à côte.
+
+## Dock de l'atelier
+
+Six verbes, un picto lisible par geste :
+
+| Entrée | Panneau / action |
+|---|---|
+| **Composer** | structure, tracé, densité, échelle, géométrie |
+| **Colorer** | couronne DMC, palette, harmonies, contraste |
+| **Ajuster** | toile, aïda, brins, marge, signature |
+| **Broder** | mode broderie plein écran |
+| **Sauvegarder** | collection et favoris |
+| **Exporter** | PNG, SVG, CSV, PDF, projet ROSACE |
+
+Les libellés sont affichés en capitales (`text-transform: uppercase`) pour lire le geste d'un coup d'œil ; les pictos ont été agrandis (26 px sur bureau). Les identifiants internes (`PanelId`) sont inchangés.
 
 ## Installation
 

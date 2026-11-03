@@ -1,4 +1,4 @@
-import { Download, Flower2, Heart, Palette, PenTool, SlidersHorizontal, X } from "lucide-react";
+import { Download, Flower2, Grid3x3, Heart, Palette, SlidersHorizontal, X } from "lucide-react";
 import { useCallback, useEffect, useRef } from "react";
 import { formatDuration } from "../lib/rosace";
 import { formatSeed, useRosaceApi, type PanelId } from "../state/rosace-store";
@@ -6,19 +6,24 @@ import { Disque } from "./Disque";
 import { PANEL_COMPONENTS } from "./Panels";
 import { ZoomStage } from "./ZoomStage";
 
+/**
+ * Le dock, à gauche sur bureau et au pouce sur mobile. Chaque entrée est un verbe :
+ * on compose, on colore, on ajuste, on brode, on sauvegarde, on exporte.
+ * Les identifiants internes (PanelId) restent inchangés : seule la lecture change.
+ */
 const CATEGORIES: Array<{ id: PanelId | "broder" | "collection"; label: string; icon: typeof Flower2 }> = [
-  { id: "forme", label: "Forme", icon: Flower2 },
-  { id: "couleurs", label: "Couleurs", icon: Palette },
-  { id: "reglages", label: "Réglages", icon: SlidersHorizontal },
-  { id: "broder", label: "Broder", icon: PenTool },
-  { id: "collection", label: "Collection", icon: Heart },
-  { id: "export", label: "Export", icon: Download },
+  { id: "forme", label: "Composer", icon: Flower2 },
+  { id: "couleurs", label: "Colorer", icon: Palette },
+  { id: "reglages", label: "Ajuster", icon: SlidersHorizontal },
+  { id: "broder", label: "Broder", icon: Grid3x3 },
+  { id: "collection", label: "Sauvegarder", icon: Heart },
+  { id: "export", label: "Exporter", icon: Download },
 ];
 
 const PANEL_TITLES: Record<PanelId, string> = {
-  forme: "Forme de la rosace",
-  couleurs: "Couleurs et harmonie",
-  reglages: "Toile et signature",
+  forme: "Composer la forme",
+  couleurs: "Colorer les fils",
+  reglages: "Ajuster la toile",
   export: "Exporter et partager",
 };
 
@@ -143,7 +148,7 @@ export function Composer() {
               aria-describedby={hasAlert ? "dock-alerte-aide" : undefined}
               onClick={() => choose(category.id)}
             >
-              <Icon size={21} strokeWidth={1.7} aria-hidden="true" />
+              <Icon size={26} strokeWidth={1.65} aria-hidden="true" />
               <span>{category.label}</span>
               {hasAlert && <span className="dock-alerte" aria-hidden="true" />}
               <kbd>{index + 1}</kbd>
