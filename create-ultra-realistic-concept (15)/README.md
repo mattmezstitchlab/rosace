@@ -28,6 +28,8 @@ Les liens `#atelier…` sont remplacés dès l'ouverture par la recette courante
 
 La présentation (`src/landing/`) ne raconte pas l'interface : elle montre des **patrons réels**, rendus par `generateRosace` + `paintPattern`, avec les mêmes chiffres que l'atelier (croix, centimètres, fils, durée). Le comparateur motif/grille recale la marge technique de la grille sur celle du rendu textile : les deux moitiés coïncident exactement au trait de comparaison.
 
+Fond blanc, sections alternées en gris très clair, deux temps sombres (la carte des exports, l'appel final). L'atelier est **mis en situation** dans des châssis d'ordinateur, de tablette et de téléphone (`src/landing/devices.tsx`) : chaque écran est composé avec le moteur du produit — la même rosace, la même palette, le même dock en six verbes — jamais une capture d'image. Sur ordinateur, l'écran suit la largeur du châssis (`container-type: inline-size`) pour rester lisible du grand écran au mobile, où les trois appareils passent en colonne : ordinateur, puis tablette et téléphone côte à côte.
+
 ## Dock de l'atelier
 
 Six verbes, un picto lisible par geste :
@@ -41,7 +43,7 @@ Six verbes, un picto lisible par geste :
 | **Sauvegarder** | collection et favoris |
 | **Exporter** | PNG, SVG, CSV, PDF, projet ROSACE |
 
-Les identifiants internes (`PanelId`) sont inchangés : seuls les libellés et la taille des pictos ont évolué.
+Les libellés sont affichés en capitales (`text-transform: uppercase`) pour lire le geste d'un coup d'œil ; les pictos ont été agrandis (26 px sur bureau). Les identifiants internes (`PanelId`) sont inchangés.
 
 ## Installation
 

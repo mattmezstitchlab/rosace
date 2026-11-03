@@ -59,9 +59,9 @@ function Formes() {
 /* ---------------------------------------------------------------- Couleurs */
 function Couleurs() {
   return (
-    <section id="couleurs" className="section section--sombre" aria-labelledby="titre-couleurs">
+    <section id="couleurs" className="section section--papier" aria-labelledby="titre-couleurs">
       <div className="section-tete" data-reveal>
-        <p className="surtitre surtitre-clair">02 — La couleur devient matière</p>
+        <p className="surtitre">02 — La couleur devient matière</p>
         <h2 id="titre-couleurs">
           Choisissez avec vos yeux.
           <br />
@@ -451,7 +451,7 @@ const PUBLICS = [
 
 function Public() {
   return (
-    <section id="public" className="section" aria-labelledby="titre-public">
+    <section id="public" className="section section--papier" aria-labelledby="titre-public">
       <div className="section-tete" data-reveal>
         <p className="surtitre">06 — Pour qui</p>
         <h2 id="titre-public">

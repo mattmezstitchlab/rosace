@@ -1,10 +1,9 @@
 import { useEffect } from "react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
-import { EmbroideryHoop } from "../components/RosaceCanvas";
 import { RosaceLogo } from "../components/RosaceLogo";
 import { LandingSections } from "./Sections";
 import { HERO_PATTERN, HERO_STATS, decimal, nombre } from "./data";
-import { RosaceRender } from "./media";
+import { EcranAtelier, EcranBroderie, EcranGrille, Ordinateur, Tablette, Telephone } from "./devices";
 
 const LIENS = [
   { href: "#formes", label: "Formes" },
@@ -103,31 +102,48 @@ export function Landing() {
             </p>
           </div>
 
-          <div className="heros-visuel">
+          <div className="heros-appareils">
             <div className="heros-decor" aria-hidden="true" />
-            <div className="heros-grille" aria-hidden="true">
-              <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={640} />
+            <div
+              className="heros-ecrans"
+              role="img"
+              aria-label="ROSACE sur ordinateur, tablette et téléphone : l'atelier de composition, la grille technique et le suivi de la broderie."
+            >
+              <Ordinateur className="heros-ordi">
+                <EcranAtelier pattern={HERO_PATTERN} />
+              </Ordinateur>
+              <div className="heros-mobiles">
+                <Tablette className="heros-tablette">
+                  <EcranGrille pattern={HERO_PATTERN} />
+                </Tablette>
+                <Telephone className="heros-tel">
+                  <EcranBroderie pattern={HERO_PATTERN} compact />
+                </Telephone>
+              </div>
             </div>
-            <div className="heros-tambour">
-              <EmbroideryHoop pattern={HERO_PATTERN} />
-            </div>
-            <ul className="heros-infos" aria-label="Le patron en chiffres">
-              {INFOS.map((info) => (
-                <li key={info.note}>
-                  <strong>{info.valeur}</strong>
-                  <span>{info.note}</span>
-                </li>
-              ))}
-            </ul>
           </div>
+          <ul className="heros-infos" aria-label="Le patron en chiffres">
+            {INFOS.map((info) => (
+              <li key={info.note}>
+                <strong>{info.valeur}</strong>
+                <span>{info.note}</span>
+              </li>
+            ))}
+          </ul>
+          <p className="heros-legende">
+            Le même patron, de l'atelier à la broderie <span aria-hidden="true">·</span> ordinateur, tablette et téléphone.
+          </p>
         </section>
 
         <LandingSections />
 
         {/* ------------------------------------------------------------- Appel final */}
         <section className="final" aria-labelledby="titre-final">
-          <div className="final-rosace" aria-hidden="true">
-            <RosaceRender pattern={HERO_PATTERN} mode="fabric" resolution={880} />
+          <div className="final-appareil" aria-hidden="true">
+            <span className="final-halo" />
+            <Telephone className="final-tel">
+              <EcranBroderie pattern={HERO_PATTERN} />
+            </Telephone>
           </div>
           <div className="final-texte" data-reveal>
             <p className="surtitre surtitre-clair">Ouvrir l'atelier</p>

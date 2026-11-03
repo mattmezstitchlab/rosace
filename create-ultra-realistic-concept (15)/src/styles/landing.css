@@ -5,19 +5,19 @@
   Tous les sélecteurs sont portés par .presentation pour ne jamais toucher l'atelier.
 */
 
-body.est-presentation { height: auto; overflow-x: hidden; overflow-y: auto; background: #f7f3ea; }
+body.est-presentation { height: auto; overflow-x: hidden; overflow-y: auto; background: #fff; }
 body.est-presentation #root { height: auto; }
-html[data-mode="nuit"] body.est-presentation { background: #f7f3ea; }
+html[data-mode="nuit"] body.est-presentation { background: #fff; }
 
 .presentation {
-  --l-fond: #f7f3ea;
-  --l-fond-2: #f0e8d8;
-  --l-carte: #fffdf8;
+  --l-fond: #ffffff;
+  --l-fond-2: #f7f5f1;
+  --l-carte: #ffffff;
   --l-encre: #14110f;
   --l-encre-2: #4c453c;
   --l-encre-3: #6f6455;
-  --l-trait: #e3dac9;
-  --l-trait-2: #cec1aa;
+  --l-trait: #e8e3da;
+  --l-trait-2: #d5ccc0;
   --l-plum: #6f3f62;
   --l-grenat: #7b1f33;
   --l-or: #a9762f;
@@ -63,7 +63,7 @@ html[data-mode="nuit"] body.est-presentation { background: #f7f3ea; }
   position: sticky; top: 0; z-index: 60; display: flex; align-items: center; gap: 20px;
   padding: 12px var(--l-gouttiere);
   border-bottom: 1px solid rgba(20, 17, 15, .08);
-  background: color-mix(in srgb, #f7f3ea 84%, transparent);
+  background: color-mix(in srgb, #ffffff 84%, transparent);
   backdrop-filter: blur(16px) saturate(1.2);
 }
 .presentation .nav-marque { display: flex; align-items: center; gap: 11px; min-height: 44px; text-decoration: none; }
@@ -83,13 +83,14 @@ html[data-mode="nuit"] body.est-presentation { background: #f7f3ea; }
 
 /* ---------- Hero ---------- */
 .presentation .heros {
-  display: grid; grid-template-columns: minmax(0, 1.04fr) minmax(0, .96fr);
-  gap: clamp(24px, 4vw, 56px); align-items: center;
-  max-width: 1320px; margin-inline: auto;
-  padding: clamp(30px, 5vw, 64px) clamp(20px, 4vw, 48px) clamp(56px, 7vw, 104px);
+  position: relative; max-width: 1320px; margin-inline: auto;
+  padding: clamp(32px, 5vw, 68px) clamp(20px, 4vw, 48px) clamp(28px, 4vw, 54px);
+  text-align: center;
 }
+.presentation .heros-texte { max-width: 880px; margin-inline: auto; }
+.presentation .heros .surtitre { justify-content: center; }
 .presentation .heros-titre {
-  margin: 0; font-size: clamp(44px, 6.2vw, 90px); line-height: .94; font-weight: 600;
+  margin: 0 auto; font-size: clamp(42px, 6.2vw, 92px); line-height: .94; font-weight: 600;
   letter-spacing: -0.045em; text-wrap: balance;
 }
 .presentation .heros-titre-serif {
@@ -97,58 +98,257 @@ html[data-mode="nuit"] body.est-presentation { background: #f7f3ea; }
   letter-spacing: -0.025em; color: var(--l-grenat);
 }
 .presentation .heros-chapeau {
-  max-width: 46ch; margin: 26px 0 0; font-size: clamp(17px, 1.35vw, 20px); line-height: 1.5; color: var(--l-encre-2);
+  max-width: 56ch; margin: 24px auto 0; font-size: clamp(16.5px, 1.3vw, 19.5px); line-height: 1.55; color: var(--l-encre-2);
 }
-.presentation .heros-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 30px; }
-.presentation .heros-mention {
-  margin: 20px 0 0; font-size: 13px; line-height: 1.5; color: var(--l-encre-3);
-}
+.presentation .heros-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 28px; justify-content: center; }
+.presentation .heros-mention { margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: var(--l-encre-3); }
 .presentation .heros-mention span { margin: 0 6px; }
 
-.presentation .heros-visuel { position: relative; justify-self: end; width: min(100%, 580px); aspect-ratio: 1 / 1; }
+/* Les appareils : ordinateur au centre, tablette à gauche, téléphone à droite. */
+.presentation .heros-appareils {
+  position: relative; width: min(100%, 1040px); height: 470px; margin: clamp(34px, 5vw, 58px) auto 0;
+}
 .presentation .heros-decor {
-  position: absolute; inset: 6% 0 4% 8%; border-radius: 50%;
-  background: radial-gradient(circle at 58% 42%, #eadfd2 0%, rgba(247, 243, 234, 0) 66%);
+  position: absolute; inset: 6% 4% 0; border-radius: 50%;
+  background: radial-gradient(circle at 50% 58%, #f3e9df 0%, rgba(255, 255, 255, 0) 66%);
 }
-.presentation .heros-grille {
-  position: absolute; top: 2%; left: 0; width: 62%; transform: rotate(-7deg);
-  border-radius: 16px; overflow: hidden; background: #fbf7ee;
-  box-shadow: 0 26px 50px -34px rgba(20, 17, 15, .55), 0 0 0 1px rgba(20, 17, 15, .1);
+.presentation .heros-ecrans { position: absolute; inset: 0; }
+.presentation .heros-mobiles { display: contents; }
+.presentation .heros-ordi { position: absolute; z-index: 2; left: 50%; bottom: 0; width: 620px; transform: translateX(-50%); }
+.presentation .heros-tablette { position: absolute; z-index: 1; left: 3%; bottom: 62px; width: 258px; }
+.presentation .heros-tel { position: absolute; z-index: 3; left: calc(50% + 312px); bottom: 4px; width: 132px; }
+.presentation .heros-legende {
+  max-width: 60ch; margin: 30px auto 0; font-size: 13px; line-height: 1.5; color: var(--l-encre-3);
 }
-.presentation .heros-tambour {
-  position: absolute; right: 0; bottom: 0; width: 74%;
-  filter: drop-shadow(0 34px 44px rgba(36, 24, 16, .3));
-}
-.presentation .heros-infos { position: absolute; inset: 0; margin: 0; padding: 0; list-style: none; pointer-events: none; }
-.presentation .heros-infos li {
-  position: absolute; display: flex; flex-direction: column; gap: 1px; padding: 9px 13px;
-  border: 1px solid rgba(20, 17, 15, .1); border-radius: 12px;
-  background: color-mix(in srgb, #fffdf8 88%, transparent); backdrop-filter: blur(8px);
-  box-shadow: 0 12px 26px -20px rgba(20, 17, 15, .8);
-}
-.presentation .heros-infos strong { font-size: 13.5px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
-.presentation .heros-infos span { font-size: 10px; letter-spacing: .06em; text-transform: uppercase; color: var(--l-encre-3); }
-.presentation .heros-infos li:nth-child(1) { top: 4%; right: 2%; }
-.presentation .heros-infos li:nth-child(2) { top: 40%; left: -2%; }
-.presentation .heros-infos li:nth-child(3) { bottom: 24%; right: -1%; }
-.presentation .heros-infos li:nth-child(4) { bottom: 2%; left: 6%; }
+.presentation .heros-legende span { margin: 0 6px; opacity: .6; }
 
-@media (max-width: 1120px) and (min-width: 941px) {
+.presentation .heros-infos {
+  display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 0;
+  width: min(100%, 880px); margin: 34px auto 0; padding: 0; list-style: none;
+  border-top: 1px solid var(--l-trait); border-bottom: 1px solid var(--l-trait);
+}
+.presentation .heros-infos li { display: flex; flex-direction: column; gap: 2px; padding: 16px 10px; }
+.presentation .heros-infos li + li { border-left: 1px solid var(--l-trait); }
+.presentation .heros-infos strong { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; font-variant-numeric: tabular-nums; }
+.presentation .heros-infos span { font-size: 10px; letter-spacing: .07em; text-transform: uppercase; color: var(--l-encre-3); }
+
+@media (max-width: 1100px) {
   .presentation .heros-actions .bouton { padding: 0 20px; font-size: 15px; }
 }
-@media (max-width: 940px) {
-  .presentation .heros { grid-template-columns: 1fr; gap: 30px; }
-  .presentation .heros-visuel { justify-self: center; width: min(100%, 480px); }
-  .presentation .heros-titre { font-size: clamp(38px, 9.6vw, 64px); }
+@media (max-width: 960px) {
+  .presentation .heros-appareils { height: auto; }
+  .presentation .heros-decor { inset: 0 12% auto; height: 62%; }
+  .presentation .heros-ecrans { position: relative; inset: auto; display: flex; flex-direction: column; align-items: center; gap: 24px; }
+  .presentation .heros-mobiles { display: flex; width: 100%; align-items: flex-end; justify-content: center; gap: 20px; }
+  .presentation .heros-ordi,
+  .presentation .heros-tablette,
+  .presentation .heros-tel { position: relative; left: auto; bottom: auto; transform: none; }
+  .presentation .heros-ordi { width: min(100%, 640px); }
+  .presentation .heros-tablette { width: min(52%, 340px); margin-left: 4%; }
+  .presentation .heros-tel { width: min(24%, 156px); }
+  .presentation .heros-infos { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 28px; }
+  .presentation .heros-infos li:nth-child(3) { border-left: 0; }
+  .presentation .heros-infos li:nth-child(n+3) { border-top: 1px solid var(--l-trait); }
 }
-@media (max-width: 620px) {
-  .presentation .heros-visuel { aspect-ratio: auto; display: flex; flex-direction: column; gap: 14px; }
-  .presentation .heros-decor { inset: 0 0 auto; height: 70%; }
-  .presentation .heros-grille { display: none; }
-  .presentation .heros-tambour { position: relative; width: 88%; margin-inline: auto; }
-  .presentation .heros-infos { position: static; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
-  .presentation .heros-infos li { position: static; padding: 8px 10px; }
-  .presentation .heros-infos strong { font-size: 12.5px; }
+@media (max-width: 600px) {
+  .presentation .heros-titre { font-size: clamp(36px, 10vw, 54px); }
+  .presentation .heros-chapeau { font-size: 16px; }
+  .presentation .heros-actions .bouton { flex: 1 1 auto; }
+  .presentation .heros-appareils { margin-top: 30px; }
+  .presentation .heros-mobiles { gap: 14px; }
+  .presentation .heros-tablette { width: 56%; margin-left: 0; }
+  .presentation .heros-tel { width: 27%; }
+}
+
+/* ---------- Appareils ---------- */
+/* :where() garde une spécificité nulle : les placements du hero reprennent la main. */
+.presentation :where(.ordinateur, .tablette, .telephone) { position: relative; }
+.presentation .ordinateur { filter: drop-shadow(0 26px 34px rgba(24, 18, 14, .18)); }
+.presentation .ordinateur-ecran {
+  position: relative; overflow: hidden; aspect-ratio: 16 / 10; background: #fff;
+  border: 8px solid #1c1918; border-bottom-width: 10px; border-radius: 13px 13px 4px 4px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14);
+}
+.presentation .ordinateur-socle {
+  position: relative; height: 12px; margin: 0 -3.4%;
+  border-radius: 0 0 11px 11px;
+  background: linear-gradient(#dcd6cd, #aaa39a);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .55);
+}
+.presentation .ordinateur-socle::after {
+  content: ""; position: absolute; top: 0; left: 41%; right: 41%; height: 4px;
+  border-radius: 0 0 4px 4px; background: #8f887f;
+}
+
+.presentation .tablette { filter: drop-shadow(0 22px 30px rgba(24, 18, 14, .2)); }
+.presentation .tablette-ecran {
+  position: relative; overflow: hidden; aspect-ratio: 4 / 3; background: #fff;
+  border: 6px solid #1c1918; border-radius: 15px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .12);
+}
+.presentation .tablette::after {
+  content: ""; position: absolute; z-index: 4; top: 2px; left: 50%; width: 4px; height: 4px;
+  transform: translateX(-50%); border-radius: 50%; background: #5a5450;
+}
+
+.presentation .telephone { font-size: 15px; filter: drop-shadow(0 24px 30px rgba(24, 18, 14, .26)); }
+.presentation .telephone-ecran > .ecran { padding-top: .95em; }
+.presentation .telephone-ecran {
+  position: relative; overflow: hidden; aspect-ratio: 9 / 19; background: #fff;
+  border: 5px solid #14110f; border-radius: 20px;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .1);
+}
+.presentation .telephone-ilot {
+  position: absolute; z-index: 3; top: .5em; left: 50%; width: 32%; height: .36em;
+  transform: translateX(-50%); border-radius: 999px; background: #14110f;
+}
+.presentation .telephone::after {
+  content: ""; position: absolute; top: 26%; right: -2px; width: 2px; height: 12%;
+  border-radius: 2px; background: #3b3330;
+}
+
+/* Écrans : tout est en em, un seul font-size règle l'échelle du châssis. */
+.presentation .ordinateur-ecran > .ecran,
+.presentation .tablette-ecran > .ecran,
+.presentation .telephone-ecran > .ecran { position: absolute; inset: 0; }
+/* L'écran suit la largeur du châssis : la maquette reste une maquette, jamais une bouillie. */
+.presentation .ordinateur-ecran { container-type: inline-size; }
+.presentation .ordinateur .ecran { font-size: clamp(6.4px, 2.15cqw, 13px); }
+.presentation .tablette .ecran { font-size: 9.5px; }
+.presentation .telephone .ecran { font-size: 8.5px; }
+
+.presentation .ecran {
+  display: flex; flex-direction: column; width: 100%; height: 100%;
+  background: #fffdfb; color: #14110f; line-height: 1.15; overflow: hidden;
+}
+.presentation .ecran-barre {
+  display: flex; flex: none; align-items: center; gap: .7em; padding: .55em .8em;
+  border-bottom: 1px solid rgba(20, 17, 15, .09); background: #fff;
+}
+.presentation .ecran-marque {
+  display: inline-flex; align-items: center; gap: .45em; margin-right: auto;
+  font-size: .82em; font-weight: 800; letter-spacing: -.01em;
+}
+.presentation .ecran-marque sup { font-size: .55em; font-weight: 500; vertical-align: .9em; }
+.presentation .ecran-barre-actions { display: inline-flex; gap: .7em; color: #6f6455; }
+.presentation .ecran-barre-note { font-size: .62em; font-weight: 600; letter-spacing: .06em; color: #6f6455; }
+
+/* Atelier : scène + panneau + dock */
+.presentation .ecran-corps { display: grid; flex: 1; grid-template-columns: minmax(0, 1fr) 33%; min-height: 0; }
+.presentation .ecran-scene {
+  position: relative; display: grid; place-items: center; padding: 1.3em 1.6em;
+  background: radial-gradient(circle at 50% 42%, #fbf7f1, #f2ebe1);
+}
+.presentation .ecran-tambour {
+  width: min(100%, 64%); border-radius: 50%;
+  box-shadow: 0 14px 24px -14px rgba(20, 17, 15, .55), 0 0 0 1px rgba(20, 17, 15, .1);
+}
+.presentation .ecran-tambour canvas { border-radius: 50%; }
+.presentation .ecran-pastille,
+.presentation .ecran-echelle {
+  position: absolute; padding: .35em .6em; border-radius: 999px;
+  background: rgba(255, 255, 255, .86); font-size: .58em; font-weight: 600; color: #4c453c;
+  box-shadow: 0 1px 3px rgba(20, 17, 15, .12);
+}
+.presentation .ecran-pastille { top: .8em; left: .9em; }
+.presentation .ecran-echelle { right: .9em; bottom: .8em; }
+.presentation .ecran-panneau {
+  display: flex; flex-direction: column; gap: .8em; padding: .9em;
+  border-left: 1px solid rgba(20, 17, 15, .09); background: #fff;
+}
+.presentation .ecran-panneau-titre {
+  margin: 0; font-size: .58em; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #6f6455;
+}
+.presentation .ecran-champ > span { display: flex; align-items: baseline; justify-content: space-between; gap: .5em; font-size: .68em; color: #4c453c; }
+.presentation .ecran-champ > span strong { font-weight: 700; color: #14110f; font-variant-numeric: tabular-nums; }
+.presentation .ecran-champ > i {
+  position: relative; display: block; height: .3em; margin-top: .4em;
+  border-radius: 999px; background: rgba(20, 17, 15, .1);
+}
+.presentation .ecran-champ > i > b { position: absolute; inset: 0 auto 0 0; border-radius: 999px; background: #14110f; }
+.presentation .ecran-champ > i > b::after {
+  content: ""; position: absolute; top: 50%; right: -.4em; width: .8em; height: .8em;
+  transform: translateY(-50%); border-radius: 50%; background: #fff;
+  box-shadow: 0 0 0 1px rgba(20, 17, 15, .35);
+}
+.presentation .ecran-fils { display: flex; flex-direction: column; gap: .5em; padding-top: .75em; border-top: 1px solid rgba(20, 17, 15, .09); }
+.presentation .ecran-fils > div { display: flex; gap: .3em; }
+.presentation .ecran-fils > div > span { width: 1.15em; height: 1.15em; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .16); }
+.presentation .ecran-mesures {
+  display: flex; gap: 1em; margin-top: auto; padding-top: .8em; border-top: 1px solid rgba(20, 17, 15, .09);
+}
+.presentation .ecran-mesures > span { display: flex; flex-direction: column; gap: .1em; font-size: .56em; color: #6f6455; }
+.presentation .ecran-mesures strong { font-size: 1.55em; font-weight: 700; letter-spacing: -.02em; color: #14110f; }
+.presentation .ecran-dock {
+  display: grid; flex: none; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: .15em;
+  padding: .5em .4em; border-top: 1px solid rgba(20, 17, 15, .09); background: #fff;
+}
+.presentation .ecran-dock > span {
+  display: flex; flex-direction: column; align-items: center; gap: .35em; padding: .3em .1em; overflow: hidden;
+  border-radius: .5em; font-size: .68em; font-weight: 700; letter-spacing: .05em;
+  text-transform: uppercase; color: #6f6455; white-space: nowrap;
+}
+.presentation .ecran-dock > span.est-actif { background: #f2ece3; color: #14110f; }
+
+/* Tablette : la grille technique */
+.presentation .ecran-grille { background: #fff; }
+.presentation .ecran-grille-scene {
+  position: relative; flex: 1; min-height: 0; overflow: hidden; background: #fff;
+}
+.presentation .ecran-grille-scene canvas { position: absolute; inset: .5em; width: calc(100% - 1em); height: calc(100% - 1em); object-fit: contain; }
+.presentation .ecran-grille-pied {
+  display: flex; flex: none; flex-wrap: wrap; gap: .4em .8em; padding: .55em .8em;
+  border-top: 1px solid rgba(20, 17, 15, .09);
+}
+.presentation .ecran-grille-pied > span { display: inline-flex; align-items: center; gap: .35em; font-size: .68em; color: #4c453c; white-space: nowrap; }
+.presentation .ecran-grille-pied i { width: .85em; height: .85em; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .18); }
+
+/* Téléphone : la broderie en cours */
+.presentation .ecran-broderie { background: #fff; }
+.presentation .ecran-barre--tel { justify-content: space-between; }
+.presentation .ecran-barre--tel .ecran-marque { margin-right: 0; }
+.presentation .ecran-broderie-scene {
+  position: relative; display: flex; flex: 1; flex-direction: column; min-height: 0;
+  background-color: #e9e1d4;
+  background-image: radial-gradient(rgba(20, 17, 15, .05) 1px, transparent 1.3px);
+  background-size: 5px 5px;
+}
+.presentation .ecran-broderie-scene canvas { display: block; flex: none; width: 100%; height: auto; }
+
+/* Version compacte (petit téléphone) : la toile en haut, la carte au-dessus du vide. */
+.presentation .ecran-broderie--compact .ecran-broderie-scene { justify-content: flex-start; overflow: hidden; }
+.presentation .ecran-broderie--compact .ecran-broderie-scene canvas { transform: scale(1.46); transform-origin: 50% 46%; }
+.presentation .ecran-broderie-carte {
+  position: absolute; right: .6em; bottom: .6em; left: .6em;
+  display: flex; flex-direction: column; gap: .32em; padding: .55em .7em;
+  border-radius: .55em; background: rgba(255, 253, 251, .95);
+  box-shadow: 0 .35em .9em -.35em rgba(20, 17, 15, .5);
+}
+.presentation .ecran-broderie-carte > span { font-size: .8em; color: #4c453c; font-variant-numeric: tabular-nums; }
+.presentation .ecran-broderie-carte strong { font-weight: 700; color: #14110f; }
+.presentation .ecran-broderie-carte > i { display: block; height: .3em; border-radius: 999px; background: rgba(20, 17, 15, .12); }
+.presentation .ecran-broderie-carte > i > b { display: block; height: 100%; border-radius: 999px; background: #7b1f33; }
+.presentation .ecran-broderie-carte small { font-size: .66em; color: #6f6455; }
+
+/* Version complète (grand téléphone) : la progression sous la toile. */
+.presentation .ecran-broderie-panneau {
+  display: flex; flex: 1; flex-direction: column; justify-content: space-between; gap: .7em; min-height: 0;
+  padding: .9em; border-top: 1px solid rgba(20, 17, 15, .09); background: #fff;
+}
+.presentation .ecran-broderie-compteur { display: flex; align-items: baseline; justify-content: space-between; gap: .6em; }
+.presentation .ecran-broderie-compteur strong { font-size: 1.5em; font-weight: 700; letter-spacing: -.03em; }
+.presentation .ecran-broderie-compteur span { font-size: .72em; color: #6f6455; font-variant-numeric: tabular-nums; }
+.presentation .ecran-jauge { display: block; height: .34em; border-radius: 999px; background: rgba(20, 17, 15, .12); }
+.presentation .ecran-jauge > b { display: block; height: 100%; border-radius: 999px; background: #7b1f33; }
+.presentation .ecran-fils-brodes { display: flex; flex-direction: column; gap: .35em; margin: 0; padding: .2em 0 0; list-style: none; }
+.presentation .ecran-fils-brodes li { display: flex; align-items: center; gap: .45em; font-size: .72em; color: #4c453c; }
+.presentation .ecran-fils-brodes li > span { width: .85em; height: .85em; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .18); }
+.presentation .ecran-fils-brodes b { font-weight: 600; }
+.presentation .ecran-fils-brodes small { margin-left: auto; font-size: .92em; color: #6f6455; font-variant-numeric: tabular-nums; }
+.presentation .ecran-broderie-note { margin: 0; font-size: .66em; line-height: 1.45; color: #6f6455; }
+.presentation .ecran-bouton {
+  padding: .7em; border-radius: .55em; background: #14110f; color: #fffdf8;
+  font-size: .72em; font-weight: 600; text-align: center;
 }
 
 /* ---------- Sections ---------- */
@@ -445,11 +645,15 @@ html[data-mode="nuit"] body.est-presentation { background: #f7f3ea; }
 .presentation .final-texte { position: relative; z-index: 2; max-width: 620px; }
 .presentation .final h2 { margin: 0 0 20px; font-size: clamp(34px, 4.6vw, 64px); line-height: 1.02; font-weight: 600; letter-spacing: -0.04em; text-wrap: balance; }
 .presentation .final-texte p { margin: 0 0 30px; font-family: var(--serif); font-size: clamp(19px, 1.8vw, 25px); line-height: 1.4; color: rgba(244, 239, 228, .78); }
-.presentation .final-rosace { position: relative; z-index: 1; justify-self: center; width: min(100%, 520px); }
-.presentation .final-rosace canvas { border-radius: 50%; box-shadow: 0 60px 120px -50px rgba(0, 0, 0, .9), 0 0 0 1px rgba(244, 239, 228, .08); }
+.presentation .final-appareil { position: relative; z-index: 1; display: grid; justify-self: center; place-items: center; width: min(100%, 250px); }
+.presentation .final-halo {
+  position: absolute; width: min(150%, 560px); aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(123, 31, 51, .5) 0%, rgba(123, 31, 51, 0) 62%);
+}
+.presentation .final-tel { position: relative; width: 100%; }
 @media (max-width: 880px) {
   .presentation .final { grid-template-columns: 1fr; text-align: left; }
-  .presentation .final-rosace { width: min(86%, 420px); }
+  .presentation .final-appareil { order: -1; justify-self: start; width: min(62%, 210px); margin-bottom: 30px; }
 }
 
 /* ---------- Pied de page ---------- */
