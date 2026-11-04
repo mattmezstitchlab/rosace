@@ -1,9 +1,8 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { RosaceLogo } from "../components/RosaceLogo";
-import { LandingSections } from "./Sections";
-import { HERO_PATTERN, HERO_STATS, decimal, nombre } from "./data";
-import { EcranAtelier, EcranBroderie, EcranImport, Ordinateur, Tablette, Telephone } from "./devices";
+import { Comparateur, LandingSections } from "./Sections";
+import { HERO_STATS, decimal, nombre } from "./data";
 
 const LIENS = [
   { href: "#entrees", label: "Trois portes" },
@@ -15,7 +14,6 @@ const LIENS = [
   { href: "#atelier-importer", label: "Importer" },
 ];
 
-const NOUVEAUTES = ["Import PDF page par page", "Texte brodé", "Broder en couleurs", "Prévision de fin", "Boîte à fils", "Broder ensemble"];
 
 const INFOS = [
   { valeur: `${nombre(HERO_STATS.stitches)} croix`, note: "patron calculé" },
@@ -30,6 +28,19 @@ const INFOS = [
  */
 export function Landing() {
   const [barre, setBarre] = useState(false);
+  /* Le trait du comparateur est aussi celui du mot-symbole : entre le S et le A, d'entrée de jeu. */
+  const [split, setSplit] = useState(50);
+  const [largeur, setLargeur] = useState<number | null>(null);
+  const nomRef = useRef<HTMLSpanElement>(null);
+
+  /* Le comparateur prend exactement la largeur du mot ROSACE : le trait traverse les deux. */
+  useEffect(() => {
+    const target = nomRef.current;
+    if (!target || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(([entry]) => setLargeur(Math.round(entry.contentRect.width)));
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, []);
 
   useEffect(() => {
     const onScroll = () => setBarre(window.scrollY > 180);
@@ -70,11 +81,15 @@ export function Landing() {
 
       <header className="entete">
         <div className="entete-haut">
-          <a className="entete-marque" href="#haut" aria-label="ROSACE, retour en haut de la présentation">
-            <span className="entete-nom">
-              ROSACE<sup>®</sup>
-            </span>
-          </a>
+          <span className="entete-nom" ref={nomRef}>
+            <a className="entete-marque" href="#haut" aria-label="ROSACE® — retour en haut de la présentation">
+              <span className="entete-nom-plein">ROSACE<sup>®</sup></span>
+            </a>
+            <span className="entete-nom-grille" aria-hidden="true" style={{ clipPath: `inset(0 0 0 ${split}%)` }}>ROSACE<sup>®</sup></span>
+          </span>
+          <div className="heros-comparateur" style={largeur ? { width: `${largeur}px` } : undefined}>
+            <Comparateur split={split} onSplit={setSplit} resolution={1400} leftMode="stitches" aide={false} />
+          </div>
         </div>
         <div className="entete-bas">
           <nav className="entete-liens" aria-label="Sections de la présentation">
@@ -133,33 +148,9 @@ export function Landing() {
             <p className="heros-mention">
               Gratuit à essayer <span aria-hidden="true">·</span> Aucun compte nécessaire pour commencer <span aria-hidden="true">·</span> <a href="#entrees">Voir comment ça marche</a>
             </p>
-            <ul className="heros-nouveautes" aria-label="Nouveautés de l'atelier">
-              {NOUVEAUTES.map((item) => (
-                <li key={item}>{item}</li>
-              ))}
-            </ul>
+            <p className="heros-mention">Au-dessus, attrapez le trait : d'un côté les croix, de l'autre la grille — le même patron.</p>
           </div>
 
-          <div className="heros-appareils">
-            <div className="heros-decor" aria-hidden="true" />
-            <div
-              className="heros-ecrans"
-              role="img"
-              aria-label="ROSACE sur ordinateur, tablette et téléphone : l'atelier de composition, l'import d'un patron PDF et le suivi de la broderie."
-            >
-              <Ordinateur className="heros-ordi">
-                <EcranAtelier pattern={HERO_PATTERN} />
-              </Ordinateur>
-              <div className="heros-mobiles">
-                <Tablette className="heros-tablette">
-                  <EcranImport pattern={HERO_PATTERN} />
-                </Tablette>
-                <Telephone className="heros-tel">
-                  <EcranBroderie pattern={HERO_PATTERN} compact />
-                </Telephone>
-              </div>
-            </div>
-          </div>
           <ul className="heros-infos" aria-label="Le patron en chiffres">
             {INFOS.map((info) => (
               <li key={info.note}>
@@ -168,21 +159,12 @@ export function Landing() {
               </li>
             ))}
           </ul>
-          <p className="heros-legende">
-            Composer, importer un PDF, broder <span aria-hidden="true">·</span> le même atelier sur ordinateur, tablette et téléphone.
-          </p>
         </section>
 
         <LandingSections />
 
         {/* ------------------------------------------------------------- Appel final */}
         <section className="final" aria-labelledby="titre-final">
-          <div className="final-appareil" aria-hidden="true">
-            <span className="final-halo" />
-            <Telephone className="final-tel">
-              <EcranBroderie pattern={HERO_PATTERN} />
-            </Telephone>
-          </div>
           <div className="final-texte" data-reveal>
             <p className="surtitre surtitre-clair">Ouvrir l'atelier</p>
             <h2 id="titre-final">Votre prochain ouvrage commence ici.</h2>

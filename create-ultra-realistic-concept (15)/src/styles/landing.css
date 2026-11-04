@@ -63,12 +63,23 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .entete { padding: clamp(16px, 2.6vw, 30px) var(--l-gouttiere) 0; background: var(--l-fond); }
 .presentation .entete-haut { display: block; text-align: center; }
 .presentation .entete-marque { display: block; color: var(--l-encre); text-decoration: none; text-align: center; }
+.presentation .entete-nom-grille { pointer-events: none; }
 .presentation .entete-nom {
-  display: block; font-size: clamp(72px, 18.4vw, 268px); font-weight: 800; line-height: .78;
-  letter-spacing: -.06em;
+  position: relative; display: inline-block; font-size: clamp(64px, 24vw, 268px); font-weight: 800; line-height: .78;
+  letter-spacing: -.06em; white-space: nowrap;
 }
 .presentation .entete-nom sup {
   margin-left: .06em; font-size: .085em; font-weight: 500; letter-spacing: 0; vertical-align: top;
+}
+/* Le mot-symbole, en deux lectures comme la rosace : plein à gauche du trait, en grille à droite. */
+.presentation .entete-nom-plein { display: block; }
+.presentation .entete-nom-grille {
+  position: absolute; inset: 0; display: block; color: #fff;
+  -webkit-text-stroke: max(1.5px, .012em) var(--l-encre); paint-order: stroke fill;
+  background-color: #fff;
+  background-image: linear-gradient(rgba(20, 17, 15, .22) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 17, 15, .22) 1px, transparent 1px);
+  background-size: .11em .11em; background-position: center top;
+  -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
 }
 .presentation .entete-bas {
   display: flex; align-items: center; justify-content: space-between; gap: 18px;
@@ -84,6 +95,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .entete-cta { height: 42px; padding: 0 18px; font-size: 13.5px; }
 
 @media (max-width: 700px) {
+  .presentation .entete-nom { font-size: 24vw; }
   .presentation .entete-bas { flex-wrap: wrap; gap: 12px; }
   .presentation .entete-liens { gap: 6px 16px; }
   .presentation .entete-liens a { font-size: 10px; letter-spacing: .12em; }
@@ -143,8 +155,21 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .heros-mention { margin: 18px 0 0; font-size: 13px; line-height: 1.5; color: var(--l-encre-3); }
 .presentation .heros-mention span { margin: 0 6px; }
 
+/* Le comparateur, en grand, d'entrée de jeu : sans cadre, sur blanc, de la largeur du mot. */
+.presentation .heros-comparateur { width: min(100%, 900px); max-width: 100%; margin: clamp(10px, 1.6vw, 22px) auto 0; }
+.presentation .heros-comparateur .comparateur-cadre {
+  width: 100%; border-radius: 0; overflow: visible; background: transparent; box-shadow: none;
+}
+.presentation .heros-comparateur .comparateur-grille { overflow: hidden; }
+.presentation .heros-comparateur .comparateur-etiquette { top: auto; bottom: 10px; background: transparent; color: var(--l-encre-3); backdrop-filter: none; padding: 0; }
+.presentation .heros-comparateur .comparateur-etiquette--gauche { left: 2%; }
+.presentation .heros-comparateur .comparateur-etiquette--droite { right: 2%; }
+/* Le trait monte jusqu'au mot-symbole. */
+.presentation .heros-comparateur .comparateur-poignee::before { top: calc(-1 * clamp(10px, 1.6vw, 22px) - .1em); background: var(--l-encre); box-shadow: none; width: 2px; }
+
 /* Les appareils : ordinateur au centre, tablette à gauche, téléphone à droite. */
-.presentation .heros-appareils {
+.presentation .heros-appareils,
+.presentation .appareils {
   position: relative; width: min(100%, 1040px); height: 470px; margin: clamp(34px, 5vw, 58px) auto 0;
 }
 .presentation .heros-decor {
@@ -175,7 +200,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
   .presentation .heros-actions .bouton { padding: 0 20px; font-size: 15px; }
 }
 @media (max-width: 960px) {
-  .presentation .heros-appareils { height: auto; }
+  .presentation .heros-appareils, .presentation .appareils { height: auto; }
   .presentation .heros-decor { inset: 0 12% auto; height: 62%; }
   .presentation .heros-ecrans { position: relative; inset: auto; display: flex; flex-direction: column; align-items: center; gap: 24px; }
   .presentation .heros-mobiles { display: flex; width: 100%; align-items: flex-end; justify-content: center; gap: 20px; }
@@ -193,7 +218,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
   .presentation .heros-titre { font-size: clamp(36px, 10vw, 54px); }
   .presentation .heros-chapeau { font-size: 16px; }
   .presentation .heros-actions .bouton { flex: 1 1 auto; }
-  .presentation .heros-appareils { margin-top: 30px; }
+  .presentation .heros-appareils, .presentation .appareils { margin-top: 30px; }
   .presentation .heros-mobiles { gap: 14px; }
   .presentation .heros-tablette { width: 56%; margin-left: 0; }
   .presentation .heros-tel { width: 27%; }
@@ -725,7 +750,7 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
   transition: background .15s ease, color .15s ease, border-color .15s ease;
 }
 .presentation .vivant-onglets button:hover { border-color: var(--l-encre); color: var(--l-encre); }
-.presentation .vivant-onglets button.est-active { background: #f4efe4; border-color: #f4efe4; color: #0d0b0c; }
+.presentation .vivant-onglets button.est-active { background: var(--l-encre); border-color: var(--l-encre); color: var(--l-fond); }
 .presentation .vivant-scene {
   display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, .75fr); gap: 18px;
   padding: 16px; border: 1px solid var(--l-trait); border-radius: 26px; background: var(--l-carte);
@@ -846,3 +871,81 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
   .presentation [data-reveal] { opacity: 1; transform: none; transition: none; }
   .presentation .forme, .presentation .bouton { transition: none; }
 }
+
+/* ---------- Broder : le téléphone en grand, au centre ---------- */
+.presentation .section-tete--centre { max-width: 760px; margin-inline: auto; text-align: center; }
+.presentation .section-tete--centre .surtitre { justify-content: center; }
+.presentation .section-tete--centre .section-chapeau { margin-inline: auto; }
+.presentation .telephone-scene { display: grid; place-items: center; margin-top: clamp(28px, 4vw, 48px); }
+.presentation .telephone-scene .vivant { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+.presentation .telephone-scene .vivant li { padding: 16px 18px; }
+.presentation .telephone-scene .vivant h3 { font-size: 15.5px; margin-top: 8px; }
+.presentation .telephone-scene .vivant p { font-size: 13px; }
+.presentation .vivant--gauche li { text-align: right; }
+.presentation .vivant--gauche li svg { margin-left: auto; display: block; }
+.presentation .telephone-centre { display: flex; flex-direction: column; align-items: center; gap: 22px; }
+.presentation .vivant-onglets { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px; }
+.presentation .vivant-onglets button {
+  height: 38px; padding: 0 16px; border: 1px solid var(--l-trait-2); border-radius: 999px;
+  background: transparent; color: var(--l-encre-2); font-size: 13px; font-weight: 600;
+  transition: background .15s ease, color .15s ease, border-color .15s ease;
+}
+.presentation .vivant-onglets button:hover { border-color: var(--l-encre); color: var(--l-encre); }
+.presentation .vivant-onglets button.est-active { background: var(--l-encre); border-color: var(--l-encre); color: var(--l-fond); }
+.presentation .telephone-grand { position: relative; display: grid; place-items: center; width: min(100%, 340px); }
+.presentation .telephone-grand .final-halo { width: min(220%, 640px); }
+.presentation .telephone-heros { position: relative; width: 100%; font-size: 17px; }
+.presentation .telephone-heros .ecran { font-size: 10.5px; }
+@media (max-width: 980px) {
+  .presentation .telephone-scene { grid-template-columns: 1fr; }
+  .presentation .telephone-centre { order: -1; }
+  .presentation .telephone-scene .vivant { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .presentation .vivant--gauche li { text-align: left; }
+  .presentation .vivant--gauche li svg { margin-left: 0; }
+}
+@media (max-width: 600px) { .presentation .telephone-scene .vivant { grid-template-columns: 1fr; } }
+
+/* ---------- Le puzzle PDF, en démonstration directe ---------- */
+.presentation .puzzle-bloc { margin-top: clamp(32px, 4vw, 48px); }
+.presentation .puzzle {
+  display: grid; grid-template-columns: minmax(0, 1.8fr) minmax(260px, .8fr); gap: 20px; align-items: start;
+  padding: 16px; border: 1px solid var(--l-trait); border-radius: 26px; background: var(--l-carte);
+}
+.presentation .puzzle-plateau {
+  position: relative; width: 100%; border-radius: 16px; overflow: hidden; touch-action: none; user-select: none;
+  background-color: #fff;
+  background-image: linear-gradient(rgba(20, 17, 15, .07) 1px, transparent 1px), linear-gradient(90deg, rgba(20, 17, 15, .07) 1px, transparent 1px);
+  background-size: 7.8125% 8.4746%; box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .1);
+}
+.presentation .puzzle-guide { position: absolute; background: var(--l-grenat); opacity: .7; pointer-events: none; }
+.presentation .puzzle-guide--v { top: 0; bottom: 0; width: 1px; }
+.presentation .puzzle-guide--h { left: 0; right: 0; height: 1px; }
+.presentation .puzzle-carte {
+  position: absolute; overflow: hidden; background: #fff; cursor: grab;
+  box-shadow: 0 0 0 1px rgba(20, 17, 15, .18), 0 10px 24px -14px rgba(20, 17, 15, .7);
+  transition: box-shadow .15s ease;
+}
+.presentation .puzzle-carte canvas { display: block; width: 100%; height: 100%; aspect-ratio: auto; image-rendering: pixelated; }
+.presentation .puzzle-carte.est-prise { cursor: grabbing; z-index: 3; box-shadow: 0 0 0 1.5px var(--l-encre), 0 22px 40px -18px rgba(20, 17, 15, .8); }
+.presentation .puzzle-carte.est-recouverte { box-shadow: 0 0 0 2px var(--l-grenat), 0 10px 24px -14px rgba(20, 17, 15, .7); }
+.presentation .puzzle-carte.est-juste { box-shadow: 0 0 0 1px rgba(20, 17, 15, .1); }
+.presentation .puzzle-carte:focus-visible { outline: 2px solid var(--l-encre); outline-offset: 2px; }
+.presentation .puzzle-badge {
+  position: absolute; top: 6px; left: 6px; display: inline-flex; align-items: baseline; gap: 5px; padding: 3px 8px; border-radius: 999px;
+  background: var(--l-encre); color: #fff; font-size: 11px; font-weight: 700; letter-spacing: .04em; pointer-events: none;
+}
+.presentation .puzzle-badge em { font-style: normal; font-weight: 500; opacity: .75; }
+.presentation .puzzle-cote { display: flex; flex-direction: column; gap: 14px; padding: 8px 6px; }
+.presentation .puzzle-titre { margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--l-encre-3); }
+.presentation .puzzle-etat { display: flex; gap: 8px; margin: 0; font-size: 15px; line-height: 1.45; font-weight: 500; color: var(--l-encre); }
+.presentation .puzzle-etat.est-juste { color: #2f6b3a; }
+.presentation .puzzle-etat svg { flex: none; margin-top: 3px; }
+.presentation .puzzle-compte { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; margin: 0; padding: 14px 0; border-top: 1px solid var(--l-trait); border-bottom: 1px solid var(--l-trait); }
+.presentation .puzzle-compte dt { font-size: 10.5px; font-weight: 600; letter-spacing: .08em; text-transform: uppercase; color: var(--l-encre-3); }
+.presentation .puzzle-compte dd { margin: 4px 0 0; font-size: 20px; font-weight: 600; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.presentation .puzzle-compte dd.est-attention { color: var(--l-grenat); }
+.presentation .puzzle-aide, .presentation .puzzle-note { margin: 0; font-size: 13px; line-height: 1.5; color: var(--l-encre-3); }
+.presentation .puzzle-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.presentation .puzzle-actions .bouton { height: 46px; padding: 0 18px; font-size: 14px; }
+@media (max-width: 900px) { .presentation .puzzle { grid-template-columns: 1fr; } }
+.presentation .telephone-heros { filter: drop-shadow(0 40px 50px rgba(24, 18, 14, .28)); }

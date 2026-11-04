@@ -15,13 +15,14 @@ import { toWork, type StitchWork } from "./work";
  * `fabric` : la toile et ses croix bombées (tambour) · `chart` : la grille à symboles (lecture classique) ·
  * `color` : la grille à cases pleines de la couleur du fil · `color-chart` : cases pleines + symbole en contraste.
  */
-export type CanvasMode = "fabric" | "chart" | "color" | "color-chart";
+/** `stitches` : les croix seules, sans toile ni grille, sur fond transparent (la présentation, sur blanc). */
+export type CanvasMode = "fabric" | "stitches" | "chart" | "color" | "color-chart";
 
 /** `chartGeometry(side, size, mode)` reste valide pour une grille carrée ; `(side, width, height, mode)` pour une grille rectangulaire. */
 export function chartGeometry(side: number, width: number, heightOrMode: number | CanvasMode, modeArg?: CanvasMode) {
   const height = typeof heightOrMode === "number" ? heightOrMode : width;
   const mode: CanvasMode = typeof heightOrMode === "number" ? (modeArg ?? "chart") : heightOrMode;
-  const origin = side * (mode === "fabric" ? 0.055 : 0.075);
+  const origin = side * (mode === "fabric" || mode === "stitches" ? 0.055 : 0.075);
   const plot = side - origin * 2;
   const longest = Math.max(width, height);
   const cell = longest > 1 ? plot / (longest - 1) : plot;
@@ -235,7 +236,7 @@ export function paintPattern(canvas: HTMLCanvasElement, source: RosacePattern | 
   context.clearRect(0, 0, side, side);
 
   if (mode === "fabric") drawFabric(context, side, pattern.textile.fabric, cell);
-  else drawChart(context, side, originX, originY, pattern.width, pattern.height, cell);
+  else if (mode !== "stitches") drawChart(context, side, originX, originY, pattern.width, pattern.height, cell);
 
   if (mode === "color" || mode === "color-chart") {
     // Cases pleines : la couleur du fil remplit la case, la grille fine reste visible par-dessus.
@@ -357,6 +358,8 @@ export function paintPattern(canvas: HTMLCanvasElement, source: RosacePattern | 
     });
   });
 
+  // Le vignettage appartient à la toile : sur fond transparent, les croix restent nettes jusqu'au bord.
+  if (mode === "stitches") return;
   const edge = context.createRadialGradient(side / 2, side / 2, side * 0.38, side / 2, side / 2, side * 0.53);
   edge.addColorStop(0, "rgba(60,40,25,0)");
   edge.addColorStop(1, "rgba(60,40,25,0.13)");

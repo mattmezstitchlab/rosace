@@ -1,10 +1,10 @@
 import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Layers, MousePointer2, Navigation, Package, Printer, Redo2, Share2, Timer, Type, Undo2, Users } from "lucide-react";
-import { EmbroideryHoop } from "../components/RosaceCanvas";
-import { SYMBOLS, formatDuration } from "../lib/rosace";
-import { formatMinutes } from "../lib/sessions";
-import { DEMO_FORECAST, DEMO_HOOP, HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
-import { EcranImport, Tablette } from "./devices";
+import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Layers, MousePointer2, Printer, Redo2, Share2, Type, Undo2 } from "lucide-react";
+import { formatDuration } from "../lib/rosace";
+import type { CanvasMode } from "../lib/paint";
+import { HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
+import { EcranBroderie, EcranImport, Tablette, Telephone } from "./devices";
+import { DemoPuzzle } from "./DemoPuzzle";
 import { DmcCrown, RosaceRender } from "./media";
 
 /* ------------------------------------------------------------------ Entrées */
@@ -17,7 +17,7 @@ function Entrees() {
   return (
     <section id="entrees" className="section" aria-labelledby="titre-entrees">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">01 — Un atelier, trois portes</p>
+        <p className="surtitre">02 — Un atelier, trois portes</p>
         <h2 id="titre-entrees">Composez, importez ou écrivez : la suite est la même.</h2>
         <p className="section-chapeau">
           Une rosace calculée, un patron PDF acheté ailleurs ou un prénom en lettres brodées entrent par des portes
@@ -73,7 +73,7 @@ function Formes() {
   return (
     <section id="formes" className="section" aria-labelledby="titre-formes">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">02 — La promesse</p>
+        <p className="surtitre">03 — La promesse</p>
         <h2 id="titre-formes">
           Une création, pas un modèle prédéfini.
         </h2>
@@ -123,7 +123,7 @@ function Couleurs() {
   return (
     <section id="couleurs" className="section section--papier" aria-labelledby="titre-couleurs">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">03 — La couleur devient matière</p>
+        <p className="surtitre">04 — La couleur devient matière</p>
         <h2 id="titre-couleurs">
           Choisissez avec vos yeux.
           <br />
@@ -181,8 +181,30 @@ function Couleurs() {
 }
 
 /* ---------------------------------------------------------------- Réalisation */
-function Realisation() {
-  const [split, setSplit] = useState(50);
+/** Le comparateur motif / grille : un trait à prendre à la main, au clavier comme au doigt. */
+export function Comparateur({
+  initial = 50,
+  resolution = 900,
+  split: controlled,
+  onSplit,
+  leftMode = "fabric",
+  aide = true,
+}: {
+  initial?: number;
+  resolution?: number;
+  /** Position contrôlée (0–100), pour lier le trait à autre chose — le mot-symbole du hero. */
+  split?: number;
+  onSplit?: (value: number) => void;
+  leftMode?: CanvasMode;
+  aide?: boolean;
+}) {
+  const [interne, setInterne] = useState(initial);
+  const split = controlled ?? interne;
+  const setSplit = useCallback((next: number | ((value: number) => number)) => {
+    const value = typeof next === "function" ? next(controlled ?? interne) : next;
+    setInterne(value);
+    onSplit?.(value);
+  }, [controlled, interne, onSplit]);
   const [glisse, setGlisse] = useState(false);
   const cadre = useRef<HTMLDivElement>(null);
 
@@ -205,130 +227,83 @@ function Realisation() {
   };
 
   return (
-    <section id="realisation" className="section" aria-labelledby="titre-realisation">
-      <div className="section-tete" data-reveal>
-        <p className="surtitre">04 — Du motif au patron</p>
-        <h2 id="titre-realisation">
-          Ce que vous créez à l'écran
-          <br />
-          prend vie sur toile.
-        </h2>
-        <p className="section-chapeau">
-          ROSACE calcule les croix, les couleurs, les dimensions, les métrages et le temps estimé. Vous pouvez
-          ensuite consulter la grille et préparer votre ouvrage.
-        </p>
+    <>
+      <div
+        className={`comparateur-cadre${glisse ? " est-glisse" : ""}`}
+        ref={cadre}
+        onPointerDown={(event) => {
+          if (event.pointerType === "mouse" && event.button !== 0) return;
+          event.currentTarget.setPointerCapture(event.pointerId);
+          setGlisse(true);
+          viser(event.clientX);
+        }}
+        onPointerMove={(event) => {
+          if (glisse) viser(event.clientX);
+        }}
+        onPointerUp={(event) => {
+          setGlisse(false);
+          if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+            event.currentTarget.releasePointerCapture(event.pointerId);
+          }
+        }}
+        onPointerCancel={() => setGlisse(false)}
+      >
+        <RosaceRender pattern={HERO_PATTERN} mode={leftMode} resolution={resolution} label="La rosace brodée" />
+        <div className="comparateur-grille" style={{ clipPath: `inset(0 0 0 ${split}%)` }}>
+          {/* La grille a sa propre marge technique : on la recale sur le rendu textile
+              pour que les deux moitiés se répondent exactement au trait de comparaison. */}
+          <div className="comparateur-aligne">
+            <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={resolution} label="La grille technique du même patron" />
+          </div>
+        </div>
+        <span className="comparateur-etiquette comparateur-etiquette--gauche" aria-hidden="true">Motif</span>
+        <span className="comparateur-etiquette comparateur-etiquette--droite" aria-hidden="true">Grille</span>
+        <div
+          className="comparateur-poignee"
+          style={{ left: `${split}%` }}
+          role="slider"
+          tabIndex={0}
+          aria-label="Balayer entre le motif brodé et la grille technique"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round(split)}
+          aria-valuetext={`${Math.round(split)} % de grille`}
+          aria-orientation="horizontal"
+          onKeyDown={auClavier}
+        >
+          <span aria-hidden="true" />
+        </div>
       </div>
 
-      <ol className="etapes" data-reveal>
-        <li>
-          <span className="etape-num">1</span>
-          <div className="etape-image">
-            <RosaceRender pattern={HERO_PATTERN} resolution={480} label="Le motif brodé" />
-          </div>
-          <h3>Motif</h3>
-          <p>L'aperçu textile de votre rosace.</p>
-        </li>
-        <li>
-          <span className="etape-num">2</span>
-          <div className="etape-image etape-image--grille">
-            <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={480} label="La grille technique, symbole par fil" />
-          </div>
-          <h3>Grille</h3>
-          <p>Chaque croix, son symbole et son fil.</p>
-        </li>
-        <li>
-          <span className="etape-num">3</span>
-          <div className="etape-image etape-image--detail">
-            <div className="etape-zoom">
-              <RosaceRender pattern={HERO_PATTERN} resolution={480} label="Détail des croix brodées, vu de près" />
-            </div>
-          </div>
-          <h3>Broderie</h3>
-          <p>Le détail des points, prêt à être suivi.</p>
-        </li>
-      </ol>
-
-      <div className="comparateur" data-reveal>
-        <div className="comparateur-tete">
-          <h3>Un seul patron, deux lectures.</h3>
-          <p>Attrapez le trait et faites-le glisser : la forme ne change pas, seule la lecture change.</p>
-        </div>
-
-        <div
-          className={`comparateur-cadre${glisse ? " est-glisse" : ""}`}
-          ref={cadre}
-          onPointerDown={(event) => {
-            if (event.pointerType === "mouse" && event.button !== 0) return;
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setGlisse(true);
-            viser(event.clientX);
-          }}
-          onPointerMove={(event) => {
-            if (glisse) viser(event.clientX);
-          }}
-          onPointerUp={(event) => {
-            setGlisse(false);
-            if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-              event.currentTarget.releasePointerCapture(event.pointerId);
-            }
-          }}
-          onPointerCancel={() => setGlisse(false)}
-        >
-          <RosaceRender pattern={HERO_PATTERN} resolution={900} label="La rosace brodée" />
-          <div className="comparateur-grille" style={{ clipPath: `inset(0 0 0 ${split}%)` }}>
-            {/* La grille a sa propre marge technique : on la recale sur le rendu textile
-                pour que les deux moitiés se répondent exactement au trait de comparaison. */}
-            <div className="comparateur-aligne">
-              <RosaceRender pattern={HERO_PATTERN} mode="chart" resolution={900} label="La grille technique du même patron" />
-            </div>
-          </div>
-          <span className="comparateur-etiquette comparateur-etiquette--gauche" aria-hidden="true">Motif</span>
-          <span className="comparateur-etiquette comparateur-etiquette--droite" aria-hidden="true">Grille</span>
-          <div
-            className="comparateur-poignee"
-            style={{ left: `${split}%` }}
-            role="slider"
-            tabIndex={0}
-            aria-label="Balayer entre le motif brodé et la grille technique"
-            aria-valuemin={0}
-            aria-valuemax={100}
-            aria-valuenow={Math.round(split)}
-            aria-valuetext={`${Math.round(split)} % de grille`}
-            aria-orientation="horizontal"
-            onKeyDown={auClavier}
-          >
-            <span aria-hidden="true" />
-          </div>
-        </div>
-
+      {aide && (
         <p className="comparateur-aide">
           <MousePointer2 size={14} strokeWidth={1.9} aria-hidden="true" />
           Glissez le trait — ou les flèches du clavier — pour passer du motif à la grille.
         </p>
+      )}
+    </>
+  );
+}
+
+function Patron() {
+  return (
+    <section id="realisation" className="section" aria-labelledby="titre-realisation">
+      <div className="section-tete" data-reveal>
+        <p className="surtitre">05 — Le patron PDF, recomposé sous vos yeux</p>
+        <h2 id="titre-realisation">
+          Quatre pages, un puzzle,
+          <br />
+          une grille exacte.
+        </h2>
+        <p className="section-chapeau">
+          Un patron acheté en PDF arrive en pages. ROSACE les lit, vous les calez sur la table de montage, et chaque
+          case recouverte, chaque conflit, chaque trou est compté. <strong>Essayez, c'est le vrai moteur.</strong>
+        </p>
       </div>
 
-      <ul className="chiffres" data-reveal aria-label="Le patron calculé">
-        <li>
-          <strong>{nombre(HERO_STATS.stitches)}</strong>
-          <span>croix calculées</span>
-        </li>
-        <li>
-          <strong>{HERO_STATS.threads}</strong>
-          <span>fils DMC</span>
-        </li>
-        <li>
-          <strong>{decimal(HERO_STATS.widthCm)} cm</strong>
-          <span>sur aïda {HERO_STATS.aida}</span>
-        </li>
-        <li>
-          <strong>{HERO_STATS.duration}</strong>
-          <span>estimées</span>
-        </li>
-        <li>
-          <strong>{nombre(HERO_STATS.skeins)}</strong>
-          <span>échevettes</span>
-        </li>
-      </ul>
+      <div className="puzzle-bloc" data-reveal>
+        <DemoPuzzle />
+      </div>
 
       <p className="section-manifeste" data-reveal>
         Ce n'est pas seulement une image générée.
@@ -340,124 +315,54 @@ function Realisation() {
 
 /* ----------------------------------------------------------------- Broder */
 const AFFICHAGES = [
-  { id: "chart", label: "Symboles", legende: "La lecture classique : un symbole par fil, les repères tous les dix points." },
-  { id: "color", label: "Couleurs", legende: "Chaque case dans la teinte de son fil, pour voir l'ouvrage prendre forme." },
-  { id: "color-chart", label: "Les deux", legende: "La couleur sous le symbole : on ne se trompe ni de fil ni de case." },
-  { id: "fabric", label: "Toile", legende: "L'aïda et les croix brodées, telles qu'elles seront sous vos doigts." },
+  { id: "fabric", label: "Toile" },
+  { id: "chart", label: "Symboles" },
+  { id: "color", label: "Couleurs" },
+  { id: "color-chart", label: "Les deux" },
 ] as const;
 
 type AffichageId = (typeof AFFICHAGES)[number]["id"];
 
-const VIVANT = [
-  { icone: Navigation, titre: "Fil conducteur", texte: "Le fil enfilé reste en main. « Suivante » emmène à la prochaine zone du même fil, la plus proche de l'aiguille." },
-  { icone: Timer, titre: "Rythme et prévision", texte: "Vos séances sont comptées sans rien saisir. Dès trente croix, une fourchette honnête de temps restant et une date probable." },
-  { icone: Users, titre: "Broder ensemble", texte: "Le projet d'une amie sur le même ouvrage devient un calque : ses croix et les vôtres, sans jamais se mélanger." },
-  { icone: Package, titre: "Boîte à fils et courses", texte: "Dites quels DMC vous possédez : la liste de courses ne garde que les manquants, échevettes comptées." },
-  { icone: Circle, titre: "Tambour sur mesure", texte: `Pour un tambour de 20 cm, ROSACE calcule l'échelle la plus grande qui tient : ici ×${DEMO_HOOP.scale}, soit ${decimal(DEMO_HOOP.motifCm)} cm de motif.` },
-  { icone: Printer, titre: "Fiche réimportable", texte: "La fiche PDF imprimée porte sa recette et son empreinte : réimportée un jour, elle redonne la rosace exacte, vérifiée." },
-];
-
 function Broder() {
-  const [affichage, setAffichage] = useState<AffichageId>("color-chart");
+  const [affichage, setAffichage] = useState<AffichageId>("fabric");
   const base = useId();
-  const active = AFFICHAGES.find((entry) => entry.id === affichage)!;
-  const prevision = DEMO_FORECAST.forecast;
 
   return (
-    <section id="broder" className="section section--sombre" aria-labelledby="titre-broder">
-      <div className="section-tete" data-reveal>
-        <p className="surtitre">05 — Broder, en vrai</p>
-        <h2 id="titre-broder">
-          Une grille vivante,
-          <br />
-          qui vous suit croix par croix.
-        </h2>
+    <section id="broder" className="section" aria-labelledby="titre-broder">
+      <div className="section-tete section-tete--centre" data-reveal>
+        <p className="surtitre">01 — Broder, en vrai</p>
+        <h2 id="titre-broder">Cochez une croix. Le reste se calcule.</h2>
         <p className="section-chapeau">
-          Le mode Broder affiche la grille comme vous la lisez — symboles, couleurs, les deux ou la toile — et cocher une croix
-          suffit : le reste se calcule.
+          La grille vous suit croix par croix, dans l'affichage que vous préférez.
         </p>
       </div>
 
-      <div className="vivant-bloc" data-reveal>
-        <div className="vivant-onglets" role="tablist" aria-label="Affichages du mode Broder">
-          {AFFICHAGES.map((entree) => (
-            <button
-              key={entree.id}
-              id={`${base}-onglet-${entree.id}`}
-              type="button"
-              role="tab"
-              aria-selected={affichage === entree.id}
-              aria-controls={`${base}-panneau`}
-              tabIndex={affichage === entree.id ? 0 : -1}
-              className={affichage === entree.id ? "est-active" : ""}
-              onClick={() => setAffichage(entree.id)}
-            >
-              {entree.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="vivant-scene" id={`${base}-panneau`} role="tabpanel" aria-labelledby={`${base}-onglet-${affichage}`}>
-          <div className={`vivant-cadre vivant-cadre--${affichage}`}>
-            <RosaceRender
-              key={affichage}
-              pattern={HERO_PATTERN}
-              mode={affichage}
-              resolution={1000}
-              label={`${active.label} : ${active.legende}`}
-            />
+      <div className="telephone-scene" data-reveal>
+        <div className="telephone-centre">
+          <div className="vivant-onglets" role="tablist" aria-label="Affichages du mode Broder">
+            {AFFICHAGES.map((entree) => (
+              <button
+                key={entree.id}
+                id={`${base}-onglet-${entree.id}`}
+                type="button"
+                role="tab"
+                aria-selected={affichage === entree.id}
+                aria-controls={`${base}-panneau`}
+                tabIndex={affichage === entree.id ? 0 : -1}
+                className={affichage === entree.id ? "est-active" : ""}
+                onClick={() => setAffichage(entree.id)}
+              >
+                {entree.label}
+              </button>
+            ))}
           </div>
-
-          <div className="vivant-lecture">
-            <p className="vivant-surtitre">Affichage · {active.label}</p>
-            <p>{active.legende}</p>
-            <dl className="vivant-exemple" aria-label="Exemple de prévision, calculé par le moteur des séances sur des séances fictives">
-              <div>
-                <dt>Brodées</dt>
-                <dd>{nombre(DEMO_FORECAST.done)} / {nombre(HERO_STATS.stitches)}</dd>
-              </div>
-              <div>
-                <dt>Rythme</dt>
-                <dd>{nombre(DEMO_FORECAST.rhythm.stitchesPerHour)} croix / h</dd>
-              </div>
-              {prevision && (
-                <div>
-                  <dt>Reste</dt>
-                  <dd>{formatMinutes(prevision.low)} – {formatMinutes(prevision.high)}</dd>
-                </div>
-              )}
-            </dl>
-            <ul className="vues-legende" aria-label="Fils et symboles du patron">
-              {PALETTE.map((thread, index) => (
-                <li key={thread.code}>
-                  <b aria-hidden="true">{SYMBOLS[index]}</b>
-                  <i style={{ background: thread.hex }} aria-hidden="true" />
-                  <span>
-                    DMC {thread.code}
-                    <small>{thread.name}</small>
-                  </span>
-                </li>
-              ))}
-            </ul>
-            <p className="vivant-note">
-              Exemple : quatre soirées fictives de 40 minutes, sur une semaine. Chez vous, la prévision n'apparaît qu'avec vos propres croix, en fourchette, jamais à la minute.
-            </p>
+          <div className="telephone-grand" id={`${base}-panneau`} role="tabpanel" aria-labelledby={`${base}-onglet-${affichage}`}>
+            <Telephone className="telephone-heros">
+              <EcranBroderie pattern={HERO_PATTERN} mode={affichage} />
+            </Telephone>
           </div>
         </div>
 
-        <ul className="vivant" aria-label="Ce que le mode Broder fait pour vous">
-          {VIVANT.map(({ icone: Icone, titre, texte }) => (
-            <li key={titre}>
-              <Icone size={20} strokeWidth={1.7} aria-hidden="true" />
-              <h3>{titre}</h3>
-              <p>{texte}</p>
-            </li>
-          ))}
-        </ul>
-
-        <div className="vivant-tambour" aria-hidden="true">
-          <EmbroideryHoop pattern={HERO_PATTERN} />
-        </div>
       </div>
     </section>
   );
@@ -595,11 +500,11 @@ function Public() {
 export function LandingSections() {
   return (
     <>
+      <Broder />
       <Entrees />
       <Formes />
       <Couleurs />
-      <Realisation />
-      <Broder />
+      <Patron />
       <Progression />
       <Public />
     </>

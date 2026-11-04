@@ -16,6 +16,7 @@ import {
 import { EmbroideryHoop } from "../components/RosaceCanvas";
 import { RosaceLogo } from "../components/RosaceLogo";
 import type { RosacePattern } from "../lib/rosace";
+import type { CanvasMode } from "../lib/paint";
 import { HERO_STATS, PALETTE, USED_THREADS, decimal, nombre } from "./data";
 import { DmcCrown, RosaceRender } from "./media";
 
@@ -177,7 +178,7 @@ export function EcranGrille({ pattern }: { pattern: RosacePattern }) {
 }
 
 /* ------------------------------------------------------ Téléphone : broderie */
-export function EcranBroderie({ pattern, compact = false }: { pattern: RosacePattern; compact?: boolean }) {
+export function EcranBroderie({ pattern, compact = false, mode = "fabric" }: { pattern: RosacePattern; compact?: boolean; mode?: CanvasMode }) {
   return (
     <div className={`ecran ecran-broderie${compact ? " ecran-broderie--compact" : ""}`}>
       <div className="ecran-barre ecran-barre--tel">
@@ -188,7 +189,7 @@ export function EcranBroderie({ pattern, compact = false }: { pattern: RosacePat
       </div>
 
       <div className="ecran-broderie-scene">
-        <RosaceRender pattern={pattern} resolution={520} label="La rosace à broder, croix par croix" />
+        <RosaceRender key={mode} pattern={pattern} mode={mode} resolution={mode === "fabric" ? 520 : 900} label="La rosace à broder, croix par croix" />
         {compact ? (
           <div className="ecran-broderie-carte">
             <span>
