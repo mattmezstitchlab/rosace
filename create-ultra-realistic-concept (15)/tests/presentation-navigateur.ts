@@ -23,7 +23,7 @@ async function main() {
   assert.ok(CHROMIUM_PATH, "CHROMIUM_PATH est requis (binaire Chromium).");
   await mkdir(ARTIFACTS, { recursive: true });
   const browser = await chromium.launch({ executablePath: CHROMIUM_PATH, args: BROWSER_ARGS });
-  const page = await browser.newPage({ viewport: { width: 1360, height: 900 } });
+  const page = await browser.newPage({ viewport: { width: 1360, height: 1500 } });
   const url = new URL(BASE_URL);
   url.searchParams.set("vue", "presentation");
   await page.goto(url.toString(), { waitUntil: "domcontentloaded" });
@@ -59,6 +59,7 @@ async function main() {
   // À la main : on mélange, puis on glisse chaque page à sa place ; l'aimantation finit le travail.
   await page.getByRole("button", { name: /Mélanger/ }).click();
   await page.waitForFunction(() => !document.querySelector(".puzzle-etat")?.textContent?.includes("vérifiée"));
+  await page.locator(".puzzle-plateau").evaluate((node) => node.scrollIntoView({ block: "center" }));
   const board = await page.locator(".puzzle-plateau").boundingBox();
   assert.ok(board);
   const cell = board.width / 128;
