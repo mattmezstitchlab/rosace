@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Check, Shuffle, Sparkles } from "lucide-react";
-import { getThread } from "../data/dmc";
 import { assembleTiles, snapPosition, type Tile, type TilePlacement } from "../lib/import-pdf/montage";
 import { workFingerprint } from "../lib/pattern-id";
 import { HERO_WORK, nombre } from "./data";
@@ -38,7 +37,7 @@ function buildTiles(): DemoTile[] {
 }
 
 const TILES = buildTiles();
-const HEXES = HERO_WORK.palette.map((entry) => getThread(entry.code).hex);
+const SYMBOLS_BY_INDEX = HERO_WORK.palette.map((entry) => entry.symbol);
 const CODES = HERO_WORK.palette.map((entry) => entry.code);
 
 /** Positions « sorties du PDF » : écartées, l'une d'elles chevauchant sa voisine. */
@@ -50,27 +49,35 @@ const SCATTERED: TilePlacement[] = [
 ];
 const HOME: TilePlacement[] = TILES.map((tile) => ({ id: tile.id, x: tile.home.x, y: tile.home.y, w: tile.cols, h: tile.rows }));
 
-/** Peint les cases réelles d'une carte : la couleur du fil, un trait tous les dix points. */
+/** Peint une carte comme une page de patron PDF : un symbole par case, en noir sur blanc, repères tous les dix points. */
 function paintTile(canvas: HTMLCanvasElement, tile: Tile) {
-  const scale = 6;
+  const scale = 14;
   canvas.width = tile.cols * scale;
   canvas.height = tile.rows * scale;
   const ctx = canvas.getContext("2d");
   if (!ctx) return;
-  ctx.fillStyle = "#fffdf8";
+  ctx.fillStyle = "#ffffff";
   ctx.fillRect(0, 0, canvas.width, canvas.height);
+  ctx.lineWidth = 1;
+  for (let c = 0; c <= tile.cols; c += 1) {
+    ctx.strokeStyle = c % 10 === 0 ? "rgba(20,17,15,.55)" : "rgba(20,17,15,.14)";
+    ctx.beginPath(); ctx.moveTo(c * scale + 0.5, 0); ctx.lineTo(c * scale + 0.5, canvas.height); ctx.stroke();
+  }
+  for (let r = 0; r <= tile.rows; r += 1) {
+    ctx.strokeStyle = r % 10 === 0 ? "rgba(20,17,15,.55)" : "rgba(20,17,15,.14)";
+    ctx.beginPath(); ctx.moveTo(0, r * scale + 0.5); ctx.lineTo(canvas.width, r * scale + 0.5); ctx.stroke();
+  }
+  ctx.fillStyle = "#14110f";
+  ctx.textAlign = "center";
+  ctx.textBaseline = "middle";
+  ctx.font = `600 ${scale * 0.78}px "Inter Tight", Arial, sans-serif`;
   for (let r = 0; r < tile.rows; r += 1) {
     for (let c = 0; c < tile.cols; c += 1) {
       const value = tile.cells[r * tile.cols + c];
       if (value < 0) continue;
-      ctx.fillStyle = HEXES[value] ?? "#000";
-      ctx.fillRect(c * scale, r * scale, scale, scale);
+      ctx.fillText(SYMBOLS_BY_INDEX[value] ?? "×", c * scale + scale / 2, r * scale + scale / 2 + 0.5);
     }
   }
-  ctx.strokeStyle = "rgba(20, 17, 15, .12)";
-  ctx.lineWidth = 1;
-  for (let c = 0; c <= tile.cols; c += 1) { ctx.beginPath(); ctx.moveTo(c * scale + 0.5, 0); ctx.lineTo(c * scale + 0.5, canvas.height); ctx.stroke(); }
-  for (let r = 0; r <= tile.rows; r += 1) { ctx.beginPath(); ctx.moveTo(0, r * scale + 0.5); ctx.lineTo(canvas.width, r * scale + 0.5); ctx.stroke(); }
 }
 
 function TileCanvas({ tile }: { tile: Tile }) {
@@ -201,7 +208,7 @@ export function DemoPuzzle() {
           </button>
         </div>
         <p className="puzzle-note">
-          Ce sont les vraies cases de la rosace ci-dessus, découpées en quatre pages ; l'aimantation, le comptage et la vérification par empreinte sont ceux de l'atelier d'import.
+          Ce sont les vraies cases de la rosace du haut, imprimées comme un patron du commerce — un symbole par fil — et découpées en quatre pages ; l'aimantation, le comptage et la vérification par empreinte sont ceux de l'atelier d'import.
         </p>
       </div>
     </div>

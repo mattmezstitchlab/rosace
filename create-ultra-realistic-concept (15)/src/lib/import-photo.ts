@@ -26,13 +26,19 @@ export interface PhotoOptions {
   maxColors: number;
   /** Laisse la toile nue sous les pixels quasi blancs. */
   dropWhite: boolean;
-  /** Nettoyage des confettis. */
-  confetti: boolean;
+  /** Nettoyage des confettis : `false` = aucun, `true` = deux passes, ou le nombre de passes (0 à 6). */
+  confetti: boolean | number;
   /** Nom du fichier, pour la provenance. */
   file: string;
 }
 
-export const PHOTO_LIMITS = { width: { min: 20, max: 240 }, colors: { min: 2, max: 60 } } as const;
+export const PHOTO_LIMITS = { width: { min: 20, max: 240 }, colors: { min: 2, max: 60 }, confetti: { min: 0, max: 6 } } as const;
+
+export function confettiPasses(value: boolean | number) {
+  if (value === true) return 2;
+  if (value === false) return 0;
+  return Math.max(PHOTO_LIMITS.confetti.min, Math.min(PHOTO_LIMITS.confetti.max, Math.round(value)));
+}
 
 export interface PhotoColorLine {
   code: string;
@@ -124,7 +130,8 @@ export function photoGrid(data: Uint8ClampedArray, srcW: number, srcH: number, o
       cells[i] = match;
     }
   }
-  const confettiRemoved = options.confetti ? removeConfetti(cells, width, height) : 0;
+  const passes = confettiPasses(options.confetti);
+  const confettiRemoved = passes > 0 ? removeConfetti(cells, width, height, passes) : 0;
 
   // Rapport de couleurs : la moyenne de la photo par fil, contre la couleur d'écran du fil.
   const sums = new Map<number, { r: number; g: number; b: number; n: number; de: number }>();

@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { photoGrid, type PhotoResult } from "../lib/import-photo";
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from "react";
+import { PHOTO_LIMITS, photoGrid, type PhotoResult } from "../lib/import-photo";
 import { paintPattern } from "../lib/paint";
 import { fromImport, type StitchWork } from "../lib/work";
 import aida from "../assets/aida-macro.jpg";
@@ -15,8 +15,8 @@ const MAX_COLORS = 10;
 
 export function DemoPhoto() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [result, setResult] = useState<PhotoResult | null>(null);
-  const [work, setWork] = useState<StitchWork | null>(null);
+  const [pixels, setPixels] = useState<{ data: Uint8ClampedArray; w: number; h: number } | null>(null);
+  const [confetti, setConfetti] = useState(0);
   const [error, setError] = useState("");
 
   useEffect(() => {
@@ -34,19 +34,25 @@ export function DemoPhoto() {
         if (!context) throw new Error("canvas");
         context.drawImage(bitmap, 0, 0, w, h);
         bitmap.close();
-        const outcome = photoGrid(context.getImageData(0, 0, w, h).data, w, h, { width: WIDTH, maxColors: MAX_COLORS, dropWhite: false, confetti: true, file: "aida-macro.jpg" });
-        if (cancelled) return;
-        if ("error" in outcome) { setError(outcome.error); return; }
-        const built = fromImport(outcome.grid);
-        if (!built.ok) { setError(built.error); return; }
-        setResult(outcome);
-        setWork(built.work);
+        if (!cancelled) setPixels({ data: context.getImageData(0, 0, w, h).data, w, h });
       } catch (cause) {
         if (!cancelled) setError(cause instanceof Error ? cause.message : String(cause));
       }
     })();
     return () => { cancelled = true; };
   }, []);
+
+  /* La conversion tourne à chaque cran du curseur : c'est le vrai moteur, en direct. */
+  const computed = useMemo<{ result: PhotoResult; work: StitchWork } | { error: string } | null>(() => {
+    if (!pixels) return null;
+    const outcome = photoGrid(pixels.data, pixels.w, pixels.h, { width: WIDTH, maxColors: MAX_COLORS, dropWhite: false, confetti, file: "aida-macro.jpg" });
+    if ("error" in outcome) return outcome;
+    const built = fromImport(outcome.grid);
+    return built.ok ? { result: outcome, work: built.work } : { error: built.error };
+  }, [pixels, confetti]);
+  const result = computed && !("error" in computed) ? computed.result : null;
+  const work = computed && !("error" in computed) ? computed.work : null;
+  const failure = error || (computed && "error" in computed ? computed.error : "");
 
   useEffect(() => {
     if (canvasRef.current && work) paintPattern(canvasRef.current, work, "color", 900);
@@ -61,16 +67,25 @@ export function DemoPhoto() {
         </figure>
         <figure className="photo-demo-grille">
           {work ? (
-            <canvas ref={canvasRef} role="img" aria-label={`La grille obtenue : ${work.width} par ${work.height} points, ${work.palette.length} fils DMC`} />
+            <canvas ref={canvasRef} role="img" style={{ "--ratio": `${work.width} / ${work.height}` } as CSSProperties} aria-label={`La grille obtenue : ${work.width} par ${work.height} points, ${work.palette.length} fils DMC`} />
           ) : (
-            <div className="photo-demo-attente" role="status">{error ? `Démonstration indisponible : ${error}` : "Conversion de la photo…"}</div>
+            <div className="photo-demo-attente" role="status">{failure ? `Démonstration indisponible : ${failure}` : "Conversion de la photo…"}</div>
           )}
           <figcaption>
-            {work && result
-              ? `La grille · ${work.width} × ${work.height} points · ${nombre(work.stitches.length)} croix · ${work.palette.length} fils DMC · ${nombre(result.confettiRemoved)} confetti${result.confettiRemoved > 1 ? "s" : ""} nettoyé${result.confettiRemoved > 1 ? "s" : ""}`
-              : "La grille"}
+            {work ? `La grille · ${work.width} × ${work.height} points · ${nombre(work.stitches.length)} croix · ${work.palette.length} fils DMC` : "La grille"}
           </figcaption>
         </figure>
+      </div>
+
+      <div className="photo-demo-curseur">
+        <label>
+          <span>
+            <strong>Nettoyage des confettis</strong>
+            <em aria-live="polite">{confetti === 0 ? "aucun — chaque pixel isolé reste une croix" : `${confetti} passe${confetti > 1 ? "s" : ""} · ${result ? nombre(result.confettiRemoved) : "…"} croix isolées rendues à leurs voisines`}</em>
+          </span>
+          <input type="range" min={PHOTO_LIMITS.confetti.min} max={PHOTO_LIMITS.confetti.max} value={confetti} onChange={(event) => setConfetti(Number(event.target.value))} aria-valuetext={confetti === 0 ? "aucun nettoyage" : `${confetti} passes`} />
+        </label>
+        <p>Un confetti, c'est une croix d'un fil seule au milieu d'autres : jolie à l'écran, pénible à broder. Le curseur les rend au fil voisin majoritaire ; la grille et les comptes se recalculent à chaque cran.</p>
       </div>
 
       {result && (
@@ -80,7 +95,7 @@ export function DemoPhoto() {
             <p className="photo-demo-legende"><i style={{ background: "#c85a96" }} aria-hidden="true" /> photo (écran, sRGB) <i style={{ background: "#c54989" }} aria-hidden="true" /> fil (écran, sRGB)</p>
           </div>
           <ul>
-            {result.colors.slice(0, 6).map((line) => (
+            {result.colors.slice(0, 5).map((line) => (
               <li key={line.code}>
                 <span className="photo-demo-fil"><strong>DMC {line.code}</strong><small>{line.name}</small></span>
                 <span className="photo-demo-pastilles">

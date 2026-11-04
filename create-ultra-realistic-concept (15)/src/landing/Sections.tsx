@@ -2,11 +2,12 @@ import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react"
 import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Image as ImageIcon, Layers, MousePointer2, Printer, Redo2, Share2, Type, Undo2 } from "lucide-react";
 import { formatDuration } from "../lib/rosace";
 import type { CanvasMode } from "../lib/paint";
-import { HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
+import { HERO_PATTERN, HERO_STATS, SHAPE_VARIANTS, TEXT_WORK, decimal, nombre } from "./data";
 import { EcranBroderie, EcranImport, Tablette, Telephone } from "./devices";
 import { DemoPuzzle } from "./DemoPuzzle";
 import { DemoPhoto } from "./DemoPhoto";
-import { DmcCrown, RosaceRender } from "./media";
+import { Nuancier } from "./Nuancier";
+import { RosaceRender } from "./media";
 
 /* ------------------------------------------------------------------ Entrées */
 /**
@@ -29,7 +30,7 @@ function Entrees() {
       <ul className="entrees" data-reveal>
         <li className="entree">
           <div className="entree-image">
-            <RosaceRender pattern={HERO_PATTERN} resolution={640} label="Une rosace composée dans l'atelier" />
+            <RosaceRender pattern={HERO_PATTERN} mode="stitches" resolution={640} label="Une rosace composée dans l'atelier" />
           </div>
           <div className="entree-texte">
             <p className="entree-sur"><Circle size={13} strokeWidth={2} aria-hidden="true" /> Créer</p>
@@ -100,7 +101,7 @@ function Formes() {
         {SHAPE_VARIANTS.map((variant) => (
           <li key={variant.id} className="forme">
             <div className="forme-image">
-              <RosaceRender pattern={variant.pattern} resolution={560} label={`Rosace ${variant.label}, ${variant.pattern.stitches.length.toLocaleString("fr-FR")} croix`} />
+              <RosaceRender pattern={variant.pattern} mode="stitches" resolution={640} label={`Rosace ${variant.label}, ${variant.pattern.stitches.length.toLocaleString("fr-FR")} croix`} />
             </div>
             <div className="forme-texte">
               <h3>{variant.label}</h3>
@@ -142,51 +143,13 @@ function Couleurs() {
           Brodez avec les bonnes références.
         </h2>
         <p className="section-chapeau">
-          La couronne ROSACE permet d'explorer les couleurs DMC, de construire une palette et de vérifier son
-          contraste avant de commencer.
+          La couronne ROSACE, c'est le nuancier complet : {nombre(489)} références DMC Mouliné à survoler. Chaque fil
+          affiche son code, son nom et sa couleur d'écran — dite sRGB, parce que l'écran n'est pas le fil.
         </p>
       </div>
 
-      <div className="couleurs" data-reveal>
-        <div className="couleurs-mosaique">
-          <div className="couleurs-couronne">
-            <div className="couronne-cadre">
-              <DmcCrown palette={HERO_PATTERN.config.palette} />
-              <div className="couronne-coeur">
-                <RosaceRender pattern={HERO_PATTERN} resolution={420} label="La rosace entourée de la couronne DMC" />
-              </div>
-            </div>
-            <p className="couleurs-legende">
-              <strong>{nombre(489)}</strong> références DMC Mouliné, une couronne continue.
-            </p>
-          </div>
-        </div>
-
-        <div className="couleurs-palette">
-          <p className="couleurs-titre">La palette de la rosace</p>
-          <ul className="fils">
-            {PALETTE.map((thread) => {
-              const usage = USED_THREADS.find((entry) => entry.code === thread.code);
-              return (
-                <li key={thread.code}>
-                  <span className="fil-pastille" style={{ background: thread.hex }} aria-hidden="true" />
-                  <span className="fil-nom">
-                    <strong>DMC {thread.code}</strong>
-                    <small>{thread.name}</small>
-                  </span>
-                  <span className="fil-metres">
-                    {usage ? `${nombre(usage.count)} croix` : "—"}
-                    <small>{usage ? `${decimal(usage.meters)} m` : "non employé"}</small>
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
-          <p className="couleurs-note">
-            Les couleurs affichées sont liées à une palette de fils identifiable, pas à des couleurs arbitraires
-            d'écran.
-          </p>
-        </div>
+      <div className="nuancier-bloc" data-reveal>
+        <Nuancier />
       </div>
     </section>
   );

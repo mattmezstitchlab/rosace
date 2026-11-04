@@ -129,7 +129,7 @@ function PhotoMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
   const [width, setWidth] = useState(80);
   const [colors, setColors] = useState(12);
   const [dropWhite, setDropWhite] = useState(true);
-  const [confetti, setConfetti] = useState(true);
+  const [confetti, setConfetti] = useState(2);
   const [error, setError] = useState("");
   const [showRgb, setShowRgb] = useState(false);
 
@@ -180,7 +180,7 @@ function PhotoMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
           <label className="importer-curseur">Largeur : {width} cases<input type="range" min={PHOTO_LIMITS.width.min} max={PHOTO_LIMITS.width.max} value={width} onChange={(event) => setWidth(Number(event.target.value))} /></label>
           <label className="importer-curseur">Fils au maximum : {colors}<input type="range" min={PHOTO_LIMITS.colors.min} max={PHOTO_LIMITS.colors.max} value={colors} onChange={(event) => setColors(Number(event.target.value))} /></label>
           <label className="importer-case"><input type="checkbox" checked={dropWhite} onChange={(event) => setDropWhite(event.target.checked)} /> Laisser la toile nue sous le blanc</label>
-          <label className="importer-case"><input type="checkbox" checked={confetti} onChange={(event) => setConfetti(event.target.checked)} /> Nettoyer les confettis</label>
+          <label className="importer-curseur">Nettoyage des confettis : {confetti === 0 ? "aucun" : `${confetti} passe${confetti > 1 ? "s" : ""}`}<input type="range" min={PHOTO_LIMITS.confetti.min} max={PHOTO_LIMITS.confetti.max} value={confetti} onChange={(event) => setConfetti(Number(event.target.value))} /></label>
         </div>
       )}
       {failure && <p className="importer-erreur" role="alert">{failure}</p>}
