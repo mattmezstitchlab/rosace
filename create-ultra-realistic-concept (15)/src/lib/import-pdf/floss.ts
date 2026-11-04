@@ -12,7 +12,7 @@ import { DMC_ALL_THREADS } from "../../data/dmc";
  * (`mix:a/n+b/m`) n'est pas reconnu : il est compté parmi les pertes (`lost.blends`) et
  * signalé avant validation, jamais aplati en silence.
  */
-type Lab = [number, number, number];
+export type Lab = [number, number, number];
 
 export interface Floss {
   code: string;

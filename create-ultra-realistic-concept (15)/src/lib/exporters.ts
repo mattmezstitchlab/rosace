@@ -12,6 +12,7 @@ export function safeName(source: WorkLike) {
   const work = toWork(source);
   if (work.origin.kind === "rosace") return `rosace-${String(work.origin.config.seed).padStart(3, "0")}-${shortFingerprint(work.fingerprint)}`;
   if (work.origin.kind === "text") return `rosace-texte-${shortFingerprint(work.fingerprint)}`;
+  if (work.origin.kind === "photo") return `rosace-photo-${shortFingerprint(work.fingerprint)}`;
   const base = work.origin.provenance.file.replace(/\.pdf$/i, "").replace(/[^a-z0-9àâäéèêëîïôöùûüç-]+/gi, "-").replace(/^-+|-+$/g, "").slice(0, 40) || "patron";
   return `rosace-import-${base}-${shortFingerprint(work.fingerprint)}`;
 }
@@ -21,12 +22,14 @@ export function workTitle(source: WorkLike) {
   const work = toWork(source);
   if (work.origin.kind === "rosace") return `Rosace n° ${work.origin.config.seed}`;
   if (work.origin.kind === "text") return `Texte « ${work.origin.text ?? work.origin.provenance.title ?? ""} »`;
+  if (work.origin.kind === "photo") return `Photo ${work.origin.provenance.title ?? work.origin.provenance.file}`;
   return work.origin.provenance.title || work.origin.provenance.file.replace(/\.pdf$/i, "") || "Patron importé";
 }
 
 function workSubtitle(work: StitchWork) {
   if (work.origin.kind === "rosace") return getPatternName(work.origin.config);
   if (work.origin.kind === "text") return `Texte brodé · police 5 × 7 · ${work.palette.length} fil${work.palette.length > 1 ? "s" : ""}`;
+  if (work.origin.kind === "photo") return `Photo convertie · ${work.palette.length} fil${work.palette.length > 1 ? "s" : ""} DMC, couleurs estimées`;
   const { provenance } = work.origin;
   return `Patron importé · ${provenance.pages} page${provenance.pages > 1 ? "s" : ""} · lecture ${provenance.mode}`;
 }

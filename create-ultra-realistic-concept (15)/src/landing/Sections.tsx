@@ -1,10 +1,11 @@
 import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
-import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Layers, MousePointer2, Printer, Redo2, Share2, Type, Undo2 } from "lucide-react";
+import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Image as ImageIcon, Layers, MousePointer2, Printer, Redo2, Share2, Type, Undo2 } from "lucide-react";
 import { formatDuration } from "../lib/rosace";
 import type { CanvasMode } from "../lib/paint";
 import { HERO_PATTERN, HERO_STATS, PALETTE, SHAPE_VARIANTS, TEXT_WORK, USED_THREADS, decimal, nombre } from "./data";
 import { EcranBroderie, EcranImport, Tablette, Telephone } from "./devices";
 import { DemoPuzzle } from "./DemoPuzzle";
+import { DemoPhoto } from "./DemoPhoto";
 import { DmcCrown, RosaceRender } from "./media";
 
 /* ------------------------------------------------------------------ Entrées */
@@ -17,11 +18,11 @@ function Entrees() {
   return (
     <section id="entrees" className="section" aria-labelledby="titre-entrees">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">02 — Un atelier, trois portes</p>
-        <h2 id="titre-entrees">Composez, importez ou écrivez : la suite est la même.</h2>
+        <p className="surtitre">02 — Un atelier, quatre portes</p>
+        <h2 id="titre-entrees">Composez, importez, écrivez ou convertissez : la suite est la même.</h2>
         <p className="section-chapeau">
-          Une rosace calculée, un patron PDF acheté ailleurs ou un prénom en lettres brodées entrent par des portes
-          différentes et arrivent au même endroit : <strong>une grille, une palette DMC, une progression suivie croix par croix.</strong>
+          Une rosace calculée, un patron PDF acheté ailleurs, un prénom en lettres brodées ou une photo entrent par des
+          portes différentes et arrivent au même endroit : <strong>une grille, une palette DMC, une progression suivie croix par croix.</strong>
         </p>
       </div>
 
@@ -61,6 +62,17 @@ function Entrees() {
             <h3>Un prénom, une date, un mot doux</h3>
             <p>Une police de croix dessinée pour l'aïda, un fil pour le texte et un pour l'ombre : {nombre(TEXT_WORK.stitches.length)} croix ici, prêtes à broder.</p>
             <a className="lien-souligne" href="#atelier-importer">Écrire un texte brodé</a>
+          </div>
+        </li>
+        <li className="entree">
+          <div className="entree-image entree-image--photo">
+            <RosaceRender pattern={HERO_PATTERN} mode="color" resolution={640} label="Une grille en couleurs pleines, telle qu'une photo convertie" />
+          </div>
+          <div className="entree-texte">
+            <p className="entree-sur"><ImageIcon size={13} strokeWidth={2} aria-hidden="true" /> Convertir</p>
+            <h3>Une photo, triée en fils</h3>
+            <p>Les fils DMC les plus proches, les confettis nettoyés, et chaque couleur d'écran annoncée en sRGB face au fil. <a href="#photo">Voir la démonstration</a>.</p>
+            <a className="lien-souligne" href="#atelier-importer">Convertir une photo</a>
           </div>
         </li>
       </ul>
@@ -368,6 +380,30 @@ function Broder() {
   );
 }
 
+/* ------------------------------------------------------------------ Photo */
+function Photo() {
+  return (
+    <section id="photo" className="section section--papier" aria-labelledby="titre-photo">
+      <div className="section-tete" data-reveal>
+        <p className="surtitre">06 — De la photo au fil</p>
+        <h2 id="titre-photo">
+          Les fils triés, les confettis nettoyés,
+          <br />
+          et l'écran qui dit ce qu'il est.
+        </h2>
+        <p className="section-chapeau">
+          Une photo devient une grille : chaque case prend le fil DMC le plus proche, les croix isolées sont rendues à
+          leurs voisines, et le rapport de couleurs distingue ce que l'écran montre de ce que le fil est.
+          <strong> Ci-dessous, la conversion se fait en direct, dans votre navigateur.</strong>
+        </p>
+      </div>
+      <div className="photo-demo-bloc" data-reveal>
+        <DemoPhoto />
+      </div>
+    </section>
+  );
+}
+
 /* -------------------------------------------------------------- Progression */
 const EXPORTS = [
   { id: "png", titre: "PNG", usage: "Montrer le rendu", icone: Layers },
@@ -389,7 +425,7 @@ function Progression() {
   return (
     <section id="progression" className="section" aria-labelledby="titre-progression">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">06 — Gardez votre progression</p>
+        <p className="surtitre">07 — Gardez votre progression</p>
         <h2 id="titre-progression">Votre rosace vous appartient.</h2>
         <p className="section-chapeau">
           Sauvegardez une création, reprenez votre progression d'un appareil à l'autre, comparez plusieurs palettes et
@@ -468,7 +504,7 @@ function Public() {
   return (
     <section id="public" className="section section--papier" aria-labelledby="titre-public">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">07 — Pour qui</p>
+        <p className="surtitre">08 — Pour qui</p>
         <h2 id="titre-public">
           Pour celles et ceux qui aiment créer avec leurs mains.
         </h2>
@@ -505,6 +541,7 @@ export function LandingSections() {
       <Formes />
       <Couleurs />
       <Patron />
+      <Photo />
       <Progression />
       <Public />
     </>

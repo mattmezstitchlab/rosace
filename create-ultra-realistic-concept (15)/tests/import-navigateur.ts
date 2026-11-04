@@ -12,6 +12,7 @@ import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
+import { deflateSync } from "node:zlib";
 import path from "node:path";
 import { chromium, type Page } from "playwright-core";
 import { worksheetHtml } from "../src/lib/exporters";
@@ -20,6 +21,25 @@ import { DEFAULT_CONFIG, generateRosace } from "../src/lib/rosace";
 import { fromRosace } from "../src/lib/work";
 
 const BASE_URL = process.env.BASE_URL ?? "http://127.0.0.1:5173";
+
+/** Un PNG synthétique sans dépendance : quatre aplats et un confetti, encodé à la main (zlib de Node). */
+function syntheticPng(w: number, h: number): Buffer {
+  const raw = Buffer.alloc((w * 3 + 1) * h);
+  for (let y = 0; y < h; y += 1) {
+    raw[y * (w * 3 + 1)] = 0;
+    for (let x = 0; x < w; x += 1) {
+      const left = x < w / 2, top = y < h / 2;
+      let color = left && top ? [120, 20, 50] : !left && top ? [200, 90, 150] : left && !top ? [30, 60, 30] : [250, 220, 120];
+      if (x >= 10 && x < 13 && y >= 10 && y < 13) color = [40, 180, 60];
+      raw.set(color, y * (w * 3 + 1) + 1 + x * 3);
+    }
+  }
+  const crcTable = Array.from({ length: 256 }, (_, n) => { let c = n; for (let k = 0; k < 8; k += 1) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; return c >>> 0; });
+  const crc = (buf: Buffer) => { let c = 0xffffffff; for (const byte of buf) c = crcTable[(c ^ byte) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  const chunk = (type: string, data: Buffer) => { const len = Buffer.alloc(4); len.writeUInt32BE(data.length); const body = Buffer.concat([Buffer.from(type), data]); const sum = Buffer.alloc(4); sum.writeUInt32BE(crc(body)); return Buffer.concat([len, body, sum]); };
+  const ihdr = Buffer.alloc(13); ihdr.writeUInt32BE(w, 0); ihdr.writeUInt32BE(h, 4); ihdr[8] = 8; ihdr[9] = 2; ihdr[10] = 0; ihdr[11] = 0; ihdr[12] = 0;
+  return Buffer.concat([Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]), chunk("IHDR", ihdr), chunk("IDAT", deflateSync(raw)), chunk("IEND", Buffer.alloc(0))]);
+}
 const ARTIFACT_DIR = process.env.ARTIFACT_DIR ?? path.join(os.tmpdir(), "rosace-browser-artifacts");
 const CHROMIUM_PATH = process.env.CHROMIUM_PATH ?? ["/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome"].find(existsSync);
 const BROWSER_ARGS = (process.env.BROWSER_ARGS ?? "--no-sandbox --disable-dev-shm-usage --disable-gpu").split(" ").filter(Boolean);
@@ -119,7 +139,7 @@ async function main() {
     /* ---------- 3. Importer : Analyser ---------- */
     await page.goto(`${BASE_URL}#atelier-importer`);
     await page.locator(".importer-depot").waitFor({ state: "visible" });
-    await page.locator("input[type=file]").setInputFiles(pdfPath);
+    await page.locator("input[accept*=\"pdf\"]").setInputFiles(pdfPath);
     await expectText(page, ".importer-h2", /2 pages de grille/, 60000);
     await expectText(page, ".importer-texte", /Lecture vectorielle par graduations/);
     assert.equal(await page.locator(".importer-page").count(), 3, "trois pages analysées");
@@ -261,6 +281,27 @@ async function main() {
     await page.getByRole("button", { name: "Fermer le mode broderie et enregistrer la progression" }).click();
     await page.locator(".broder").waitFor({ state: "detached" });
 
+    /* ---------- 12 bis. Import photo : fils triés, confettis nettoyés, couleurs d'écran annoncées en sRGB ---------- */
+    const photoPath = path.join(ARTIFACT_DIR, "photo-essai.png");
+    await writeFile(photoPath, syntheticPng(96, 64));
+    await page.locator(".studio-dock button", { hasText: /^Importer/ }).click();
+    await page.locator(".importer-photo").waitFor({ state: "visible" });
+    await page.locator("input[accept*=\"image\"]").setInputFiles(photoPath);
+    await page.locator(".importer-photo-table tbody tr").first().waitFor({ state: "visible" });
+    await expectText(page, ".importer-photo-bilan", /fils? reconnus?.*confetti/s);
+    const photoRows = await page.locator(".importer-photo-table tbody tr").count();
+    assert.ok(photoRows >= 3 && photoRows <= 12, `entre 3 et 12 fils, ${photoRows} obtenus`);
+    await expectText(page, ".importer-photo-table thead", /sRGB/);
+    await expectText(page, ".importer-photo-note", /sRGB \(RVB\)/);
+    await page.getByLabel("Afficher les valeurs sRGB").check();
+    await expectText(page, ".importer-photo-table tbody tr:first-child", /#[0-9A-F]{6}/);
+    await page.screenshot({ path: path.join(ARTIFACT_DIR, "innovation-photo.png") });
+    await page.getByRole("button", { name: "Broder cette photo" }).click();
+    await page.locator(".broder-canvas").waitFor({ state: "visible" });
+    await expectText(page, ".broder-titre strong", /Photo photo-essai/);
+    await page.getByRole("button", { name: "Fermer le mode broderie et enregistrer la progression" }).click();
+    await page.locator(".broder").waitFor({ state: "detached" });
+
     /* ---------- 13. Fiche ROSACE réimportée : la rosace est retrouvée à l'identique, sans lecture d'image ---------- */
     const sheetPath = path.join(ARTIFACT_DIR, "fiche-rosace.pdf");
     const printer = await browser.newPage();
@@ -269,7 +310,7 @@ async function main() {
     await printer.close();
     await page.goto(`${BASE_URL}#atelier-importer`);
     await page.locator(".importer-depot").waitFor({ state: "visible" });
-    await page.locator("input[type=file]").first().setInputFiles(sheetPath);
+    await page.locator("input[accept*=\"pdf\"]").first().setInputFiles(sheetPath);
     await expectText(page, ".importer-fiche strong", /Fiche ROSACE reconnue/, 60000);
     await expectText(page, ".importer-fiche p", new RegExp(rosace.fingerprint.slice(0, 8)));
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "innovation-fiche.png") });

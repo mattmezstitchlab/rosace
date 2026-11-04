@@ -1,4 +1,4 @@
-import { ArrowLeft, ArrowRight, Check, FileUp, Grid3x3, Magnet, Minus, Plus, Undo2, X } from "lucide-react";
+import { ArrowLeft, ArrowRight, Check, FileUp, Grid3x3, Image as ImageIcon, Magnet, Minus, Plus, Undo2, X } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as RPointerEvent } from "react";
 import { getThread } from "../data/dmc";
 import { FLOSS, flossIndex } from "../lib/import-pdf/floss";
@@ -14,6 +14,7 @@ import { readVectorChart, type VectorResult } from "../lib/import-pdf/pdfVector"
 import { paintPattern } from "../lib/paint";
 import { readRosaceWorksheet, type WorksheetReading } from "../lib/import-pdf/worksheet";
 import { textGrid, unsupportedChars, TEXT_MAX_CHARS } from "../lib/text";
+import { PHOTO_LIMITS, photoGrid, type PhotoResult } from "../lib/import-photo";
 import { DEFAULT_CONFIG, type RosaceConfig } from "../lib/rosace";
 import { fromImport, type ImportLosses, type ImportedGrid, type StitchWork } from "../lib/work";
 import { prefersReducedMotion, useRosaceApi } from "../state/rosace-store";
@@ -115,6 +116,115 @@ function TextMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
   );
 }
 
+
+/**
+ * Import photo : l'image devient une grille de croix. Le moteur (`photoGrid`) trie les fils DMC,
+ * nettoie les confettis et rend un rapport de couleurs où chaque teinte d'écran est annoncée
+ * pour ce qu'elle est : une valeur sRGB, pas le fil.
+ */
+function PhotoMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const previewRef = useRef<HTMLCanvasElement>(null);
+  const [source, setSource] = useState<{ name: string; data: Uint8ClampedArray; w: number; h: number; url: string } | null>(null);
+  const [width, setWidth] = useState(80);
+  const [colors, setColors] = useState(12);
+  const [dropWhite, setDropWhite] = useState(true);
+  const [confetti, setConfetti] = useState(true);
+  const [error, setError] = useState("");
+  const [showRgb, setShowRgb] = useState(false);
+
+  const accept = async (file: File | undefined) => {
+    if (!file) return;
+    if (!/^image\/(png|jpeg|webp|gif|bmp)$/.test(file.type)) { setError("Choisissez une image PNG, JPEG ou WebP."); return; }
+    setError("");
+    try {
+      const bitmap = await createImageBitmap(file);
+      // On lit l'image à une taille raisonnable : la grille ne dépasse jamais 240 cases de large.
+      const scale = Math.min(1, 960 / Math.max(bitmap.width, bitmap.height));
+      const w = Math.max(2, Math.round(bitmap.width * scale));
+      const h = Math.max(2, Math.round(bitmap.height * scale));
+      const canvas = document.createElement("canvas");
+      canvas.width = w; canvas.height = h;
+      const context = canvas.getContext("2d", { willReadFrequently: true });
+      if (!context) throw new Error("Canvas indisponible.");
+      context.drawImage(bitmap, 0, 0, w, h);
+      bitmap.close();
+      if (source) URL.revokeObjectURL(source.url);
+      setSource({ name: file.name, data: context.getImageData(0, 0, w, h).data, w, h, url: URL.createObjectURL(file) });
+    } catch (cause) {
+      setError(`Image illisible : ${cause instanceof Error ? cause.message : String(cause)}`);
+    }
+  };
+
+  const result = useMemo<PhotoResult | { error: string } | null>(() => (source ? photoGrid(source.data, source.w, source.h, { width, maxColors: colors, dropWhite, confetti, file: source.name }) : null), [source, width, colors, dropWhite, confetti]);
+  const outcome = useMemo(() => (result && !("error" in result) ? fromImport(result.grid) : null), [result]);
+  const work = outcome?.ok ? outcome.work : null;
+  useEffect(() => {
+    const canvas = previewRef.current;
+    if (!canvas || !work) return;
+    paintPattern(canvas, work, "color", Math.min(1400, Math.max(500, Math.max(work.width, work.height) * 8)));
+  }, [work]);
+  const failure = error || (result && "error" in result ? result.error : outcome && !outcome.ok ? outcome.error : "");
+
+  return (
+    <div className="importer-texte-atelier importer-photo">
+      <h2>Ou partez d'une photo</h2>
+      <p>Une image devient une grille de croix : les fils DMC sont triés par ressemblance, les confettis nettoyés, et chaque couleur d'écran est annoncée pour ce qu'elle est — une valeur sRGB, pas le fil.</p>
+      <div className="importer-photo-choix">
+        <button type="button" className="bouton" onClick={() => inputRef.current?.click()}><ImageIcon size={16} aria-hidden="true" /> {source ? "Changer d'image" : "Choisir une image"}</button>
+        <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className="sr-only" aria-label="Choisir une image" onChange={(event) => { void accept(event.target.files?.[0]); event.target.value = ""; }} />
+        {source && <span className="importer-photo-nom">{source.name} · {source.w} × {source.h} px</span>}
+      </div>
+      {source && (
+        <div className="importer-texte-options importer-photo-options">
+          <label className="importer-curseur">Largeur : {width} cases<input type="range" min={PHOTO_LIMITS.width.min} max={PHOTO_LIMITS.width.max} value={width} onChange={(event) => setWidth(Number(event.target.value))} /></label>
+          <label className="importer-curseur">Fils au maximum : {colors}<input type="range" min={PHOTO_LIMITS.colors.min} max={PHOTO_LIMITS.colors.max} value={colors} onChange={(event) => setColors(Number(event.target.value))} /></label>
+          <label className="importer-case"><input type="checkbox" checked={dropWhite} onChange={(event) => setDropWhite(event.target.checked)} /> Laisser la toile nue sous le blanc</label>
+          <label className="importer-case"><input type="checkbox" checked={confetti} onChange={(event) => setConfetti(event.target.checked)} /> Nettoyer les confettis</label>
+        </div>
+      )}
+      {failure && <p className="importer-erreur" role="alert">{failure}</p>}
+      {source && work && result && !("error" in result) && (
+        <div className="importer-photo-resultat">
+          <div className="importer-photo-duo">
+            <figure className="importer-photo-source"><img src={source.url} alt={`L'image d'origine, ${source.name}`} /><figcaption>Photo</figcaption></figure>
+            <figure className="importer-photo-grille"><canvas ref={previewRef} role="img" aria-label={`La grille obtenue, ${work.width} par ${work.height} points, ${work.palette.length} fils`} /><figcaption>Grille · {work.width} × {work.height} points · {work.stitches.length.toLocaleString("fr-FR")} croix · {String(work.motifWidthCm).replace(".", ",")} × {String(work.motifHeightCm).replace(".", ",")} cm sur aïda 14</figcaption></figure>
+          </div>
+          <p className="importer-photo-bilan" role="status">
+            {result.threadsBeforeReduction} fil{result.threadsBeforeReduction > 1 ? "s" : ""} reconnu{result.threadsBeforeReduction > 1 ? "s" : ""} dans la photo, ramené{result.threadsBeforeReduction > 1 ? "s" : ""} à {work.palette.length} ·
+            {result.confettiRemoved > 0 ? ` ${result.confettiRemoved.toLocaleString("fr-FR")} confetti${result.confettiRemoved > 1 ? "s" : ""} nettoyé${result.confettiRemoved > 1 ? "s" : ""}` : " aucun confetti"} ·
+            {result.blank > 0 ? ` ${result.blank.toLocaleString("fr-FR")} case${result.blank > 1 ? "s" : ""} laissée${result.blank > 1 ? "s" : ""} nue${result.blank > 1 ? "s" : ""}` : " aucune case nue"}.
+          </p>
+          <div className="importer-photo-tete">
+            <h3>Fils DMC et couleurs d'écran</h3>
+            <label className="importer-case"><input type="checkbox" checked={showRgb} onChange={(event) => setShowRgb(event.target.checked)} /> Afficher les valeurs sRGB</label>
+          </div>
+          <table className="importer-photo-table">
+            <thead>
+              <tr><th scope="col">Fil DMC</th><th scope="col">Photo (écran, sRGB)</th><th scope="col">Fil (écran, sRGB)</th><th scope="col">Écart ΔE</th><th scope="col">Croix</th></tr>
+            </thead>
+            <tbody>
+              {result.colors.map((line) => (
+                <tr key={line.code}>
+                  <th scope="row"><strong>DMC {line.code}</strong><small>{line.name}</small></th>
+                  <td><i className="importer-pastille" style={{ background: line.photoHex }} aria-hidden="true" />{showRgb ? <code>{line.photoHex.toUpperCase()}</code> : null}</td>
+                  <td><i className="importer-pastille" style={{ background: line.threadHex }} aria-hidden="true" />{showRgb ? <code>{line.threadHex.toUpperCase()}</code> : null}</td>
+                  <td><span className={line.deltaE > 8 ? "is-attention" : ""}>{String(line.deltaE).replace(".", ",")}</span></td>
+                  <td>{line.count.toLocaleString("fr-FR")}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          <p className="importer-photo-note">
+            Les deux pastilles sont des couleurs d'écran, en sRGB (RVB) : la première est la moyenne des pixels de la photo affectés à ce fil, la seconde la teinte du nuancier DMC telle qu'un écran la montre. Le fil réel, en coton, sous votre lumière, reste la seule référence ; l'écart ΔE2000 dit à quel point la photo et le nuancier s'éloignent (en dessous de 2, l'œil ne voit pas la différence ; au-delà de 8, comparez l'échevette).
+          </p>
+          <button type="button" className="bouton noir" onClick={() => onUse(work)}><Check size={16} aria-hidden="true" /> Broder cette photo</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function DropZone({ onFile, onClose, onUse, activeTitle }: { onFile: (file: File) => void; onClose: () => void; onUse: (work: StitchWork) => void; activeTitle: string | null }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
@@ -150,6 +260,7 @@ function DropZone({ onFile, onClose, onUse, activeTitle }: { onFile: (file: File
           <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="sr-only" aria-label="Choisir un patron PDF" onChange={(event) => { accept(event.target.files?.[0]); event.target.value = ""; }} />
           <small>Le fichier reste sur votre appareil : rien n'est envoyé. {activeTitle ? `Votre patron actuel (${activeTitle}) sera remplacé seulement à l'étape Utiliser.` : "Votre rosace actuelle n'est modifiée qu'à l'étape Utiliser."} Une fiche imprimée par ROSACE est reconnue et retrouvée à l'identique.</small>
         </div>
+        <PhotoMaker onUse={onUse} />
         <TextMaker onUse={onUse} />
       </div>
     </section>

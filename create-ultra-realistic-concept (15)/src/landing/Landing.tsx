@@ -5,11 +5,12 @@ import { Comparateur, LandingSections } from "./Sections";
 import { HERO_STATS, decimal, nombre } from "./data";
 
 const LIENS = [
-  { href: "#entrees", label: "Trois portes" },
+  { href: "#entrees", label: "Quatre portes" },
   { href: "#formes", label: "Formes" },
   { href: "#couleurs", label: "Couleurs" },
   { href: "#realisation", label: "Patron" },
   { href: "#broder", label: "Broder" },
+  { href: "#photo", label: "Photo" },
   { href: "#progression", label: "Garder" },
   { href: "#atelier-importer", label: "Importer" },
 ];
@@ -133,8 +134,8 @@ export function Landing() {
               <span className="heros-titre-suite"> devient broderie.</span>
             </h1>
             <p className="heros-chapeau">
-              Composez une rosace, importez un patron PDF ou écrivez un mot en croix : un seul atelier, une grille vivante,
-              chaque croix suivie jusqu'à la dernière — avec ses fils DMC, ses dimensions et son temps.
+              Composez une rosace, importez un patron PDF, écrivez un mot ou convertissez une photo : un seul atelier,
+              une grille vivante, chaque croix suivie jusqu'à la dernière — avec ses fils DMC, ses dimensions et son temps.
             </p>
             <div className="heros-actions">
               <a className="bouton bouton-noir" href="#atelier">
@@ -191,7 +192,7 @@ export function Landing() {
           </div>
         </div>
         <nav className="pied-liens" aria-label="Liens de la présentation">
-          <a href="#entrees">Trois portes</a>
+          <a href="#entrees">Quatre portes</a>
           <a href="#formes">Formes</a>
           <a href="#couleurs">Couleurs</a>
           <a href="#broder">Broder</a>

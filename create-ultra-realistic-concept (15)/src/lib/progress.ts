@@ -74,7 +74,7 @@ export interface ImportedProjectFile {
   format: typeof PROJECT_FORMAT;
   version: typeof IMPORTED_PROJECT_VERSION;
   fingerprint: string;
-  origin: "pdf" | "text";
+  origin: "pdf" | "text" | "photo";
   work: ImportedWorkRecord;
   progress: ProjectProgress;
 }
@@ -407,7 +407,7 @@ function migrateProjectV1(raw: unknown): ImportResult {
 /** Projet v3 : l'ouvrage importé est reconstruit depuis sa matrice, puis son empreinte est vérifiée. */
 function importProjectV3(raw: unknown): ImportResult {
   const project = raw as Partial<ImportedProjectFile>;
-  if ((project.origin !== "pdf" && project.origin !== "text") || !project.work || typeof project.fingerprint !== "string" || !project.progress) {
+  if ((project.origin !== "pdf" && project.origin !== "text" && project.origin !== "photo") || !project.work || typeof project.fingerprint !== "string" || !project.progress) {
     return { ok: false, error: "Le fichier projet version 3 est incomplet." };
   }
   const restored = restoreImportedWork(project.work);

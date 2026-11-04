@@ -48,7 +48,7 @@ export interface ImportLosses {
 }
 
 /** Origines importées : un patron PDF recomposé, ou un texte brodé (même matrice, même progression, pas de recette). */
-export type ImportedKind = "pdf" | "text";
+export type ImportedKind = "pdf" | "text" | "photo";
 export interface ImportedOrigin {
   kind: ImportedKind;
   provenance: ImportProvenance;
@@ -258,7 +258,7 @@ export function restoreImportedWork(record: unknown): ImportOutcome {
     wastePercent: Math.max(0, Math.min(50, Math.round(Number(source.textile?.wastePercent ?? DEFAULT_IMPORT_TEXTILE.wastePercent)))),
   };
   const outcome = fromImport({
-    kind: source.kind === "text" ? "text" : "pdf",
+    kind: source.kind === "text" ? "text" : source.kind === "photo" ? "photo" : "pdf",
     text: typeof source.text === "string" ? source.text : undefined,
     width,
     height,
