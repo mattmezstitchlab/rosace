@@ -167,7 +167,7 @@ async function main() {
     await expectText(page, ".importer-segments button[aria-pressed=true]", /Automatique/);
     // Ce PDF n'a pas de légende lisible en image : la lecture automatique le dit, sans inventer de couleurs.
     try {
-      await expectText(page, ".importer-section .panneau-aide", /512 symbole\\(s\\) sans code, laissés vides/, 12000);
+      await expectText(page, ".importer-section .panneau-aide", /512 symbole\(s\) sans code, laissés vides/, 12000);
     } catch (error) {
       const details = {
         mode: await page.locator(".importer-segments button[aria-pressed=true]").allTextContents(),
