@@ -270,6 +270,7 @@ async function main() {
 
     /* ---------- 12. Texte brodé ---------- */
     await page.locator(".studio-dock button", { hasText: /^Importer/ }).click();
+    await page.locator(".importer-modes button", { hasText: /^Texte$/ }).click();
     await page.locator(".importer-texte-champ textarea").fill("MATT ♥ 2026");
     await page.locator(".importer-texte-options input[aria-label=\"Code DMC de l'ombre\"]").fill("321");
     await expectText(page, ".importer-texte-apercu p", /\d+ × \d+ points/);
@@ -285,6 +286,7 @@ async function main() {
     const photoPath = path.join(ARTIFACT_DIR, "photo-essai.png");
     await writeFile(photoPath, syntheticPng(96, 64));
     await page.locator(".studio-dock button", { hasText: /^Importer/ }).click();
+    await page.locator(".importer-modes button", { hasText: /^Photo$/ }).click();
     await page.locator(".importer-photo").waitFor({ state: "visible" });
     await page.locator("input[accept*=\"image\"]").setInputFiles(photoPath);
     await page.locator(".importer-photo-table tbody tr").first().waitFor({ state: "visible" });
