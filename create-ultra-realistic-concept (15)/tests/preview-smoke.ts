@@ -45,8 +45,8 @@ async function main() {
 
     /* La présentation est la porte d'entrée, et son bouton mène réellement à l'atelier. */
     await page.locator(".presentation").waitFor({ state: "visible" });
-    assert.match((await page.getByRole("heading", { level: 1 }).innerText()).replace(/\s+/g, " "), /La géométrie devient broderie\./, "titre de la présentation inattendu");
-    assert.ok(await page.getByRole("link", { name: /Composer une rosace/ }).getAttribute("href") === "#atelier");
+    assert.match((await page.getByRole("heading", { level: 1 }).innerText()).replace(/\s+/g, " "), /Imaginez le motif\. Brodez-le\./, "titre de la présentation inattendu");
+    assert.ok(await page.getByRole("link", { name: /Créer mon premier motif/ }).getAttribute("href") === "#atelier");
     await page.getByRole("link", { name: "Ouvrir l'atelier" }).first().click();
     /* La présentation a aussi son tambour : on attend l'atelier lui-même, pas un canvas. */
     await page.locator(".studio-dock").waitFor({ state: "visible" });
