@@ -1,10 +1,9 @@
-import { useEffect, useState } from "react";
-import { Landing } from "./landing/Landing";
-import { RosaceContent } from "./RosaceModule";
-import { TopBar } from "./components/TopBar";
-import { RosaceProvider } from "./state/rosace-store";
+import { Suspense, lazy, useEffect, useState } from "react";
 
 type Route = "presentation" | "atelier";
+
+const Landing = lazy(() => import("./landing/Landing").then((module) => ({ default: module.Landing })));
+const Studio = lazy(() => import("./Studio"));
 
 /**
  * Deux entrées, une seule application.
@@ -26,15 +25,9 @@ export default function App() {
     return () => window.removeEventListener("hashchange", sync);
   }, []);
 
-  if (route === "presentation") return <Landing />;
-
   return (
-    <RosaceProvider>
-      <a className="lien-evitement" href="#composer">Aller à l'atelier</a>
-      <div className="app">
-        <TopBar />
-        <RosaceContent />
-      </div>
-    </RosaceProvider>
+    <Suspense fallback={<div role="status" aria-live="polite">Chargement de ROSACE…</div>}>
+      {route === "presentation" ? <Landing /> : <Studio />}
+    </Suspense>
   );
 }

@@ -71,21 +71,25 @@ Node 22 est utilisé pour la validation. Vite sert l'application sur `0.0.0.0` a
 | Commande | Rôle |
 |---|---|
 | `npm run dev` | serveur de développement |
-| `npm run build` | build de production multifichier dans `dist/` (pdf.js chargé à la demande) ; `ROSACE_SINGLEFILE=1 npm run build` produit l'ancien fichier unique |
+| `npm run build` | build de production multifichier dans `dist/` (présentation, atelier et pdf.js chargés à la demande) ; `ROSACE_SINGLEFILE=1 npm run build` produit l'ancien fichier unique |
 | `npm run preview` | sert le build réel |
-| `npm test` | assertions Node/tsx : `tests/verify.ts` (moteur, StitchWork, non-régression de 161 empreintes) puis `tests/import-pdf.ts` (noyau d'import PDF) |
+| `npm test` | assertions Node/tsx : moteur et non-régressions, import PDF, innovations Broderie et import photo |
 | `npm run typecheck` | TypeScript strict, `src` + `tests` + `vite.config.ts` |
 | `npm run test:browser` | parcours Playwright mobile + bureau, puis parcours d'import PDF (un vrai PDF produit par Chromium) |
 | `npm run test:preview` | fumage du build servi |
 | `npm run test:a11y` | accessibilité, clavier, réduction des animations sur 4 configurations — **bloquant, 0 violation axe** |
 | `npm run licenses` | régénère `LICENSES.md` |
-| `npm run test:all` | tests, typecheck, build, navigateur, preview |
+| `npm run test:all` | tests, typecheck, build, licences, navigateur, accessibilité et preview |
 
-`test:browser`, `test:preview` et `test:a11y` utilisent Chromium par défaut via `CHROMIUM_PATH` ; `BASE_URL` et `ARTIFACT_DIR` sont optionnels. `BROWSER=firefox|webkit` (avec `npx playwright install firefox webkit`) prépare les mêmes parcours pour Firefox et Safari/WebKit — **ces navigateurs ne sont pas encore exécutés**. Le workflow GitHub Actions est fourni dans `ci/github-workflow-ci.yml` : copiez-le vers `.github/workflows/ci.yml` une fois la permission `workflows` accordée à l'intégration GitHub pour activer la CI distante. Exemple :
+`test:browser`, `test:preview` et `test:a11y` utilisent Chromium par défaut via `CHROMIUM_PATH` ; `BASE_URL` et `ARTIFACT_DIR` sont optionnels. `BROWSER=firefox|webkit` (avec `npx playwright install firefox webkit`) permet de lancer les mêmes parcours pour Firefox et Safari/WebKit — **ces navigateurs ne sont pas encore exécutés**. Le workflow GitHub Actions actif `.github/workflows/rosace.yml` valide les pull requests vers `main` et les pushs sur `main`, `arena/**` et `chatgpt/**`. Exemple :
 
 ```bash
 CHROMIUM_PATH=/chemin/vers/chromium BASE_URL=http://127.0.0.1:5173 npm run test:browser
 ```
+
+Le chargement initial est découpé par écran : le JavaScript d'entrée est passé de 601 kB (196 kB gzip) à 196 kB (62 kB gzip) ; la présentation (42 kB) et l'atelier (247 kB) ne sont chargés qu'à leur ouverture. Le moteur PDF reste lui aussi différé.
+
+Le 8 novembre 2026, la dernière exécution distante observée sur `main` était réussie. La validation locale complète passe après le découpage ; la CI devra aussi repasser sur le commit qui le contient.
 
 ## Architecture
 
@@ -162,8 +166,8 @@ Les projets **version 1** sont migrés explicitement vers v2 lorsque leur forme 
 ## Limites connues
 
 - Validation terrain humaine (5 brodeuses, 3 recettes) encore à organiser ; les six familles géométriques sont vérifiées en Chromium headless, pas sur appareil réel.
-- Couverture navigateur exécutée : Chromium 153 headless uniquement. Safari/WebKit et Firefox sont **préparés** via `BROWSER=webkit|firefox`, mais non exécutés ; appareils réels et gestes tactiles matériels restent à valider.
-- La CI GitHub distante n'est pas encore active : le workflow est prêt dans `ci/github-workflow-ci.yml`, en attente de la permission `workflows`.
+- Couverture navigateur automatisée exécutée : Chromium 156 headless. Safari/WebKit et Firefox sont **préparés** via `BROWSER=webkit|firefox`, mais non exécutés ; appareils réels et gestes tactiles matériels restent à valider.
+- La CI GitHub distante est active via `.github/workflows/rosace.yml` ; la dernière exécution observée sur `main` a réussi. Le changement de découpage décrit plus haut doit encore passer dans une nouvelle exécution CI.
 - Couleurs écran indicatives ; métrages et temps sont des estimations.
 - Le lien de partage ne transporte pas la progression.
 - Import PDF : demi-points, quarts, points arrière, nœuds et mélanges de fils ne sont pas lus (signalé à l'étape Vérifier) ; la lecture par image dépend de la qualité de la légende ; les tests utilisent un PDF synthétique produit par Chromium, les PDF réels restent à contrôler à la main.

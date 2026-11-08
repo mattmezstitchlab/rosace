@@ -533,6 +533,7 @@ async function main() {
       }]));
     });
     await legacyPage.reload({ waitUntil: "domcontentloaded" });
+    await legacyPage.locator(".hoop-canvas").waitFor({ state: "visible" });
     const favoritePalette = await legacyPage.evaluate(() => JSON.parse(localStorage.getItem("aime-rosace-favorites-v1") ?? "[]")[0].config.palette);
     assert.deepEqual(favoritePalette, ["BLANC", "ECRU", "310", "902", "3607"]);
     await openDock(legacyPage, "Sauvegarder");
@@ -627,6 +628,7 @@ async function main() {
     const navPage = await navContext.newPage();
     trackErrors(navPage, "navigation");
     await navPage.goto(STUDIO_URL, { waitUntil: "domcontentloaded" });
+    await navPage.locator(".hoop-canvas").waitFor({ state: "visible" });
     const configA = normalizeConfig({ ...DEFAULT_CONFIG, seed: 123, palette: [...DEFAULT_CONFIG.palette] });
     const configB = normalizeConfig({ ...DEFAULT_CONFIG, seed: 456, palette: [...DEFAULT_CONFIG.palette] });
     const hashA = `#r=${encodeConfig(configA)}`;

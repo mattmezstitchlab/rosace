@@ -2,6 +2,13 @@
 
 Ce document distingue strictement ce qui **a été exécuté** de ce qui est **préparé mais non exécuté**. Les contrôles exécutés font échouer la commande concernée en cas de régression ; aucun contrôle simplement prévu n'est présenté comme réussi.
 
+## Mise à jour — 8 novembre 2026
+
+- Le workflow `.github/workflows/rosace.yml` est actif. La dernière exécution distante observée sur `main` (`3ecec03`) a réussi ; les changements postérieurs doivent encore passer dans une nouvelle exécution CI.
+- La suite locale `npm run test:all` a réussi après le découpage du chargement de la présentation et de l'atelier.
+- Le chunk JavaScript d'entrée est passé de 601,42 kB (196,35 kB gzip) à 195,87 kB (61,84 kB gzip) ; `Landing` (42,03 kB) et `Studio` (246,99 kB) sont chargés à la demande. Le chunk PDF de 437,69 kB reste différé.
+- Les tableaux ci-dessous restent le relevé historique des contrôles de la revue précédente.
+
 ## Dernière revue avant fusion — points demandés
 
 | Point demandé | Vérification exécutée | Résultat |
@@ -51,12 +58,11 @@ Un seul contrôle reste `incomplete` par configuration : `color-contrast` sur 2 
 
 Le contrôle de brodabilité retirait auparavant 4 points de contour isolés mais formant **deux paires miroir parfaites** sur la structure 4 de la Corolle. Ils sont désormais reconnus comme détails volontaires : une croix isolée asymétrique est retirée, une croix isolée dont le symétrique est également isolé (ou le point central) est conservée. Résultat : `cleaned=0` et `mirrorSymmetric=true` sur les 30 combinaisons, sans changer la recette par défaut.
 
-## CI GitHub
+## CI GitHub — état historique de la revue précédente
 
-- Workflow prêt : `ci/github-workflow-ci.yml` ; copie préparée pour `.github/workflows/ci.yml`.
+- À la date de cette revue précédente, le workflow était décrit comme prêt dans `ci/github-workflow-ci.yml`.
 - `npm run test:a11y` y est **bloquant** (le `|| echo` a été retiré).
-- **CI distante non active à ce stade** : `gh pr checks 1` ne remonte aucun check. L'intégration GitHub de cette session n'a pas la permission `workflows` ; tout push contenant `.github/workflows/*.yml` est refusé (`refusing to allow a GitHub App to create or update workflow ... without workflows permission`). Aucun contournement par API, PAT ou autre jeton n'a été utilisé.
-- Permission supplémentaire nécessaire : **`workflows: write`** sur l'installation de la GitHub App (en plus de `contents: write` déjà accordée). Voir procédure exacte dans le rapport final.
+- Le workflow actif est désormais `.github/workflows/rosace.yml` ; la dernière exécution observée sur `main` est réussie. Les remarques historiques ci-dessous reflètent l'état antérieur et ne décrivent plus l'activation actuelle.
 - Toutes les étapes du workflow ont été exécutées localement ; une compilation réussie n'est pas présentée comme une validation fonctionnelle.
 
 ## Préparés, non exécutés

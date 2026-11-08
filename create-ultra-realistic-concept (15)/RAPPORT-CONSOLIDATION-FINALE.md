@@ -4,6 +4,14 @@
 
 Ce document est le **seul rapport applicatif** de la branche. Les anciens rapports `ATLAS-INTEGRATION.md`, `DMC-SOURCES.md` et `LOT-2-RAPPORT.md` ont été supprimés ; ce fichier les remplace. Les contrôles qualité exécutés / prévus sont détaillés dans `QUALITE-PRODUIT.md`, sans créer de second rapport de consolidation.
 
+## Addendum — 8 novembre 2026
+
+Les sections ci-dessous sont le relevé historique de la revue précédente ; les mentions de CI distante inactive ne sont plus actuelles. Le workflow `.github/workflows/rosace.yml` est actif : sa dernière exécution observée sur `main` (`3ecec03`) a réussi, mais la présente modification locale doit encore passer dans une nouvelle exécution CI.
+
+- Présentation et atelier chargés à la demande ; le chunk JavaScript d'entrée passe de 601,42 kB (196,35 kB gzip) à 195,87 kB (61,84 kB gzip). Le moteur PDF reste différé.
+- `npm run test:all` réussit avec 63 tests, typecheck, build, parcours navigateur, accessibilité et preview de production.
+- La modification du test navigateur attend maintenant le rendu de l'atelier avant de vérifier les migrations et la navigation, conformément au chargement asynchrone.
+
 ---
 
 ## 0. Dernière revue avant fusion — rapport court

@@ -6,6 +6,7 @@
 - Ce chantier protège le moteur existant : `generateRosace`, `StitchWork`, les recettes et empreintes historiques, les 489 couleurs DMC, la broderie et les exports ne sont pas modifiés.
 - Une validation GitHub Actions est installée dans `.github/workflows/rosace.yml`. Elle s'exécute sur les pull requests vers `main` et les branches `main`, `arena/**`, `chatgpt/**`.
 - `npm run test:all` démarre désormais les serveurs de développement et de prévisualisation nécessaires et exécute les vérifications d'accessibilité, en plus des tests, du typecheck et de la compilation.
+- La dernière exécution GitHub Actions observée le 8 novembre 2026 sur `main` est réussie. Le découpage récent du chargement a été vérifié localement ; la CI doit encore s'exécuter sur le commit qui le contient.
 
 ## Contrôles indispensables avant fusion
 
