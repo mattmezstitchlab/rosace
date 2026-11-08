@@ -35,46 +35,15 @@ jobs:
         working-directory: create-ultra-realistic-concept (15)
         run: npm ci --no-audit --no-fund
 
-      - name: Tests unitaires
-        working-directory: create-ultra-realistic-concept (15)
-        run: npm test
-
-      - name: Typecheck strict
-        working-directory: create-ultra-realistic-concept (15)
-        run: npm run typecheck
-
-      - name: Build (multifichier, dist/)
-        working-directory: create-ultra-realistic-concept (15)
-        run: npm run build
-
-      - name: Inventaire des licences
-        working-directory: create-ultra-realistic-concept (15)
-        run: npm run licenses
-
       - name: Chromium pour Playwright
         working-directory: create-ultra-realistic-concept (15)
         run: |
           npx playwright install --with-deps chromium
           echo "CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
 
-      - name: Parcours navigateur + accessibilité bloquante sur le serveur de dev
+      - name: Validation complète (tests, types, build, navigateur, accessibilité, preview)
         working-directory: create-ultra-realistic-concept (15)
-        run: |
-          npm run dev -- --host 127.0.0.1 --port 5173 --strictPort > /tmp/rosace-dev.log 2>&1 &
-          echo $! > /tmp/rosace-dev.pid
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:5173 > /dev/null && break; sleep 1; done
-          BASE_URL=http://127.0.0.1:5173 npm run test:browser
-          BASE_URL=http://127.0.0.1:5173 npm run test:a11y
-          kill "$(cat /tmp/rosace-dev.pid)" || true
-
-      - name: Fumage du build servi par npm run preview
-        working-directory: create-ultra-realistic-concept (15)
-        run: |
-          npm run preview -- --host 127.0.0.1 --port 4173 --strictPort > /tmp/rosace-preview.log 2>&1 &
-          echo $! > /tmp/rosace-preview.pid
-          for i in $(seq 1 60); do curl -fsS http://127.0.0.1:4173 > /dev/null && break; sleep 1; done
-          BASE_URL=http://127.0.0.1:4173 npm run test:preview
-          kill "$(cat /tmp/rosace-preview.pid)" || true
+        run: npm run test:all
 
       - name: Artefacts
         if: always()
