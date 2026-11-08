@@ -65,9 +65,12 @@ export function ImportPdf() {
   if (!importOpen) return null;
   const onUse = (work: StitchWork) => { loadImportedWork(work); notify("Patron prêt à broder", `${work.width} × ${work.height} points · ${work.palette.length} fils · empreinte ${work.fingerprint.slice(0, 8)}`); };
   const onRosace = (config: RosaceConfig, fingerprint: string) => { closeImport(); loadRecipe(config, "Fiche ROSACE retrouvée", `Recette et empreinte ${fingerprint.slice(0, 8)} identiques à l'impression`); };
+  const initialMode: "pdf" | "photo" | "texte" = window.location.hash.startsWith("#atelier-importer-photo")
+    ? "photo"
+    : window.location.hash.startsWith("#atelier-importer-texte") ? "texte" : "pdf";
   return importFile
     ? <ImportWorkbench key={`${importFile.name}-${importFile.size}-${importFile.lastModified}`} file={importFile} onClose={closeImport} onUse={onUse} onRosace={onRosace} />
-    : <DropZone onFile={setImportFile} onClose={closeImport} onUse={onUse} activeTitle={activeWork.origin.kind !== "rosace" ? activeWork.origin.provenance.file : null} />;
+    : <DropZone onFile={setImportFile} onClose={closeImport} onUse={onUse} activeTitle={activeWork.origin.kind !== "rosace" ? activeWork.origin.provenance.file : null} initialMode={initialMode} />;
 }
 
 /** Texte brodé : une phrase, un ou deux fils, et l'ouvrage est prêt. Même validation que tout import. */
@@ -89,7 +92,7 @@ function TextMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
   const error = grid && "error" in grid ? grid.error : outcome && !outcome.ok ? outcome.error : "";
   return (
     <div className="importer-texte-atelier">
-      <h2>Ou brodez un texte</h2>
+      <h2>Écrivez votre texte à broder</h2>
       <p>Un prénom, une date, un mot doux : la police 5 × 7 de ROSACE le transforme en croix, avec un fil et une ombre facultative.</p>
       <label className="importer-texte-champ">
         <span>Texte (capitales, chiffres, accents, ♥ ; une ligne par retour)</span>
@@ -168,7 +171,7 @@ function PhotoMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
 
   return (
     <div className="importer-texte-atelier importer-photo">
-      <h2>Ou partez d'une photo</h2>
+      <h2>Transformez votre photo en patron</h2>
       <p>Une image devient une grille de croix : les fils DMC sont triés par ressemblance, les confettis nettoyés, et chaque couleur d'écran est annoncée pour ce qu'elle est — une valeur sRGB, pas le fil.</p>
       <div className="importer-photo-choix">
         <button type="button" className="bouton" onClick={() => inputRef.current?.click()}><ImageIcon size={16} aria-hidden="true" /> {source ? "Changer d'image" : "Choisir une image"}</button>
@@ -225,7 +228,19 @@ function PhotoMaker({ onUse }: { onUse: (work: StitchWork) => void }) {
   );
 }
 
-function DropZone({ onFile, onClose, onUse, activeTitle }: { onFile: (file: File) => void; onClose: () => void; onUse: (work: StitchWork) => void; activeTitle: string | null }) {
+function DropZone({ onFile, onClose, onUse, activeTitle, initialMode }: {
+  onFile: (file: File) => void;
+  onClose: () => void;
+  onUse: (work: StitchWork) => void;
+  activeTitle: string | null;
+  initialMode: "pdf" | "photo" | "texte";
+}) {
+  const [mode, setMode] = useState<"pdf" | "photo" | "texte">(initialMode);
+  const chooseMode = (next: "pdf" | "photo" | "texte") => {
+    setMode(next);
+    const hash = next === "pdf" ? "#atelier-importer" : `#atelier-importer-${next}`;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+  };
   const inputRef = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const firstRef = useRef<HTMLButtonElement>(null);
@@ -241,13 +256,34 @@ function DropZone({ onFile, onClose, onUse, activeTitle }: { onFile: (file: File
     onFile(file);
   };
   return (
-    <section className="importer" role="dialog" aria-modal="true" aria-label="Importer un patron PDF">
+    <section className="importer" role="dialog" aria-modal="true" aria-label="Créer un ouvrage à partir d'un document, d'une image ou d'un texte">
       <div className="importer-tete">
         <button className="outil outil-icone" onClick={onClose} aria-label="Fermer l'import"><ArrowLeft size={21} aria-hidden="true" /></button>
-        <div className="importer-titre"><strong>Importer un patron PDF</strong><span>Analyser · Caler · Assembler · Vérifier · Utiliser</span></div>
+        <div className="importer-titre">
+          <strong>{mode === "pdf" ? "Importer un patron PDF" : mode === "photo" ? "Transformer une photo" : "Broder un texte"}</strong>
+          <span>{mode === "pdf" ? "Analyser · Caler · Assembler · Vérifier" : mode === "photo" ? "Choisir une image · Préparer les fils" : "Écrire · Choisir les fils · Broder"}</span>
+        </div>
       </div>
       <div className="importer-corps importer-corps-centre">
-        <div
+        <nav className="importer-modes" aria-label="Choisir un point de départ">
+          <a href="#atelier" onClick={onClose}>Rosace</a>
+          {([
+            { id: "photo", label: "Photo" },
+            { id: "texte", label: "Texte" },
+            { id: "pdf", label: "PDF" },
+          ] as const).map((entry) => (
+            <button
+              type="button"
+              key={entry.id}
+              ref={mode === entry.id ? firstRef : undefined}
+              aria-pressed={mode === entry.id}
+              onClick={() => chooseMode(entry.id)}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </nav>
+        {mode === "pdf" && <div
           className={`importer-depot ${over ? "is-over" : ""}`}
           onDragOver={(event) => { event.preventDefault(); setOver(true); }}
           onDragLeave={() => setOver(false)}
@@ -256,12 +292,12 @@ function DropZone({ onFile, onClose, onUse, activeTitle }: { onFile: (file: File
           <FileUp size={34} strokeWidth={1.5} aria-hidden="true" />
           <h2>Déposez votre patron PDF</h2>
           <p>Un patron multipage de point de croix. ROSACE lit ses pages, recompose la grille avec vous, puis vous brodez croix par croix.</p>
-          <button ref={firstRef} type="button" className="bouton noir" onClick={() => inputRef.current?.click()}>Choisir un fichier PDF</button>
+          <button type="button" className="bouton noir" onClick={() => inputRef.current?.click()}>Choisir un fichier PDF</button>
           <input ref={inputRef} type="file" accept="application/pdf,.pdf" className="sr-only" aria-label="Choisir un patron PDF" onChange={(event) => { accept(event.target.files?.[0]); event.target.value = ""; }} />
           <small>Le fichier reste sur votre appareil : rien n'est envoyé. {activeTitle ? `Votre patron actuel (${activeTitle}) sera remplacé seulement à l'étape Utiliser.` : "Votre rosace actuelle n'est modifiée qu'à l'étape Utiliser."} Une fiche imprimée par ROSACE est reconnue et retrouvée à l'identique.</small>
-        </div>
-        <PhotoMaker onUse={onUse} />
-        <TextMaker onUse={onUse} />
+        </div>}
+        {mode === "photo" && <PhotoMaker onUse={onUse} />}
+        {mode === "texte" && <TextMaker onUse={onUse} />}
       </div>
     </section>
   );

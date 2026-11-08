@@ -2,25 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import { ArrowRight, ArrowUpRight } from "lucide-react";
 import { RosaceLogo } from "../components/RosaceLogo";
 import { Comparateur, LandingSections } from "./Sections";
-import { HERO_STATS, decimal, nombre } from "./data";
 
 const LIENS = [
-  { href: "#entrees", label: "Quatre portes" },
-  { href: "#formes", label: "Formes" },
-  { href: "#couleurs", label: "Couleurs" },
-  { href: "#realisation", label: "Patron" },
+  { href: "#entrees", label: "Créer" },
+  { href: "#formes", label: "Découvrir" },
   { href: "#broder", label: "Broder" },
-  { href: "#photo", label: "Photo" },
-  { href: "#progression", label: "Garder" },
-  { href: "#atelier-importer", label: "Importer" },
-];
-
-
-const INFOS = [
-  { valeur: `${nombre(HERO_STATS.stitches)} croix`, note: "patron calculé" },
-  { valeur: `${HERO_STATS.threads} fils DMC`, note: "références identifiables" },
-  { valeur: `${decimal(HERO_STATS.widthCm)} cm`, note: `aïda ${HERO_STATS.aida}` },
-  { valeur: `${HERO_STATS.duration}`, note: "temps estimé" },
 ];
 
 /**
@@ -130,36 +116,26 @@ export function Landing() {
           <div className="heros-texte">
             <p className="surtitre">Atelier de point de croix</p>
             <h1 id="titre-heros" className="heros-titre">
-              La géométrie
-              <span className="heros-titre-suite"> devient broderie.</span>
+              Imaginez le motif.
+              <span className="heros-titre-suite"> Brodez-le.</span>
             </h1>
             <p className="heros-chapeau">
-              Composez une rosace, importez un patron PDF, écrivez un mot ou convertissez une photo : un seul atelier,
-              une grille vivante, chaque croix suivie jusqu'à la dernière — avec ses fils DMC, ses dimensions et son temps.
+              Créez un patron de point de croix unique, choisissez vos fils DMC, puis suivez chaque croix jusqu’à la dernière. La géométrie devient broderie.
             </p>
             <div className="heros-actions">
               <a className="bouton bouton-noir" href="#atelier">
-                Composer une rosace
+                Créer mon premier motif
                 <ArrowRight size={17} strokeWidth={2} aria-hidden="true" />
               </a>
-              <a className="bouton bouton-contour" href="#atelier-importer">
-                Importer un patron PDF
+              <a className="bouton bouton-contour" href="#entrees">
+                Choisir comment commencer
               </a>
             </div>
             <p className="heros-mention">
-              Gratuit à essayer <span aria-hidden="true">·</span> Aucun compte nécessaire pour commencer <span aria-hidden="true">·</span> <a href="#entrees">Voir comment ça marche</a>
+              Essai gratuit <span aria-hidden="true">·</span> Sans compte pour commencer <span aria-hidden="true">·</span> Quatre façons de créer
             </p>
-            <p className="heros-mention">Au-dessus, attrapez le trait : d'un côté les croix, de l'autre la grille — le même patron.</p>
+            <p className="heros-mention">Au-dessus, glissez le trait pour révéler le motif et sa grille technique.</p>
           </div>
-
-          <ul className="heros-infos" aria-label="Le patron en chiffres">
-            {INFOS.map((info) => (
-              <li key={info.note}>
-                <strong>{info.valeur}</strong>
-                <span>{info.note}</span>
-              </li>
-            ))}
-          </ul>
         </section>
 
         <LandingSections />
@@ -192,13 +168,10 @@ export function Landing() {
           </div>
         </div>
         <nav className="pied-liens" aria-label="Liens de la présentation">
-          <a href="#entrees">Quatre portes</a>
-          <a href="#formes">Formes</a>
-          <a href="#couleurs">Couleurs</a>
+          <a href="#entrees">Créer</a>
+          <a href="#formes">Découvrir</a>
           <a href="#broder">Broder</a>
-          <a href="#progression">Garder</a>
           <a href="#atelier">Atelier</a>
-          <a href="#atelier-importer">Importer</a>
         </nav>
         <p className="pied-legal">
           Un atelier par LE MONDE AIME®.<br />

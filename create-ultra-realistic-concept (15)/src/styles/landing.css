@@ -1010,3 +1010,32 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .nuancier-marque { margin-top: 6px; padding: 3px 10px; border-radius: 999px; background: var(--l-encre); color: var(--l-fond); font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; }
 .presentation .nuancier-aide { margin-top: 12px; font-size: 12px; color: var(--l-encre-3); }
 @media (max-width: 600px) { .presentation .nuancier-aide { display: none; } .presentation .nuancier-centre { width: 56%; } }
+
+
+/* Landing courte : les quatre départs prennent la priorité sur les démonstrations techniques. */
+.presentation #entrees { padding-top: clamp(30px, 4vw, 64px); }
+.presentation .landing-plus {
+  width: 100%; margin: 0; padding: 0 0 clamp(32px, 5vw, 70px);
+  border-top: 1px solid var(--l-trait); background: var(--l-fond);
+}
+.presentation .landing-plus > summary {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  max-width: 1200px; margin: 0 auto; padding: 28px var(--l-gouttiere);
+  font-size: clamp(16px, 2vw, 22px); font-weight: 650; color: var(--l-encre);
+  cursor: pointer; list-style: none;
+}
+.presentation .landing-plus > summary::-webkit-details-marker { display: none; }
+.presentation .landing-plus > summary::after {
+  content: "+"; flex: none; width: 32px; height: 32px;
+  display: grid; place-items: center; border: 1px solid var(--l-trait-2);
+  border-radius: 50%; font-size: 23px; font-weight: 400;
+}
+.presentation .landing-plus[open] > summary::after { content: "−"; }
+.presentation .landing-plus > summary:focus-visible { outline: 2px solid var(--l-encre); outline-offset: -5px; }
+.presentation .landing-plus > .section { padding-block: clamp(40px, 6vw, 78px); }
+@media (max-width: 600px) {
+  .presentation .entree { flex-direction: row; align-items: center; gap: 12px; }
+  .presentation .entree-image { flex: 0 0 33%; width: 33%; }
+  .presentation .entree-texte { padding-top: 0; }
+  .presentation .landing-plus > summary { padding: 20px var(--l-gouttiere); }
+}
