@@ -5,6 +5,12 @@
 .broder-titre strong { overflow: hidden; font-size: 16px; font-weight: 650; letter-spacing: -.02em; text-overflow: ellipsis; white-space: nowrap; }
 .broder-titre span { color: var(--encre-3); font-size: 12px; font-variant-numeric: tabular-nums; }
 .broder-actions { display: flex; gap: 2px; }
+.broder-live-cta { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 10px; border-radius: 10px; font-size: 12px; font-weight: 650; white-space: nowrap; }
+.broder-live-cta.is-active { border-color: color-mix(in srgb, #147870 55%, var(--trait)); background: color-mix(in srgb, #147870 12%, var(--carte)); }
+@media (max-width: 720px) {
+  .broder-live-cta span { display: none; }
+  .broder-live-cta { padding: 0 8px; }
+}
 .broder-progression { flex: none; height: 3px; background: var(--trait); }
 .broder-progression span { display: block; height: 100%; background: var(--encre); transition: width .25s ease-out; }
 .broder-plateau { display: flex; flex: 1; min-height: 0; padding: 8px; }

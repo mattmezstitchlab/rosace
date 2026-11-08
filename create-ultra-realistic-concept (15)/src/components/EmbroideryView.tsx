@@ -157,6 +157,7 @@ export function EmbroideryView() {
   const [livePeers, setLivePeers] = useState<Record<string, LivePeer>>({});
   const peerRef = useRef<HTMLInputElement>(null);
   const liveRoomRef = useRef<HTMLInputElement>(null);
+  const liveSectionRef = useRef<HTMLElement>(null);
   const fabricRef = useRef<HTMLCanvasElement | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; k: number; x: number; y: number; mx: number; my: number } | null>(null);
@@ -879,6 +880,13 @@ export function EmbroideryView() {
     persist(snapshot);
     exportActions.project(snapshot);
   };
+  const openBroderEnsemble = () => {
+    liveSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    window.setTimeout(() => {
+      liveRoomRef.current?.focus();
+      liveRoomRef.current?.select();
+    }, 160);
+  };
 
   if (!embroideryOpen) return null;
 
@@ -887,6 +895,10 @@ export function EmbroideryView() {
       <header className="broder-tete">
         <button ref={closeRef} className="outil outil-icone" onClick={close} aria-label="Fermer le mode broderie et enregistrer la progression">
           <ChevronLeft size={21} aria-hidden="true" />
+        </button>
+        <button className={`outil broder-live-cta ${liveEnabled ? "is-active" : ""}`} onClick={openBroderEnsemble} aria-label="Ouvrir Broder ensemble">
+          <Users size={15} aria-hidden="true" />
+          <span>Broder ensemble</span>
         </button>
         <div className="broder-titre">
           <strong>{workTitle(pattern)}</strong>
@@ -950,7 +962,7 @@ export function EmbroideryView() {
             <button type="button" onClick={clearPeer}>Retirer</button>
           </p>
         )}
-        <section className="broder-live" aria-label="Session live de broderie">
+        <section ref={liveSectionRef} className="broder-live" aria-label="Session live de broderie">
           <div className="broder-live-ligne">
             <label>
               Nom
@@ -1044,7 +1056,7 @@ export function EmbroideryView() {
         <div className="broder-outils">
           <button className="bouton bouton-petit" onClick={exportProject}><Download size={15} aria-hidden="true" /> Projet</button>
           <button className="bouton bouton-petit" onClick={() => fileRef.current?.click()}><FolderOpen size={15} aria-hidden="true" /> Importer</button>
-          <button className="bouton bouton-petit" onClick={() => peerRef.current?.click()}><Users size={15} aria-hidden="true" /> Calque amie</button>
+          <button className="bouton bouton-petit" onClick={() => peerRef.current?.click()}><Users size={15} aria-hidden="true" /> Importer calque</button>
           <input
             ref={peerRef}
             type="file"
