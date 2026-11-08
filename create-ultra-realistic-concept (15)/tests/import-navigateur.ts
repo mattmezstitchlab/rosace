@@ -166,7 +166,20 @@ async function main() {
     await page.keyboard.press("ArrowLeft");
     await expectText(page, ".importer-segments button[aria-pressed=true]", /Automatique/);
     // Ce PDF n'a pas de légende lisible en image : la lecture automatique le dit, sans inventer de couleurs.
-    await expectText(page, ".importer-section .panneau-aide", /512 symbole\(s\) sans code, laissés vides/, 60000);
+    try {
+      await expectText(page, ".importer-section .panneau-aide", /512 symbole\\(s\\) sans code, laissés vides/, 12000);
+    } catch (error) {
+      const details = {
+        mode: await page.locator(".importer-segments button[aria-pressed=true]").allTextContents(),
+        explanation: await page.locator(".importer-section .panneau-aide").allTextContents(),
+        summary: await page.locator(".importer-resume").allTextContents(),
+        alerts: await page.locator(".importer-alerte, .importer-erreur").allTextContents(),
+        body: (await page.locator(".importer-corps").innerText()).slice(0, 4500),
+      };
+      console.error("DIAGNOSTIC PDF auto", JSON.stringify(details, null, 2));
+      await page.screenshot({ path: path.join(ARTIFACT_DIR, "import-auto-diagnostic.png") });
+      throw error;
+    }
     assert.equal(await page.locator(".importer-resume").count(), 0, "aucune grille approximative n'est proposée");
     await page.getByRole("button", { name: /Réaligner/ }).click();
     // Retour à la lecture exacte : les positions viennent des graduations.
