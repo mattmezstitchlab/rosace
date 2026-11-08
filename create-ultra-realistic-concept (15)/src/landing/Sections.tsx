@@ -11,7 +11,7 @@ import { RosaceRender } from "./media";
 
 /* ------------------------------------------------------------------ Entrées */
 /**
- * Les trois portes de l'atelier. Chaque image sort du moteur : la rosace du hero,
+ * Les quatre portes de l'atelier. Chaque image sort du moteur : la rosace du hero,
  * sa grille découpée en pages comme l'import la recompose, un texte dans la police brodée.
  */
 
@@ -19,11 +19,10 @@ function Entrees() {
   return (
     <section id="entrees" className="section" aria-labelledby="titre-entrees">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">02 — Un atelier, quatre portes</p>
-        <h2 id="titre-entrees">Composez, importez, écrivez ou convertissez : la suite est la même.</h2>
+        <p className="surtitre">Choisir mon départ</p>
+        <h2 id="titre-entrees">Qu’aimeriez-vous créer aujourd’hui ?</h2>
         <p className="section-chapeau">
-          Une rosace calculée, un patron PDF acheté ailleurs, un prénom en lettres brodées ou une photo entrent par des
-          portes différentes et arrivent au même endroit : <strong>une grille, une palette DMC, une progression suivie croix par croix.</strong>
+          Choisissez votre point de départ. Chaque création devient un patron que vous pouvez personnaliser, imprimer et suivre croix par croix.
         </p>
       </div>
 
@@ -35,7 +34,7 @@ function Entrees() {
           <div className="entree-texte">
             <p className="entree-sur"><Circle size={13} strokeWidth={2} aria-hidden="true" /> Créer</p>
             <h3>Une rosace à vous</h3>
-            <p>Six géométries, une couronne de {nombre(489)} fils DMC, le patron calculé en direct : croix, métrages, dimensions, temps.</p>
+            <p>Une composition unique à faire évoluer avec vos formes et vos couleurs.</p>
             <a className="lien-souligne" href="#atelier">Créer ma rosace</a>
           </div>
         </li>
@@ -50,7 +49,7 @@ function Entrees() {
           <div className="entree-texte">
             <p className="entree-sur"><FileText size={13} strokeWidth={2} aria-hidden="true" /> Importer</p>
             <h3>Un patron PDF, page par page</h3>
-            <p>Les pages sont lues, assemblées comme un puzzle, les recouvrements vérifiés. Ce qui n'a pas pu être relu est compté et annoncé — jamais inventé.</p>
+            <p>Importez un patron. Les données non reconnues sont signalées avant utilisation.</p>
             <a className="lien-souligne" href="#atelier-importer">Importer un patron PDF</a>
           </div>
         </li>
@@ -61,19 +60,19 @@ function Entrees() {
           <div className="entree-texte">
             <p className="entree-sur"><Type size={13} strokeWidth={2} aria-hidden="true" /> Écrire</p>
             <h3>Un prénom, une date, un mot doux</h3>
-            <p>Une police de croix dessinée pour l'aïda, un fil pour le texte et un pour l'ombre : {nombre(TEXT_WORK.stitches.length)} croix ici, prêtes à broder.</p>
-            <a className="lien-souligne" href="#atelier-importer">Écrire un texte brodé</a>
+            <p>Un prénom, une date, quelques mots : transformez-les en croix, avec les fils de votre choix.</p>
+            <a className="lien-souligne" href="#atelier-importer-texte">Écrire un texte brodé</a>
           </div>
         </li>
         <li className="entree">
           <div className="entree-image entree-image--photo">
-            <RosaceRender pattern={HERO_PATTERN} mode="color" resolution={640} label="Une grille en couleurs pleines, telle qu'une photo convertie" />
+            <RosaceRender pattern={HERO_PATTERN} mode="color" resolution={640} label="Un exemple de grille colorée produite dans l’atelier" />
           </div>
           <div className="entree-texte">
             <p className="entree-sur"><ImageIcon size={13} strokeWidth={2} aria-hidden="true" /> Convertir</p>
             <h3>Une photo, triée en fils</h3>
-            <p>Les fils DMC les plus proches, les confettis nettoyés, et chaque couleur d'écran annoncée en sRGB face au fil. <a href="#photo">Voir la démonstration</a>.</p>
-            <a className="lien-souligne" href="#atelier-importer">Convertir une photo</a>
+            <p>À partir de votre image, obtenez une grille et une palette de fils DMC approchante.</p>
+            <a className="lien-souligne" href="#atelier-importer-photo">Convertir une photo</a>
           </div>
         </li>
       </ul>
@@ -264,15 +263,12 @@ function Patron() {
   return (
     <section id="realisation" className="section" aria-labelledby="titre-realisation">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">05 — Le patron PDF, recomposé sous vos yeux</p>
+        <p className="surtitre">Découvrir l’import PDF</p>
         <h2 id="titre-realisation">
-          Quatre pages, un puzzle,
-          <br />
-          une grille exacte.
+          Quatre pages, un puzzle,<br /> une grille vérifiée.
         </h2>
         <p className="section-chapeau">
-          Un patron acheté en PDF arrive en pages. ROSACE les lit, vous les calez sur la table de montage, et chaque
-          case recouverte, chaque conflit, chaque trou est compté. <strong>Essayez, c'est le vrai moteur.</strong>
+          Cette démonstration recompose quatre pages du même patron et vérifie leur empreinte. Avec un PDF externe, certaines informations peuvent manquer : elles seront signalées.
         </p>
       </div>
 
@@ -391,8 +387,7 @@ function Progression() {
         <p className="surtitre">07 — Gardez votre progression</p>
         <h2 id="titre-progression">Votre rosace vous appartient.</h2>
         <p className="section-chapeau">
-          Sauvegardez une création, reprenez votre progression d'un appareil à l'autre, comparez plusieurs palettes et
-          exportez votre projet quand vous êtes prêt. Un patron importé se garde de la même façon.
+          Votre progression est gardée sur cet appareil. Pour reprendre sur un autre, exportez votre fichier projet puis importez-le sur le nouvel appareil : il n’y a pas de synchronisation automatique.
         </p>
       </div>
 
@@ -442,71 +437,19 @@ function Progression() {
   );
 }
 
-/* ------------------------------------------------------------------- Public */
-const PUBLICS = [
-  {
-    titre: "Je découvre la broderie",
-    texte: "Commencer avec une composition simple, sans compte et sans matériel compliqué.",
-  },
-  {
-    titre: "Je cherche un motif personnel",
-    texte: "Créer une rosace qui n'existe nulle part ailleurs, avec vos couleurs.",
-  },
-  {
-    titre: "Je veux préparer un ouvrage",
-    texte: "Obtenir une grille, des couleurs et des dimensions précises avant de piquer l'aiguille.",
-  },
-  {
-    titre: "J'ai déjà un patron PDF",
-    texte: "Importer ses pages, recomposer la grille dans l'atelier et suivre chaque croix jusqu'à la dernière — ou broder un prénom en quelques lettres.",
-    href: "#atelier-importer",
-  },
-];
-
-function Public() {
-  return (
-    <section id="public" className="section section--papier" aria-labelledby="titre-public">
-      <div className="section-tete" data-reveal>
-        <p className="surtitre">08 — Pour qui</p>
-        <h2 id="titre-public">
-          Pour celles et ceux qui aiment créer avec leurs mains.
-        </h2>
-        <p className="section-chapeau">
-          Brodeurs débutants, passionnés de point de croix, amateurs de motifs géométriques et créateurs
-          textiles : ROSACE vous aide à passer de l'idée à l'ouvrage.
-        </p>
-      </div>
-
-      <ul className="publics" data-reveal>
-        {PUBLICS.map((entree, index) => (
-          <li key={entree.titre}>
-            <span className="public-num">0{index + 1}</span>
-            <h3>{entree.titre}</h3>
-            <p>{entree.texte}</p>
-            {"href" in entree && entree.href && <a className="lien-souligne" href={entree.href}>Importer un patron</a>}
-          </li>
-        ))}
-      </ul>
-
-      <p className="public-fils" data-reveal>
-        Point de croix compté <span aria-hidden="true">·</span> coton DMC Mouliné{" "}
-        <span aria-hidden="true">·</span> aïda 14, 16 ou 18.
-      </p>
-    </section>
-  );
-}
-
 export function LandingSections() {
   return (
     <>
-      <Broder />
       <Entrees />
       <Formes />
       <Couleurs />
-      <Patron />
-      <Photo />
+      <Broder />
       <Progression />
-      <Public />
+      <details className="landing-plus" id="plus">
+        <summary>Explorer les démonstrations avancées : PDF et photo</summary>
+        <Patron />
+        <Photo />
+      </details>
     </>
   );
 }
