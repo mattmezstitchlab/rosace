@@ -32,6 +32,51 @@ function readDisplay(): Display {
   } catch { return "symbols"; }
 }
 const PEER_KEY = (fingerprint: string) => `aime-rosace-amie-v1:${fingerprint}`;
+const LIVE_NAME_KEY = "aime-rosace-live-name-v1";
+const LIVE_ROOM_KEY = (fingerprint: string) => `aime-rosace-live-room-v1:${fingerprint}`;
+const LIVE_STALE_MS = 12_000;
+const LIVE_COLORS = ["#0b7285", "#1d4ed8", "#7c3aed", "#be123c", "#0f766e", "#b45309"];
+
+type LivePeer = {
+  id: string;
+  name: string;
+  color: string;
+  cursor: { x: number; y: number } | null;
+  completed: Set<number>;
+  updatedAt: number;
+};
+
+type LiveMessage = {
+  kind: "state" | "leave";
+  sender: string;
+  name?: string;
+  color?: string;
+  cursor?: { x: number; y: number } | null;
+  completedRuns?: string;
+  updatedAt: number;
+};
+
+function readLiveName() {
+  try { return localStorage.getItem(LIVE_NAME_KEY) || "Moi"; } catch { return "Moi"; }
+}
+
+function readLiveRoom(fingerprint: string) {
+  try { return localStorage.getItem(LIVE_ROOM_KEY(fingerprint)) || shortFingerprint(fingerprint); } catch { return shortFingerprint(fingerprint); }
+}
+
+function sanitizeRoom(value: string) {
+  return value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 32) || "atelier";
+}
+
+function hashCode(input: string) {
+  let hash = 0;
+  for (let i = 0; i < input.length; i += 1) hash = (hash * 31 + input.charCodeAt(i)) | 0;
+  return Math.abs(hash);
+}
+
+function colorForParticipant(id: string) {
+  return LIVE_COLORS[hashCode(id) % LIVE_COLORS.length];
+}
 
 /** Fil conducteur : la zone compacte de croix restantes la plus proche d'un point, pour un fil donné (composante connexe, 8 voisins). */
 function nearestCluster(pattern: { width: number; height: number; cells: Int16Array }, completed: Set<number>, paletteIndex: number, from: { x: number; y: number }): { cells: number[]; nearest: { x: number; y: number } } | null {
@@ -106,14 +151,34 @@ export function EmbroideryView() {
   const [guide, setGuide] = useState(true);
   const [peer, setPeer] = useState<{ completed: Set<number>; updatedAt: string } | null>(null);
   const [threadBox] = useState<Set<string>>(() => readThreadBox());
+  const [liveEnabled, setLiveEnabled] = useState(false);
+  const [liveName, setLiveName] = useState(readLiveName);
+  const [liveRoom, setLiveRoom] = useState(() => readLiveRoom(fingerprint));
+  const [livePeers, setLivePeers] = useState<Record<string, LivePeer>>({});
   const peerRef = useRef<HTMLInputElement>(null);
+  const liveRoomRef = useRef<HTMLInputElement>(null);
   const fabricRef = useRef<HTMLCanvasElement | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const pinch = useRef<{ distance: number; k: number; x: number; y: number; mx: number; my: number } | null>(null);
   const tap = useRef<Tap | null>(null);
   const suppressTap = useRef(0);
-  const liveRef = useRef({ completed, selectedCode, view, history, sessions });
-  liveRef.current = { completed, selectedCode, view, history, sessions };
+  const channelRef = useRef<BroadcastChannel | null>(null);
+  const heartbeatRef = useRef<number | null>(null);
+  const clientId = useMemo(() => {
+    try {
+      const key = `aime-rosace-client-v1:${fingerprint}`;
+      const existing = localStorage.getItem(key);
+      if (existing) return existing;
+      const generated = (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`).slice(0, 32);
+      localStorage.setItem(key, generated);
+      return generated;
+    } catch {
+      return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    }
+  }, [fingerprint]);
+  const liveColor = useMemo(() => colorForParticipant(clientId), [clientId]);
+  const liveRef = useRef({ completed, selectedCode, view, history, sessions, cursor, liveName });
+  liveRef.current = { completed, selectedCode, view, history, sessions, cursor, liveName };
 
   const progress = useMemo(() => progressPercent(pattern, completed), [pattern, completed]);
   const remaining = useMemo(() => remainingByColor(pattern, completed), [pattern, completed]);
@@ -130,6 +195,11 @@ export function EmbroideryView() {
     return nearestCluster(pattern, completed, paletteIndex, from);
   }, [guide, selectedCode, paletteCodes, history, cursor, pattern, completed]);
   const peerDone = peer ? [...peer.completed].filter((index) => pattern.cells[index] >= 0).length : 0;
+  const activeLivePeers = useMemo(() => Object.values(livePeers).sort((a, b) => a.name.localeCompare(b.name, "fr")), [livePeers]);
+  const liveDoneTotal = useMemo(
+    () => activeLivePeers.reduce((sum, peerState) => sum + [...peerState.completed].filter((index) => pattern.cells[index] >= 0).length, 0),
+    [activeLivePeers, pattern.cells],
+  );
 
   /* ---------- Progression : une seule écriture canonique ---------- */
   const persist = useCallback((snapshot?: EmbroideryProgress): EmbroideryProgress | null => {
@@ -285,6 +355,121 @@ export function EmbroideryView() {
     return () => window.removeEventListener("storage", onStorage);
   }, [embroideryOpen, fingerprint, notify, pattern]);
 
+
+  /* ---------- Session live (MVP local : même navigateur / même appareil) ---------- */
+  const broadcastLive = useCallback((kind: "state" | "leave" = "state") => {
+    const channel = channelRef.current;
+    if (!channel) return;
+    const state = liveRef.current;
+    const payload: LiveMessage = {
+      kind,
+      sender: clientId,
+      updatedAt: Date.now(),
+      name: state.liveName.trim() || "Moi",
+      color: liveColor,
+      cursor: state.cursor,
+      completedRuns: serializeRuns(state.completed),
+    };
+    channel.postMessage(payload);
+  }, [clientId, liveColor]);
+
+  const stopLiveSession = useCallback(() => {
+    if (heartbeatRef.current) {
+      window.clearInterval(heartbeatRef.current);
+      heartbeatRef.current = null;
+    }
+    broadcastLive("leave");
+    channelRef.current?.close();
+    channelRef.current = null;
+    setLivePeers({});
+    setLiveEnabled(false);
+  }, [broadcastLive]);
+
+  const startLiveSession = useCallback(() => {
+    if (typeof BroadcastChannel === "undefined") {
+      notify("Session live indisponible", "Ce navigateur ne supporte pas BroadcastChannel.");
+      return;
+    }
+    const room = sanitizeRoom(liveRoom);
+    setLiveRoom(room);
+    try { localStorage.setItem(LIVE_NAME_KEY, liveName.trim() || "Moi"); } catch { /* préférence locale */ }
+    try { localStorage.setItem(LIVE_ROOM_KEY(fingerprint), room); } catch { /* préférence locale */ }
+
+    channelRef.current?.close();
+    const channel = new BroadcastChannel(`aime-rosace-live-v1:${fingerprint}:${room}`);
+    channelRef.current = channel;
+    setLivePeers({});
+    setLiveEnabled(true);
+
+    channel.onmessage = (event: MessageEvent<LiveMessage>) => {
+      const data = event.data;
+      if (!data || data.sender === clientId) return;
+      if (data.kind === "leave") {
+        setLivePeers((current) => {
+          const next = { ...current };
+          delete next[data.sender];
+          return next;
+        });
+        return;
+      }
+      if (data.kind !== "state") return;
+      setLivePeers((current) => ({
+        ...current,
+        [data.sender]: {
+          id: data.sender,
+          name: (data.name || "Brodeuse").slice(0, 24),
+          color: data.color || colorForParticipant(data.sender),
+          cursor: data.cursor ?? null,
+          completed: parseRuns(data.completedRuns ?? ""),
+          updatedAt: Number.isFinite(data.updatedAt) ? data.updatedAt : Date.now(),
+        },
+      }));
+    };
+
+    broadcastLive("state");
+    if (heartbeatRef.current) window.clearInterval(heartbeatRef.current);
+    heartbeatRef.current = window.setInterval(() => broadcastLive("state"), 2500);
+    notify("Session live active", `Code ${room.toUpperCase()} : ouvrez le même code sur l'autre onglet/appareil.`);
+  }, [broadcastLive, clientId, fingerprint, liveName, liveRoom, notify]);
+
+  useEffect(() => {
+    setLiveRoom(readLiveRoom(fingerprint));
+    setLivePeers({});
+    stopLiveSession();
+    // changement d'ouvrage : nouvelle salle par empreinte
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fingerprint]);
+
+  useEffect(() => {
+    if (!liveEnabled || !channelRef.current) return;
+    const timer = window.setTimeout(() => broadcastLive("state"), 120);
+    return () => window.clearTimeout(timer);
+  }, [broadcastLive, completed, cursor, liveEnabled, liveName]);
+
+  useEffect(() => {
+    if (!liveEnabled) return;
+    const sweep = window.setInterval(() => {
+      const now = Date.now();
+      setLivePeers((current) => {
+        const next: Record<string, LivePeer> = {};
+        for (const [id, value] of Object.entries(current)) {
+          if (now - value.updatedAt <= LIVE_STALE_MS) next[id] = value;
+        }
+        return Object.keys(next).length === Object.keys(current).length ? current : next;
+      });
+    }, 3000);
+    return () => window.clearInterval(sweep);
+  }, [liveEnabled]);
+
+  useEffect(() => {
+    if (!embroideryOpen && liveEnabled) stopLiveSession();
+  }, [embroideryOpen, liveEnabled, stopLiveSession]);
+
+  useEffect(() => () => {
+    if (heartbeatRef.current) window.clearInterval(heartbeatRef.current);
+    channelRef.current?.close();
+  }, []);
+
   /* ---------- Base graphique et dessin ---------- */
   useEffect(() => {
     if (!embroideryOpen) return;
@@ -387,7 +572,7 @@ export function EmbroideryView() {
       ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
     }
 
-    // Broder ensemble : les croix de l'amie, en contour, jamais confondues avec les miennes.
+    // Broder ensemble : les croix importées d'une amie, en contour vert.
     if (peer) {
       ctx.strokeStyle = "rgba(20,120,110,0.85)";
       ctx.lineWidth = Math.max(0.8, cell * 0.12);
@@ -395,6 +580,17 @@ export function EmbroideryView() {
         if (pattern.cells[index] < 0 || completed.has(index)) continue;
         const { bx, by } = toBase(index % pattern.width, Math.floor(index / pattern.width));
         ctx.strokeRect(bx - cell / 2 + 1, by - cell / 2 + 1, cell - 2, cell - 2);
+      }
+    }
+
+    // Session live : chaque brodeuse affiche son avancement en contour coloré.
+    for (const participant of activeLivePeers) {
+      ctx.strokeStyle = participant.color;
+      ctx.lineWidth = Math.max(0.8, cell * 0.12);
+      for (const index of participant.completed) {
+        if (pattern.cells[index] < 0 || completed.has(index)) continue;
+        const { bx, by } = toBase(index % pattern.width, Math.floor(index / pattern.width));
+        ctx.strokeRect(bx - cell / 2 + 1.5, by - cell / 2 + 1.5, cell - 3, cell - 3);
       }
     }
 
@@ -443,8 +639,21 @@ export function EmbroideryView() {
       ctx.lineWidth = 2;
       ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
     }
+
+    for (const participant of activeLivePeers) {
+      if (!participant.cursor) continue;
+      const { bx, by } = toBase(participant.cursor.x, participant.cursor.y);
+      ctx.strokeStyle = participant.color;
+      ctx.fillStyle = participant.color;
+      ctx.lineWidth = 2;
+      ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
+      ctx.font = `${Math.max(10, Math.round(cell * 0.58))}px "Inter Tight", Arial, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "bottom";
+      ctx.fillText(participant.name, bx - cell / 2, by - cell / 2 - 4);
+    }
     ctx.restore();
-  }, [completed, config.palette, cursor, display, geometry, highlight, nextZone, pattern, peer, selectedCode, size, view]);
+  }, [activeLivePeers, completed, config.palette, cursor, display, geometry, highlight, nextZone, pattern, peer, selectedCode, size, view]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -523,6 +732,8 @@ export function EmbroideryView() {
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
     event.currentTarget.setPointerCapture(event.pointerId);
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const cell = cellAt(event.clientX, event.clientY);
+    if (cell) setCursor((current) => (current && current.x === cell.x && current.y === cell.y ? current : cell));
     if (pointers.current.size === 2) {
       const [a, b] = [...pointers.current.values()];
       pinch.current = { distance: Math.hypot(a.x - b.x, a.y - b.y), k: view.k, x: view.x, y: view.y, mx: (a.x + b.x) / 2, my: (a.y + b.y) / 2 };
@@ -536,6 +747,8 @@ export function EmbroideryView() {
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
     if (!pointers.current.has(event.pointerId)) return;
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
+    const cell = cellAt(event.clientX, event.clientY);
+    if (cell) setCursor((current) => (current && current.x === cell.x && current.y === cell.y ? current : cell));
     if (pointers.current.size === 2 && pinch.current) {
       const [a, b] = [...pointers.current.values()];
       const distance = Math.hypot(a.x - b.x, a.y - b.y);
@@ -737,6 +950,60 @@ export function EmbroideryView() {
             <button type="button" onClick={clearPeer}>Retirer</button>
           </p>
         )}
+        <section className="broder-live" aria-label="Session live de broderie">
+          <div className="broder-live-ligne">
+            <label>
+              Nom
+              <input
+                type="text"
+                value={liveName}
+                maxLength={24}
+                onChange={(event) => setLiveName(event.target.value)}
+                onBlur={() => {
+                  const next = liveName.trim() || "Moi";
+                  setLiveName(next);
+                  try { localStorage.setItem(LIVE_NAME_KEY, next); } catch { /* préférence locale */ }
+                }}
+              />
+            </label>
+            <label>
+              Code
+              <input
+                ref={liveRoomRef}
+                type="text"
+                value={liveRoom}
+                maxLength={32}
+                onChange={(event) => setLiveRoom(event.target.value)}
+                onBlur={() => setLiveRoom((current) => sanitizeRoom(current))}
+              />
+            </label>
+            {liveEnabled ? (
+              <button type="button" className="outil" onClick={stopLiveSession}>Quitter</button>
+            ) : (
+              <button type="button" className="outil" onClick={startLiveSession}><Users size={14} aria-hidden="true" /> Rejoindre</button>
+            )}
+          </div>
+          <p>
+            {liveEnabled
+              ? `Session active (${sanitizeRoom(liveRoom).toUpperCase()}) · ${activeLivePeers.length} brodeuse${activeLivePeers.length > 1 ? "s" : ""} connectée${activeLivePeers.length > 1 ? "s" : ""}.`
+              : "Session inactive. Donnez ce code et ce patron à l'autre brodeuse, puis cliquez Rejoindre des deux côtés."}
+            {liveEnabled && activeLivePeers.length > 0 && ` Croisées visibles : ${liveDoneTotal.toLocaleString("fr-FR")}.`}
+          </p>
+          {activeLivePeers.length > 0 && (
+            <ul className="broder-live-list" role="list" aria-label="Brodeuses connectées">
+              {activeLivePeers.map((participant) => {
+                const done = [...participant.completed].filter((index) => pattern.cells[index] >= 0).length;
+                return (
+                  <li key={participant.id}>
+                    <i style={{ background: participant.color }} aria-hidden="true" />
+                    <span>{participant.name}</span>
+                    <small>{done.toLocaleString("fr-FR")} croix</small>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </section>
         <div className="broder-filtres-ligne">
           <div className="broder-filtres" role="group" aria-label="Croix affichées">
             <button className={highlight === "all" ? "is-active" : ""} aria-pressed={highlight === "all"} onClick={() => setHighlight("all")}><Grid3X3 size={14} aria-hidden="true" /> Tout</button>
@@ -777,7 +1044,7 @@ export function EmbroideryView() {
         <div className="broder-outils">
           <button className="bouton bouton-petit" onClick={exportProject}><Download size={15} aria-hidden="true" /> Projet</button>
           <button className="bouton bouton-petit" onClick={() => fileRef.current?.click()}><FolderOpen size={15} aria-hidden="true" /> Importer</button>
-          <button className="bouton bouton-petit" onClick={() => peerRef.current?.click()}><Users size={15} aria-hidden="true" /> Broder ensemble</button>
+          <button className="bouton bouton-petit" onClick={() => peerRef.current?.click()}><Users size={15} aria-hidden="true" /> Calque amie</button>
           <input
             ref={peerRef}
             type="file"
