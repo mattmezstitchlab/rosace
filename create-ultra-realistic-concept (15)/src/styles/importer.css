@@ -200,3 +200,27 @@ html[data-mode="nuit"] .importer-resume .is-attention { color: #e8a94c; }
 .importer-photo-note { margin: 12px 0 14px; padding: 10px 12px; border-radius: var(--rayon-sm); background: var(--doux); color: var(--encre-2); font-size: 12.5px; line-height: 1.5; }
 .importer-photo-table .is-attention { color: var(--grenat, #7b1f33); font-weight: 650; }
 @media (max-width: 640px) { .importer-photo-duo { grid-template-columns: 1fr; } }
+
+
+/* Entrées directes depuis la landing : chaque intention ouvre son propre outil. */
+.importer-corps-centre { align-content: start; justify-items: center; gap: 18px; }
+.importer-modes {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: center;
+  width: min(100%, 640px); gap: 8px; margin: 8px auto 0;
+}
+.importer-modes a, .importer-modes button {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 44px; min-width: 88px; padding: 9px 16px;
+  border: 1px solid var(--trait-2); border-radius: var(--rayon-pilule);
+  background: var(--carte); color: var(--encre); font: inherit; font-size: 13px;
+  font-weight: 650; text-decoration: none; cursor: pointer;
+}
+.importer-modes a:hover, .importer-modes button:hover { border-color: var(--encre); }
+.importer-modes button[aria-pressed="true"] { background: var(--encre); color: var(--fond); border-color: var(--encre); }
+.importer-modes :focus-visible { outline: 2px solid var(--encre); outline-offset: 3px; }
+.importer-corps-centre > .importer-depot,
+.importer-corps-centre > .importer-texte-atelier { width: min(100%, 720px); }
+@media (max-width: 460px) {
+  .importer-modes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .importer-modes a, .importer-modes button { min-width: 0; }
+}
