@@ -1,0 +1,54 @@
+name: ROSACE — validation
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main, 'arena/**', 'chatgpt/**']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: rosace-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      ARTIFACT_DIR: tests/artifacts
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: create-ultra-realistic-concept (15)/package-lock.json
+
+      - name: Installation
+        working-directory: create-ultra-realistic-concept (15)
+        run: npm ci --no-audit --no-fund
+
+      - name: Chromium pour Playwright
+        working-directory: create-ultra-realistic-concept (15)
+        run: |
+          npx playwright install --with-deps chromium
+          echo "CHROMIUM_PATH=$(node -e 'console.log(require("playwright").chromium.executablePath())')" >> "$GITHUB_ENV"
+
+      - name: Validation complète (tests, types, build, navigateur, accessibilité, preview)
+        working-directory: create-ultra-realistic-concept (15)
+        run: npm run test:all
+
+      - name: Artefacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rosace-artefacts
+          path: create-ultra-realistic-concept (15)/tests/artifacts
+          if-no-files-found: ignore
