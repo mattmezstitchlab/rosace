@@ -56,7 +56,12 @@ async function main() {
     const start = await browser.newPage({ viewport: { width: 390, height: 844 } });
     await start.goto(url.toString(), { waitUntil: "domcontentloaded" });
     await start.locator(`#entrees .entree a.lien-souligne[href="${entry.href}"]`).click();
-    assert.equal(await start.evaluate(() => window.location.hash), entry.href, `destination ${entry.href}`);
+    const destination = await start.evaluate(() => window.location.hash);
+    if (entry.href === "#atelier") {
+      assert.match(destination, /^#(?:atelier|r=)/, "la recette peut remplacer #atelier après l'ouverture");
+    } else {
+      assert.equal(destination, entry.href, `destination ${entry.href}`);
+    }
     if (entry.label) {
       await start.getByRole("dialog", { name: /Créer un ouvrage/ }).waitFor({ state: "visible" });
       await start.getByRole("heading", { name: entry.heading }).waitFor({ state: "visible" });
