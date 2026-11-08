@@ -1,9 +1,9 @@
-import { useCallback, useId, useRef, useState, type KeyboardEvent } from "react";
+import { useCallback, useRef, useState, type KeyboardEvent } from "react";
 import { ArrowRight, Check, Circle, Download, FileText, Grid3x3, Heart, Image as ImageIcon, Layers, MousePointer2, Printer, Redo2, Share2, Type, Undo2 } from "lucide-react";
 import { formatDuration } from "../lib/rosace";
 import type { CanvasMode } from "../lib/paint";
 import { HERO_PATTERN, HERO_STATS, SHAPE_VARIANTS, TEXT_WORK, decimal, nombre } from "./data";
-import { EcranBroderie, EcranImport, Tablette, Telephone } from "./devices";
+import { EcranImport, Tablette } from "./devices";
 import { DemoPuzzle } from "./DemoPuzzle";
 import { DemoPhoto } from "./DemoPhoto";
 import { Nuancier } from "./Nuancier";
@@ -288,40 +288,37 @@ function Patron() {
 
 /* ----------------------------------------------------------------- Broder */
 const AFFICHAGES = [
-  { id: "fabric", label: "Toile" },
-  { id: "chart", label: "Symboles" },
-  { id: "color", label: "Couleurs" },
-  { id: "color-chart", label: "Les deux" },
+  { id: "fabric", label: "Toile", note: "Vision proche du rendu final sur aïda" },
+  { id: "chart", label: "Symboles", note: "Lecture maximale, idéale pour suivre ligne par ligne" },
+  { id: "color", label: "Couleurs", note: "Repérage rapide des zones par fil DMC" },
+  { id: "color-chart", label: "Les deux", note: "Couleurs + symboles : compromis de production" },
 ] as const;
 
 type AffichageId = (typeof AFFICHAGES)[number]["id"];
 
 function Broder() {
   const [affichage, setAffichage] = useState<AffichageId>("fabric");
-  const base = useId();
+  const actif = AFFICHAGES.find((entry) => entry.id === affichage) ?? AFFICHAGES[0];
 
   return (
     <section id="broder" className="section" aria-labelledby="titre-broder">
-      <div className="section-tete section-tete--centre" data-reveal>
+      <div className="section-tete" data-reveal>
         <p className="surtitre">Broder, en vrai</p>
-        <h2 id="titre-broder">Cochez une croix. Le reste se calcule.</h2>
+        <h2 id="titre-broder">Une vraie grille de production, pas une maquette.</h2>
         <p className="section-chapeau">
-          La grille vous suit croix par croix, dans l'affichage que vous préférez.
+          Le même motif passe de la toile à la grille technique sans changer d'empreinte. Vous choisissez la lecture,
+          puis l'atelier calcule le reste : progression, restants, séances, export.
         </p>
       </div>
 
-      <div className="telephone-scene" data-reveal>
-        <div className="telephone-centre">
-          <div className="vivant-onglets" role="tablist" aria-label="Affichages du mode Broder">
+      <div className="broder-vitrine" data-reveal>
+        <div className="broder-vitrine-main">
+          <div className="vivant-onglets" aria-label="Affichages du mode Broder">
             {AFFICHAGES.map((entree) => (
               <button
                 key={entree.id}
-                id={`${base}-onglet-${entree.id}`}
                 type="button"
-                role="tab"
-                aria-selected={affichage === entree.id}
-                aria-controls={`${base}-panneau`}
-                tabIndex={affichage === entree.id ? 0 : -1}
+                aria-pressed={affichage === entree.id}
                 className={affichage === entree.id ? "est-active" : ""}
                 onClick={() => setAffichage(entree.id)}
               >
@@ -329,13 +326,32 @@ function Broder() {
               </button>
             ))}
           </div>
-          <div className="telephone-grand" id={`${base}-panneau`} role="tabpanel" aria-labelledby={`${base}-onglet-${affichage}`}>
-            <Telephone className="telephone-heros">
-              <EcranBroderie pattern={HERO_PATTERN} mode={affichage} />
-            </Telephone>
-          </div>
+
+          <figure className="broder-vitrine-cadre">
+            <RosaceRender
+              pattern={HERO_PATTERN}
+              mode={affichage}
+              resolution={affichage === "fabric" ? 760 : 980}
+              label={`Mode ${actif.label.toLowerCase()} du même patron, ${nombre(HERO_STATS.stitches)} croix`}
+            />
+            <figcaption>{actif.note}</figcaption>
+          </figure>
         </div>
 
+        <aside className="broder-vitrine-aside" aria-label="Ce que la vue Broder calcule automatiquement">
+          <p className="broder-vitrine-titre">Ce que l'atelier calcule pendant que vous brodez</p>
+          <dl>
+            <div><dt>Croix</dt><dd>{nombre(HERO_STATS.stitches)}</dd></div>
+            <div><dt>Fils actifs</dt><dd>{HERO_STATS.threads} DMC</dd></div>
+            <div><dt>Format</dt><dd>{HERO_STATS.grid} × {HERO_STATS.grid}</dd></div>
+            <div><dt>Temps estimé</dt><dd>{HERO_STATS.duration}</dd></div>
+          </dl>
+          <ul>
+            <li>Annuler / rétablir sans casser la progression</li>
+            <li>Fil conducteur vers la prochaine zone compacte</li>
+            <li>Projet exportable pour reprendre ailleurs</li>
+          </ul>
+        </aside>
       </div>
     </section>
   );
@@ -372,7 +388,7 @@ const EXPORTS = [
   { id: "csv", titre: "CSV", usage: "Retrouver les fils et les métrages", icone: Grid3x3 },
   { id: "svg", titre: "SVG", usage: "Conserver le motif vectoriel", icone: Download },
   { id: "fiche", titre: "Fiche réimportable", usage: "Imprimer, et retrouver la rosace exacte", icone: Printer },
-  { id: "projet", titre: "Projet ROSACE", usage: "Reprendre, ou broder ensemble", icone: Heart },
+  { id: "projet", titre: "Projet ROSACE", usage: "Reprendre et partager une progression", icone: Heart },
 ];
 
 const GARDE = [

@@ -906,6 +906,38 @@ html[data-mode="nuit"] body.est-presentation { background: #fff; }
 .presentation .section-tete--centre { max-width: 760px; margin-inline: auto; text-align: center; }
 .presentation .section-tete--centre .surtitre { justify-content: center; }
 .presentation .section-tete--centre .section-chapeau { margin-inline: auto; }
+
+.presentation .broder-vitrine {
+  display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .75fr); gap: 20px;
+  margin-top: clamp(28px, 4vw, 48px);
+}
+.presentation .broder-vitrine-main {
+  padding: 16px; border: 1px solid var(--l-trait); border-radius: 26px; background: var(--l-carte);
+}
+.presentation .broder-vitrine-cadre {
+  margin: 0; padding: 12px; border-radius: 18px; background: var(--l-fond-2);
+  box-shadow: inset 0 0 0 1px rgba(20, 17, 15, .1);
+}
+.presentation .broder-vitrine-cadre canvas { border-radius: 12px; overflow: hidden; }
+.presentation .broder-vitrine-cadre figcaption { margin-top: 10px; font-size: 12.5px; color: var(--l-encre-3); }
+.presentation .broder-vitrine-aside {
+  display: grid; gap: 12px; align-content: start;
+  padding: 18px 18px 16px; border: 1px solid var(--l-trait); border-radius: 22px; background: var(--l-carte);
+}
+.presentation .broder-vitrine-titre {
+  margin: 0; font-size: 11px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--l-encre-3);
+}
+.presentation .broder-vitrine-aside dl { margin: 0; display: grid; gap: 7px; }
+.presentation .broder-vitrine-aside dl > div {
+  display: flex; justify-content: space-between; gap: 12px; padding-top: 7px; border-top: 1px solid var(--l-trait);
+}
+.presentation .broder-vitrine-aside dt { font-size: 11px; font-weight: 650; letter-spacing: .1em; text-transform: uppercase; color: var(--l-encre-3); }
+.presentation .broder-vitrine-aside dd { margin: 0; font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.presentation .broder-vitrine-aside ul { margin: 0; padding-left: 18px; display: grid; gap: 7px; font-size: 13px; line-height: 1.45; color: var(--l-encre-2); }
+@media (max-width: 920px) {
+  .presentation .broder-vitrine { grid-template-columns: 1fr; }
+}
+
 .presentation .telephone-scene { display: grid; place-items: center; margin-top: clamp(28px, 4vw, 48px); }
 .presentation .telephone-scene .vivant { display: flex; flex-direction: column; gap: 10px; margin: 0; }
 .presentation .telephone-scene .vivant li { padding: 16px 18px; }
