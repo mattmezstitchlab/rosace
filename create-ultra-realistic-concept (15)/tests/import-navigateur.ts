@@ -168,7 +168,7 @@ async function main() {
     // Après déplacement, la reconnaissance raster peut perdre quelques cases de bord.
     // L'invariant métier : aucun code DMC n'est inventé pour ces symboles non résolus.
     const autoSummary = page.locator(".importer-section[aria-label='Fils DMC reconnus'] .panneau-aide");
-    await autoSummary.waitFor({ state: "visible", timeout: 30000 });
+    await autoSummary.filter({ hasText: /0 croix liées à la légende/ }).waitFor({ state: "visible", timeout: 30000 });
     const autoText = (await autoSummary.innerText()).replace(/\s+/g, " ");
     assert.match(autoText, /0 croix liées à la légende/);
     assert.match(autoText, /0 estimées par couleur/);
