@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [arena/538bb149-rosace]
+    branches: [main, 'arena/**', 'chatgpt/**']
   workflow_dispatch:
 
 permissions:
