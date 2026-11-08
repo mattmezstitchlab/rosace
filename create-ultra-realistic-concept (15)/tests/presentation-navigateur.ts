@@ -42,6 +42,39 @@ async function main() {
   await page.keyboard.press("End");
   assert.equal(await slider.getAttribute("aria-valuenow"), "100");
 
+  /* ---------------- Quatre départs : chaque lien ouvre réellement son outil ---------------- */
+  assert.equal(await page.locator(".entete-liens a").count(), 3, "navigation limitée aux trois actions");
+  const entryLinks = page.locator("#entrees .entree a.lien-souligne");
+  assert.equal(await entryLinks.count(), 4, "quatre portes de création uniques");
+  const entryCases = [
+    { href: "#atelier", heading: "", label: "" },
+    { href: "#atelier-importer", heading: "Déposez votre patron PDF", label: "PDF" },
+    { href: "#atelier-importer-texte", heading: "Écrivez votre texte à broder", label: "Texte" },
+    { href: "#atelier-importer-photo", heading: "Transformez votre photo en patron", label: "Photo" },
+  ];
+  for (const entry of entryCases) {
+    const start = await browser.newPage({ viewport: { width: 390, height: 844 } });
+    await start.goto(url.toString(), { waitUntil: "domcontentloaded" });
+    await start.locator(`#entrees .entree a.lien-souligne[href="${entry.href}"]`).click();
+    assert.equal(await start.evaluate(() => window.location.hash), entry.href, `destination ${entry.href}`);
+    if (entry.label) {
+      await start.getByRole("dialog", { name: /Créer un ouvrage/ }).waitFor({ state: "visible" });
+      await start.getByRole("heading", { name: entry.heading }).waitFor({ state: "visible" });
+      const active = start.locator(".importer-modes button[aria-pressed='true']");
+      assert.equal((await active.innerText()).trim(), entry.label);
+      assert.equal(await start.locator(".importer-modes button").count(), 3, "sélection entre PDF, texte, photo");
+    } else {
+      await start.locator("#composer").waitFor({ state: "visible" });
+    }
+    await start.close();
+  }
+
+  /* ---------------- Démonstrations avancées accessibles sans surcharger la page ---------------- */
+  const advanced = page.locator(".landing-plus");
+  assert.equal(await advanced.evaluate((element) => (element as HTMLDetailsElement).open), false);
+  await advanced.locator("summary").click();
+  assert.equal(await advanced.evaluate((element) => (element as HTMLDetailsElement).open), true);
+
   /* ---------------- La table de montage : vraie, et prouvée par l'empreinte ---------------- */
   const expected = fromRosace(generateRosace(DEFAULT_CONFIG)).fingerprint;
   await page.locator(".puzzle").scrollIntoViewIfNeeded();
