@@ -16,6 +16,8 @@ import { RosaceRender } from "./media";
  */
 
 function Entrees() {
+  // L'entrée photo montre une autre grille du moteur que la rosace du hero : pas de doublon visuel.
+  const motifConversion = SHAPE_VARIANTS.find((variant) => variant.id === "geometrique")?.pattern ?? HERO_PATTERN;
   return (
     <section id="entrees" className="section" aria-labelledby="titre-entrees">
       <div className="section-tete" data-reveal>
@@ -60,13 +62,13 @@ function Entrees() {
           <div className="entree-texte">
             <p className="entree-sur"><Type size={13} strokeWidth={2} aria-hidden="true" /> Écrire</p>
             <h3>Un prénom, une date, un mot doux</h3>
-            <p>Un prénom, une date, quelques mots : transformez-les en croix, avec les fils de votre choix.</p>
+            <p>Quelques lettres deviennent des croix, dans la police brodée et les fils de votre choix.</p>
             <a className="lien-souligne" href="#atelier-importer-texte">Écrire un texte brodé</a>
           </div>
         </li>
         <li className="entree">
           <div className="entree-image entree-image--photo">
-            <RosaceRender pattern={HERO_PATTERN} mode="color" resolution={640} label="Un exemple de grille colorée produite dans l’atelier" />
+            <RosaceRender pattern={motifConversion} mode="color" resolution={640} label="Un exemple de grille colorée produite dans l’atelier" />
           </div>
           <div className="entree-texte">
             <p className="entree-sur"><ImageIcon size={13} strokeWidth={2} aria-hidden="true" /> Convertir</p>
@@ -85,7 +87,7 @@ function Formes() {
   return (
     <section id="formes" className="section" aria-labelledby="titre-formes">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">03 — La promesse</p>
+        <p className="surtitre">La promesse</p>
         <h2 id="titre-formes">
           Une création, pas un modèle prédéfini.
         </h2>
@@ -135,7 +137,7 @@ function Couleurs() {
   return (
     <section id="couleurs" className="section section--papier" aria-labelledby="titre-couleurs">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">04 — La couleur devient matière</p>
+        <p className="surtitre">La couleur devient matière</p>
         <h2 id="titre-couleurs">
           Choisissez avec vos yeux.
           <br />
@@ -301,7 +303,7 @@ function Broder() {
   return (
     <section id="broder" className="section" aria-labelledby="titre-broder">
       <div className="section-tete section-tete--centre" data-reveal>
-        <p className="surtitre">01 — Broder, en vrai</p>
+        <p className="surtitre">Broder, en vrai</p>
         <h2 id="titre-broder">Cochez une croix. Le reste se calcule.</h2>
         <p className="section-chapeau">
           La grille vous suit croix par croix, dans l'affichage que vous préférez.
@@ -344,7 +346,7 @@ function Photo() {
   return (
     <section id="photo" className="section section--papier" aria-labelledby="titre-photo">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">06 — De la photo au fil</p>
+        <p className="surtitre">De la photo au fil</p>
         <h2 id="titre-photo">
           Les fils triés, les confettis nettoyés,
           <br />
@@ -384,7 +386,7 @@ function Progression() {
   return (
     <section id="progression" className="section" aria-labelledby="titre-progression">
       <div className="section-tete" data-reveal>
-        <p className="surtitre">07 — Gardez votre progression</p>
+        <p className="surtitre">Gardez votre progression</p>
         <h2 id="titre-progression">Votre rosace vous appartient.</h2>
         <p className="section-chapeau">
           Votre progression est gardée sur cet appareil. Pour reprendre sur un autre, exportez votre fichier projet puis importez-le sur le nouvel appareil : il n’y a pas de synchronisation automatique.

@@ -134,7 +134,7 @@ export function Landing() {
             <p className="heros-mention">
               Essai gratuit <span aria-hidden="true">·</span> Sans compte pour commencer <span aria-hidden="true">·</span> Quatre façons de créer
             </p>
-            <p className="heros-mention">Au-dessus, glissez le trait pour révéler le motif et sa grille technique.</p>
+            <p className="heros-mention heros-mention--indice">Au-dessus, glissez le trait pour révéler le motif et sa grille technique.</p>
           </div>
         </section>
 
@@ -143,7 +143,7 @@ export function Landing() {
         {/* ------------------------------------------------------------- Appel final */}
         <section className="final" aria-labelledby="titre-final">
           <div className="final-texte" data-reveal>
-            <p className="surtitre surtitre-clair">Ouvrir l'atelier</p>
+            <p className="surtitre surtitre-clair">À vous de jouer</p>
             <h2 id="titre-final">Votre prochain ouvrage commence ici.</h2>
             <p>Composez une forme, importez un patron ou écrivez un prénom. Puis brodez quelque chose qui vous ressemble.</p>
             <div className="final-actions">
