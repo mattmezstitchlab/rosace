@@ -364,10 +364,13 @@ async function main() {
     assert.ok(tileText.some((line) => line.includes("Colonnes 52–101")));
     assert.ok(tileText.some((line) => line.includes("Lignes 1–51")));
     assert.ok(tileText.some((line) => line.includes("Lignes 52–101")));
-    const pdf = await popup.pdf({ printBackground: true, preferCSSPageSize: true });
-    await writeFile(path.join(ARTIFACT_DIR, "fiche.pdf"), pdf);
-    const pdfPages = (pdf.toString("latin1").match(/\/Type\s*\/Page(?!s)/g) ?? []).length;
-    assert.equal(pdfPages, 5, `PDF : 5 pages attendues, ${pdfPages} trouvées`);
+    // `page.pdf` n'existe que dans Chromium : ailleurs, la fiche n'est contrôlée que par son DOM (ci-dessus).
+    if (BROWSER === "chromium") {
+      const pdf = await popup.pdf({ printBackground: true, preferCSSPageSize: true });
+      await writeFile(path.join(ARTIFACT_DIR, "fiche.pdf"), pdf);
+      const pdfPages = (pdf.toString("latin1").match(/\/Type\s*\/Page(?!s)/g) ?? []).length;
+      assert.equal(pdfPages, 5, `PDF : 5 pages attendues, ${pdfPages} trouvées`);
+    }
     await popup.close();
 
     await closePanel(page);

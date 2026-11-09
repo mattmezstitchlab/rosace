@@ -9,6 +9,7 @@ import {
   progressStorageKey, readPeerProgress, reconcileProgress, remainingByColor, saveProgress, serializeRuns, stitchIndex,
   type EmbroideryProgress, type Viewport,
 } from "../lib/progress";
+import { LIVE_MAX_PEERS, LIVE_STALE_MS, displayNames, newClientId, parseLiveMessage, pickPeerColor, sanitizeName, sanitizeRoom, type LiveCursor, type LiveOutgoing } from "../lib/live";
 import { computeRhythm, forecast, formatMinutes, recordStitches, type StitchSession } from "../lib/sessions";
 import { readThreadBox } from "../lib/threadbox";
 import { useRosaceApi } from "../state/rosace-store";
@@ -34,48 +35,35 @@ function readDisplay(): Display {
 const PEER_KEY = (fingerprint: string) => `aime-rosace-amie-v1:${fingerprint}`;
 const LIVE_NAME_KEY = "aime-rosace-live-name-v1";
 const LIVE_ROOM_KEY = (fingerprint: string) => `aime-rosace-live-room-v1:${fingerprint}`;
-const LIVE_STALE_MS = 12_000;
-const LIVE_COLORS = ["#0b7285", "#1d4ed8", "#7c3aed", "#be123c", "#0f766e", "#b45309"];
+/** Au-delà de ce poids, un fichier de projet n'est pas un projet ROSACE : on ne le lit pas. */
+const MAX_PROJECT_FILE_BYTES = 10 * 1024 * 1024;
+/** Une synchronisation reçue d'un autre onglet est annoncée au plus une fois par ce délai. */
+const SYNC_TOAST_MS = 15_000;
+/** Délai après lequel « Confirmer le zéro » se désarme seul. */
+const RESET_ARM_MS = 6_000;
 
 type LivePeer = {
   id: string;
   name: string;
   color: string;
-  cursor: { x: number; y: number } | null;
+  cursor: LiveCursor | null;
   completed: Set<number>;
-  updatedAt: number;
-};
-
-type LiveMessage = {
-  kind: "state" | "leave";
-  sender: string;
-  name?: string;
-  color?: string;
-  cursor?: { x: number; y: number } | null;
-  completedRuns?: string;
+  /** Heure de réception locale : l'horloge de l'expéditeur n'est jamais crue. */
   updatedAt: number;
 };
 
 function readLiveName() {
-  try { return localStorage.getItem(LIVE_NAME_KEY) || "Moi"; } catch { return "Moi"; }
+  try { return sanitizeName(localStorage.getItem(LIVE_NAME_KEY)); } catch { return sanitizeName(null); }
 }
 
 function readLiveRoom(fingerprint: string) {
   try { return localStorage.getItem(LIVE_ROOM_KEY(fingerprint)) || shortFingerprint(fingerprint); } catch { return shortFingerprint(fingerprint); }
 }
 
-function sanitizeRoom(value: string) {
-  return value.trim().toLowerCase().replace(/[^a-z0-9-]/g, "-").replace(/-+/g, "-").slice(0, 32) || "atelier";
-}
-
-function hashCode(input: string) {
-  let hash = 0;
-  for (let i = 0; i < input.length; i += 1) hash = (hash * 31 + input.charCodeAt(i)) | 0;
-  return Math.abs(hash);
-}
-
-function colorForParticipant(id: string) {
-  return LIVE_COLORS[hashCode(id) % LIVE_COLORS.length];
+function sameIndexSet(a: Set<number>, b: Set<number>) {
+  if (a.size !== b.size) return false;
+  for (const index of a) if (!b.has(index)) return false;
+  return true;
 }
 
 /** Fil conducteur : la zone compacte de croix restantes la plus proche d'un point, pour un fil donné (composante connexe, 8 voisins). */
@@ -147,6 +135,11 @@ export function EmbroideryView() {
   const [cursor, setCursor] = useState<{ x: number; y: number } | null>(null);
   const [announce, setAnnounce] = useState("");
   const [confirmReset, setConfirmReset] = useState(false);
+  const confirmResetRef = useRef(false);
+  const confirmButtonRef = useRef<HTMLButtonElement>(null);
+  const zeroButtonRef = useRef<HTMLButtonElement>(null);
+  const refocusZeroRef = useRef(false);
+  const lastSyncToast = useRef(0);
   const [sessions, setSessions] = useState<StitchSession[]>([]);
   const [guide, setGuide] = useState(true);
   const [peer, setPeer] = useState<{ completed: Set<number>; updatedAt: string } | null>(null);
@@ -154,8 +147,13 @@ export function EmbroideryView() {
   const [liveEnabled, setLiveEnabled] = useState(false);
   const [liveName, setLiveName] = useState(readLiveName);
   const [liveRoom, setLiveRoom] = useState(() => readLiveRoom(fingerprint));
+  /** Salle réellement rejointe : le champ « Code » peut avoir été modifié depuis. */
+  const [liveJoined, setLiveJoined] = useState("");
   const [livePeers, setLivePeers] = useState<Record<string, LivePeer>>({});
+  const livePeersRef = useRef<Record<string, LivePeer>>({});
+  livePeersRef.current = livePeers;
   const peerRef = useRef<HTMLInputElement>(null);
+  const liveNameRef = useRef<HTMLInputElement>(null);
   const liveRoomRef = useRef<HTMLInputElement>(null);
   const liveSectionRef = useRef<HTMLElement>(null);
   const fabricRef = useRef<HTMLCanvasElement | null>(null);
@@ -165,21 +163,14 @@ export function EmbroideryView() {
   const suppressTap = useRef(0);
   const channelRef = useRef<BroadcastChannel | null>(null);
   const heartbeatRef = useRef<number | null>(null);
-  const clientId = useMemo(() => {
-    try {
-      const key = `aime-rosace-client-v1:${fingerprint}`;
-      const existing = localStorage.getItem(key);
-      if (existing) return existing;
-      const generated = (crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`).slice(0, 32);
-      localStorage.setItem(key, generated);
-      return generated;
-    } catch {
-      return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-    }
-  }, [fingerprint]);
-  const liveColor = useMemo(() => colorForParticipant(clientId), [clientId]);
-  const liveRef = useRef({ completed, selectedCode, view, history, sessions, cursor, liveName });
-  liveRef.current = { completed, selectedCode, view, history, sessions, cursor, liveName };
+  /** Propre à cette page : un identifiant partagé par tous les onglets les rendrait aveugles les uns aux autres. */
+  const [clientId] = useState(newClientId);
+  /** Case sous la souris (sans clic) : diffusée aux autres brodeuses, sans jamais redessiner cette page. */
+  const hoverRef = useRef<LiveCursor | null>(null);
+  const hoverTimer = useRef<number | null>(null);
+  const lastHelloReply = useRef(0);
+  const liveRef = useRef({ completed, selectedCode, view, history, sessions, cursor, liveName, liveEnabled });
+  liveRef.current = { completed, selectedCode, view, history, sessions, cursor, liveName, liveEnabled };
 
   const progress = useMemo(() => progressPercent(pattern, completed), [pattern, completed]);
   const remaining = useMemo(() => remainingByColor(pattern, completed), [pattern, completed]);
@@ -196,13 +187,15 @@ export function EmbroideryView() {
     return nearestCluster(pattern, completed, paletteIndex, from);
   }, [guide, selectedCode, paletteCodes, history, cursor, pattern, completed]);
   const peerDone = peer ? [...peer.completed].filter((index) => pattern.cells[index] >= 0).length : 0;
-  const activeLivePeers = useMemo(() => Object.values(livePeers).sort((a, b) => a.name.localeCompare(b.name, "fr")), [livePeers]);
-  const liveDoneTotal = useMemo(
-    () => activeLivePeers.reduce((sum, peerState) => sum + [...peerState.completed].filter((index) => pattern.cells[index] >= 0).length, 0),
-    [activeLivePeers, pattern.cells],
+  const activeLivePeers = useMemo(() => Object.values(livePeers).sort((a, b) => a.name.localeCompare(b.name, "fr") || a.id.localeCompare(b.id)), [livePeers]);
+  const peerLabels = useMemo(
+    () => displayNames(activeLivePeers.map(({ id, name }) => ({ id, name })), sanitizeName(liveName)),
+    [activeLivePeers, liveName],
   );
 
   /* ---------- Progression : une seule écriture canonique ---------- */
+  /** Vrai tant que la dernière écriture a échoué : la fermeture ne doit alors pas annoncer un enregistrement. */
+  const saveFailed = useRef(false);
   const persist = useCallback((snapshot?: EmbroideryProgress): EmbroideryProgress | null => {
     if (!hydrated.current) return null;
     const record: EmbroideryProgress = snapshot ?? {
@@ -219,8 +212,11 @@ export function EmbroideryView() {
     try {
       const saved = saveProgress(record, baseProgressRef.current);
       baseProgressRef.current = saved;
+      saveFailed.current = false;
+      storageWarned.current = false;
       return saved;
     } catch {
+      saveFailed.current = true;
       if (!storageWarned.current) {
         storageWarned.current = true;
         notify("Progression non enregistrée", "Le stockage du navigateur est plein ou indisponible.");
@@ -256,17 +252,29 @@ export function EmbroideryView() {
   const close = useCallback(() => {
     persist();
     setEmbroideryOpen(false);
-    notify(`Progression enregistrée · ${progress.percent} %`, `${progress.done.toLocaleString("fr-FR")} / ${progress.total.toLocaleString("fr-FR")} croix`);
+    if (saveFailed.current) {
+      notify("Progression non enregistrée", "Le stockage du navigateur est plein ou indisponible : exportez le projet pour ne rien perdre.");
+    } else {
+      notify(`Progression enregistrée · ${progress.percent} %`, `${progress.done.toLocaleString("fr-FR")} / ${progress.total.toLocaleString("fr-FR")} croix`);
+    }
   }, [notify, persist, progress.done, progress.percent, progress.total, setEmbroideryOpen]);
+  /** Échap referme d'abord la confirmation « Zéro » ; ce n'est qu'au second appui qu'il quitte la broderie. */
   const closeActionRef = useRef<() => void>(() => {});
-  closeActionRef.current = close;
+  closeActionRef.current = () => {
+    if (confirmResetRef.current) {
+      refocusZeroRef.current = true;
+      setConfirmReset(false);
+      return;
+    }
+    close();
+  };
 
   /* ---------- Chargement validé, séparé du patron ---------- */
   useEffect(() => {
     if (!embroideryOpen) return;
     const saved = loadPatternProgress(pattern);
     if (saved) {
-      const valid = parseRuns(saved.completedRuns);
+      const valid = parseRuns(saved.completedRuns, pattern.cells.length);
       setCompleted(valid);
       // Fil conducteur : le fil choisi explicitement est conservé ; à défaut, celui de la dernière croix cochée.
       const lastEntry = saved.journal?.length ? saved.journal[saved.journal.length - 1] : null;
@@ -288,7 +296,7 @@ export function EmbroideryView() {
       const rawPeer = localStorage.getItem(PEER_KEY(fingerprint));
       if (rawPeer) {
         const parsed = JSON.parse(rawPeer) as { runs?: string; updatedAt?: string };
-        setPeer(parsed.runs ? { completed: parseRuns(parsed.runs), updatedAt: parsed.updatedAt ?? "" } : null);
+        setPeer(parsed.runs ? { completed: parseRuns(parsed.runs, pattern.cells.length), updatedAt: parsed.updatedAt ?? "" } : null);
       } else setPeer(null);
     } catch { setPeer(null); }
     baseProgressRef.current = saved ?? emptyProgress(pattern);
@@ -324,7 +332,11 @@ export function EmbroideryView() {
     return () => { if (saveTimer.current) window.clearTimeout(saveTimer.current); };
   }, [completed, selectedCode, view, history, persist, embroideryOpen]);
 
-  /** Un autre onglet a écrit : on fusionne les croix au lieu d'écraser la progression locale. */
+  /**
+   * Un autre onglet a écrit : on fusionne ses croix au lieu d'écraser la progression locale.
+   * Seules les croix et le journal sont repris : le fil choisi et la vue restent ceux de CET onglet,
+   * sinon l'écran saute à chaque croix cochée ailleurs.
+   */
   useEffect(() => {
     if (!embroideryOpen) return;
     const onStorage = (event: StorageEvent) => {
@@ -343,36 +355,53 @@ export function EmbroideryView() {
         updatedAt: new Date().toISOString(),
       };
       const merged = reconcileProgress(remote, localSnapshot, baseProgressRef.current);
+      baseProgressRef.current = remote;
+      const mergedCompleted = parseRuns(merged.completedRuns, pattern.cells.length);
+      if (sameIndexSet(mergedCompleted, live.completed)) return;
       suppressSaveRef.current = true;
-      setCompleted(parseRuns(merged.completedRuns));
+      setCompleted(mergedCompleted);
       setHistory(merged.journal ?? []);
       setSessions(merged.sessions ?? []);
-      setSelectedCode(merged.selectedCode);
-      setView(merged.viewport);
-      baseProgressRef.current = remote;
-      notify("Progression synchronisée", "Un autre onglet a modifié cet ouvrage : les croix ont été fusionnées.");
+      // En session live, les croix de l'autre brodeuse arrivent déjà sous ses couleurs : inutile de l'annoncer à chaque point.
+      const now = Date.now();
+      if (!live.liveEnabled && now - lastSyncToast.current > SYNC_TOAST_MS) {
+        lastSyncToast.current = now;
+        notify("Progression synchronisée", "Un autre onglet a modifié cet ouvrage : les croix ont été fusionnées.");
+      }
     };
     window.addEventListener("storage", onStorage);
     return () => window.removeEventListener("storage", onStorage);
   }, [embroideryOpen, fingerprint, notify, pattern]);
 
 
-  /* ---------- Session live (MVP local : même navigateur / même appareil) ---------- */
+  /* ---------- Session live (version locale : onglets et fenêtres d'un même navigateur) ---------- */
   const broadcastLive = useCallback((kind: "state" | "leave" = "state") => {
     const channel = channelRef.current;
     if (!channel) return;
     const state = liveRef.current;
-    const payload: LiveMessage = {
+    const payload: LiveOutgoing = {
       kind,
       sender: clientId,
-      updatedAt: Date.now(),
-      name: state.liveName.trim() || "Moi",
-      color: liveColor,
-      cursor: state.cursor,
+      name: sanitizeName(state.liveName),
+      cursor: hoverRef.current ?? state.cursor,
       completedRuns: serializeRuns(state.completed),
     };
-    channel.postMessage(payload);
-  }, [clientId, liveColor]);
+    try { channel.postMessage(payload); } catch { /* canal fermé entre-temps : la session se termine d'elle-même */ }
+  }, [clientId]);
+  const broadcastRef = useRef(broadcastLive);
+  broadcastRef.current = broadcastLive;
+
+  /** Diffuse la case survolée au plus dix fois par seconde, sans passer par l'état React. */
+  const setHoverCell = useCallback((cell: LiveCursor | null) => {
+    const previous = hoverRef.current;
+    if (previous?.x === cell?.x && previous?.y === cell?.y) return;
+    hoverRef.current = cell;
+    if (!channelRef.current || hoverTimer.current !== null) return;
+    hoverTimer.current = window.setTimeout(() => {
+      hoverTimer.current = null;
+      broadcastRef.current("state");
+    }, 100);
+  }, []);
 
   const stopLiveSession = useCallback(() => {
     if (heartbeatRef.current) {
@@ -383,55 +412,79 @@ export function EmbroideryView() {
     channelRef.current?.close();
     channelRef.current = null;
     setLivePeers({});
+    setLiveJoined("");
     setLiveEnabled(false);
   }, [broadcastLive]);
 
   const startLiveSession = useCallback(() => {
     if (typeof BroadcastChannel === "undefined") {
-      notify("Session live indisponible", "Ce navigateur ne supporte pas BroadcastChannel.");
+      notify("Session live indisponible", "Ce navigateur ne permet pas l'échange entre onglets.");
       return;
     }
     const room = sanitizeRoom(liveRoom);
+    const name = sanitizeName(liveName);
+    let channel: BroadcastChannel;
+    try {
+      channel = new BroadcastChannel(`aime-rosace-live-v1:${fingerprint}:${room}`);
+    } catch {
+      notify("Session live indisponible", "Ce navigateur refuse l'échange entre onglets.");
+      return;
+    }
     setLiveRoom(room);
-    try { localStorage.setItem(LIVE_NAME_KEY, liveName.trim() || "Moi"); } catch { /* préférence locale */ }
+    setLiveName(name);
+    try { localStorage.setItem(LIVE_NAME_KEY, name); } catch { /* préférence locale */ }
     try { localStorage.setItem(LIVE_ROOM_KEY(fingerprint), room); } catch { /* préférence locale */ }
 
     channelRef.current?.close();
-    const channel = new BroadcastChannel(`aime-rosace-live-v1:${fingerprint}:${room}`);
     channelRef.current = channel;
     setLivePeers({});
+    setLiveJoined(room);
     setLiveEnabled(true);
 
-    channel.onmessage = (event: MessageEvent<LiveMessage>) => {
-      const data = event.data;
-      if (!data || data.sender === clientId) return;
-      if (data.kind === "leave") {
+    const grid = { width: pattern.width, height: pattern.height };
+    channel.onmessage = (event: MessageEvent<unknown>) => {
+      try {
+        const data = parseLiveMessage(event.data, clientId, grid);
+        if (!data) return;
+        if (data.kind === "leave") {
+          setLivePeers((current) => {
+            if (!current[data.sender]) return current;
+            const next = { ...current };
+            delete next[data.sender];
+            return next;
+          });
+          return;
+        }
+        const known = livePeersRef.current[data.sender];
+        const crowded = !known && Object.keys(livePeersRef.current).length >= LIVE_MAX_PEERS;
+        if (crowded) return;
         setLivePeers((current) => {
-          const next = { ...current };
-          delete next[data.sender];
-          return next;
+          const taken = Object.values(current).map((participant) => participant.color);
+          return {
+            ...current,
+            [data.sender]: {
+              id: data.sender,
+              name: data.name,
+              color: current[data.sender]?.color ?? pickPeerColor(taken, data.sender),
+              cursor: data.cursor,
+              completed: data.completed,
+              updatedAt: Date.now(),
+            },
+          };
         });
-        return;
-      }
-      if (data.kind !== "state") return;
-      setLivePeers((current) => ({
-        ...current,
-        [data.sender]: {
-          id: data.sender,
-          name: (data.name || "Brodeuse").slice(0, 24),
-          color: data.color || colorForParticipant(data.sender),
-          cursor: data.cursor ?? null,
-          completed: parseRuns(data.completedRuns ?? ""),
-          updatedAt: Number.isFinite(data.updatedAt) ? data.updatedAt : Date.now(),
-        },
-      }));
+        // Une nouvelle venue ne connaît pas encore cette page : on se présente tout de suite plutôt qu'au prochain battement.
+        if (!known && Date.now() - lastHelloReply.current > 400) {
+          lastHelloReply.current = Date.now();
+          broadcastRef.current("state");
+        }
+      } catch { /* message illisible : ignoré */ }
     };
 
     broadcastLive("state");
     if (heartbeatRef.current) window.clearInterval(heartbeatRef.current);
     heartbeatRef.current = window.setInterval(() => broadcastLive("state"), 2500);
-    notify("Session live active", `Code ${room.toUpperCase()} : ouvrez le même code sur l'autre onglet/appareil.`);
-  }, [broadcastLive, clientId, fingerprint, liveName, liveRoom, notify]);
+    notify("Session live active", `Code ${room.toUpperCase()} : ouvrez ce patron avec le même code dans un autre onglet ou une autre fenêtre de ce navigateur.`);
+  }, [broadcastLive, clientId, fingerprint, liveName, liveRoom, notify, pattern.height, pattern.width]);
 
   useEffect(() => {
     setLiveRoom(readLiveRoom(fingerprint));
@@ -466,9 +519,18 @@ export function EmbroideryView() {
     if (!embroideryOpen && liveEnabled) stopLiveSession();
   }, [embroideryOpen, liveEnabled, stopLiveSession]);
 
-  useEffect(() => () => {
-    if (heartbeatRef.current) window.clearInterval(heartbeatRef.current);
-    channelRef.current?.close();
+  /** Fermer l'onglet ou la page doit prévenir les autres brodeuses tout de suite, sans attendre l'expiration du battement. */
+  useEffect(() => {
+    const announceLeave = () => broadcastRef.current("leave");
+    window.addEventListener("pagehide", announceLeave);
+    return () => {
+      window.removeEventListener("pagehide", announceLeave);
+      announceLeave();
+      if (heartbeatRef.current) window.clearInterval(heartbeatRef.current);
+      if (hoverTimer.current !== null) window.clearTimeout(hoverTimer.current);
+      channelRef.current?.close();
+      channelRef.current = null;
+    };
   }, []);
 
   /* ---------- Base graphique et dessin ---------- */
@@ -574,9 +636,11 @@ export function EmbroideryView() {
     }
 
     // Broder ensemble : les croix importées d'une amie, en contour vert.
+    // Le trait garde une épaisseur d'au moins un pixel écran, sinon il disparaît quand la grille entière tient à l'écran.
+    const outline = Math.min(cell * 0.3, Math.max(cell * 0.12, 1.1 / scale));
     if (peer) {
       ctx.strokeStyle = "rgba(20,120,110,0.85)";
-      ctx.lineWidth = Math.max(0.8, cell * 0.12);
+      ctx.lineWidth = outline;
       for (const index of peer.completed) {
         if (pattern.cells[index] < 0 || completed.has(index)) continue;
         const { bx, by } = toBase(index % pattern.width, Math.floor(index / pattern.width));
@@ -587,7 +651,7 @@ export function EmbroideryView() {
     // Session live : chaque brodeuse affiche son avancement en contour coloré.
     for (const participant of activeLivePeers) {
       ctx.strokeStyle = participant.color;
-      ctx.lineWidth = Math.max(0.8, cell * 0.12);
+      ctx.lineWidth = outline;
       for (const index of participant.completed) {
         if (pattern.cells[index] < 0 || completed.has(index)) continue;
         const { bx, by } = toBase(index % pattern.width, Math.floor(index / pattern.width));
@@ -640,21 +704,38 @@ export function EmbroideryView() {
       ctx.lineWidth = 2;
       ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
     }
+    ctx.restore();
 
+    // Curseurs des autres brodeuses : dessinés à l'échelle de l'écran, sinon cadre et nom
+    // deviennent illisibles (quelques pixels) dès que la grille entière tient à l'écran.
+    ctx.font = '600 12px "Inter Tight", Arial, sans-serif';
+    ctx.textAlign = "left";
+    ctx.textBaseline = "middle";
     for (const participant of activeLivePeers) {
       if (!participant.cursor) continue;
       const { bx, by } = toBase(participant.cursor.x, participant.cursor.y);
+      const sx = centerX + view.x + bx * scale;
+      const sy = centerY + view.y + by * scale;
+      if (sx < -40 || sy < -40 || sx > size.w + 40 || sy > size.h + 40) continue;
+      const half = Math.max(5, (cell * scale) / 2 + 1);
+      ctx.lineWidth = 3;
+      ctx.strokeStyle = "rgba(255,255,255,0.95)";
+      ctx.strokeRect(sx - half, sy - half, half * 2, half * 2);
+      ctx.lineWidth = 1.6;
       ctx.strokeStyle = participant.color;
+      ctx.strokeRect(sx - half, sy - half, half * 2, half * 2);
+      const label = peerLabels[participant.id] ?? participant.name;
+      const tagWidth = Math.ceil(ctx.measureText(label).width) + 12;
+      const tagHeight = 18;
+      const tagX = Math.max(2, Math.min(size.w - tagWidth - 2, sx - half));
+      const above = sy - half - tagHeight - 3;
+      const tagY = Math.max(2, Math.min(size.h - tagHeight - 2, above >= 2 ? above : sy + half + 3));
       ctx.fillStyle = participant.color;
-      ctx.lineWidth = 2;
-      ctx.strokeRect(bx - cell / 2 - 1, by - cell / 2 - 1, cell + 2, cell + 2);
-      ctx.font = `${Math.max(10, Math.round(cell * 0.58))}px "Inter Tight", Arial, sans-serif`;
-      ctx.textAlign = "left";
-      ctx.textBaseline = "bottom";
-      ctx.fillText(participant.name, bx - cell / 2, by - cell / 2 - 4);
+      ctx.fillRect(tagX, tagY, tagWidth, tagHeight);
+      ctx.fillStyle = "#ffffff";
+      ctx.fillText(label, tagX + 6, tagY + tagHeight / 2 + 0.5);
     }
-    ctx.restore();
-  }, [activeLivePeers, completed, config.palette, cursor, display, geometry, highlight, nextZone, pattern, peer, selectedCode, size, view]);
+  }, [activeLivePeers, completed, config.palette, cursor, display, geometry, highlight, nextZone, pattern, peer, peerLabels, selectedCode, size, view]);
 
   useEffect(() => { draw(); }, [draw]);
 
@@ -730,8 +811,27 @@ export function EmbroideryView() {
 
   const fit = useCallback(() => setView({ k: 1, x: 0, y: 0 }), []);
 
+  /**
+   * Molette : écouteur natif non passif. L'écouteur React est passif, son `preventDefault`
+   * est ignoré et la page (ou le zoom du navigateur avec Ctrl) réagit en même temps que la grille.
+   */
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!embroideryOpen || !canvas) return;
+    const onWheel = (event: WheelEvent) => {
+      event.preventDefault();
+      const rect = canvas.getBoundingClientRect();
+      zoom(event.deltaY < 0 ? 1.12 : 0.89, event.clientX - rect.left - size.w / 2, event.clientY - rect.top - size.h / 2);
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
+    return () => canvas.removeEventListener("wheel", onWheel);
+  }, [embroideryOpen, size.h, size.w, zoom]);
+
   const onPointerDown = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    // Clic droit ou central : menu contextuel ou défilement du navigateur, jamais une croix cochée.
+    if (event.pointerType === "mouse" && event.button !== 0) return;
     event.currentTarget.setPointerCapture(event.pointerId);
+    hoverRef.current = null;
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const cell = cellAt(event.clientX, event.clientY);
     if (cell) setCursor((current) => (current && current.x === cell.x && current.y === cell.y ? current : cell));
@@ -746,7 +846,10 @@ export function EmbroideryView() {
   };
 
   const onPointerMove = (event: React.PointerEvent<HTMLCanvasElement>) => {
-    if (!pointers.current.has(event.pointerId)) return;
+    if (!pointers.current.has(event.pointerId)) {
+      if (event.pointerType === "mouse") setHoverCell(cellAt(event.clientX, event.clientY));
+      return;
+    }
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
     const cell = cellAt(event.clientX, event.clientY);
     if (cell) setCursor((current) => (current && current.x === cell.x && current.y === cell.y ? current : cell));
@@ -786,19 +889,31 @@ export function EmbroideryView() {
     }
   };
 
+  /** Le navigateur reprend le geste (défilement, appel entrant…) : ce n'est pas un appui, rien ne doit être coché. */
+  const cancelPointer = (event: React.PointerEvent<HTMLCanvasElement>) => {
+    pointers.current.delete(event.pointerId);
+    if (pointers.current.size < 2) pinch.current = null;
+    if (tap.current && tap.current.pointerId === event.pointerId) tap.current = null;
+  };
+
   const onKeyDown = (event: React.KeyboardEvent<HTMLCanvasElement>) => {
     const key = event.key.toLowerCase();
     // Les raccourcis du tambour et de la recette ne doivent pas agir derrière la Broderie.
     const handled = () => { event.preventDefault(); event.stopPropagation(); };
+    // Ctrl/Cmd/Alt + touche appartiennent au navigateur (zoom de page, retour arrière…) : on ne les détourne pas.
+    const modified = event.ctrlKey || event.metaKey || event.altKey;
     if ((event.ctrlKey || event.metaKey) && (key === "z" || key === "y")) {
       handled();
       if (key === "y" || (key === "z" && event.shiftKey)) redo(); else undo();
     }
+    else if (modified) return;
     else if (event.key === "+" || event.key === "=") { handled(); zoom(1.25); }
     else if (event.key === "-") { handled(); zoom(0.8); }
     else if (event.key === "0") { handled(); fit(); }
     else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key)) {
       handled();
+      // Le clavier reprend la main : les autres brodeuses doivent voir ce curseur, pas la dernière position de la souris.
+      hoverRef.current = null;
       setCursor((current) => {
         const base = current ?? { x: Math.floor(pattern.width / 2), y: Math.floor(pattern.height / 2) };
         const next = {
@@ -837,6 +952,7 @@ export function EmbroideryView() {
   };
 
   const importPeer = async (file: File) => {
+    if (file.size > MAX_PROJECT_FILE_BYTES) { notify("Projet refusé", "Ce fichier dépasse 10 Mo : ce n'est pas un projet ROSACE."); return; }
     try {
       const result = readPeerProgress(JSON.parse(await file.text()), pattern);
       if (!result.ok) { notify("Projet refusé", result.error); return; }
@@ -852,9 +968,31 @@ export function EmbroideryView() {
 
   const resetProgress = () => {
     commitProgress({ completed: new Set(), history: [], future: [] });
+    refocusZeroRef.current = true;
     setConfirmReset(false);
     setAnnounce("Progression remise à zéro.");
   };
+
+  /** « Zéro » efface tout : la confirmation est armée quelques secondes seulement, et se désarme d'elle-même. */
+  const disarmReset = (refocus: boolean) => {
+    refocusZeroRef.current = refocus;
+    setConfirmReset(false);
+  };
+  confirmResetRef.current = confirmReset;
+  useEffect(() => {
+    if (confirmReset) {
+      confirmButtonRef.current?.focus();
+      const timer = window.setTimeout(() => {
+        refocusZeroRef.current = document.activeElement === confirmButtonRef.current;
+        setConfirmReset(false);
+      }, RESET_ARM_MS);
+      return () => window.clearTimeout(timer);
+    }
+    if (refocusZeroRef.current) {
+      refocusZeroRef.current = false;
+      zeroButtonRef.current?.focus();
+    }
+  }, [confirmReset]);
 
   const selectedLine = selectedRemaining;
   const colorsUsed = pattern.palette.map(({ code, symbol }, index) => ({
@@ -883,10 +1021,20 @@ export function EmbroideryView() {
   const openBroderEnsemble = () => {
     liveSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
     window.setTimeout(() => {
-      liveRoomRef.current?.focus();
-      liveRoomRef.current?.select();
+      // Pendant une session le code est figé : on place le focus sur le nom.
+      const target = liveRoomRef.current && !liveRoomRef.current.disabled ? liveRoomRef.current : liveNameRef.current;
+      target?.focus();
+      target?.select();
     }, 160);
   };
+
+  const livePeerCount = activeLivePeers.length;
+  const livePlural = livePeerCount > 1 ? "s" : "";
+  const liveStatus = !liveEnabled
+    ? "Session inactive. Ouvrez ce patron dans un autre onglet, saisissez le même code et cliquez « Rejoindre » dans chacun."
+    : livePeerCount === 0
+      ? `Session « ${liveJoined.toUpperCase()} » active · en attente d'une autre brodeuse.`
+      : `Session « ${liveJoined.toUpperCase()} » active · ${livePeerCount} autre${livePlural} brodeuse${livePlural} connectée${livePlural}.`;
 
   if (!embroideryOpen) return null;
 
@@ -924,12 +1072,8 @@ export function EmbroideryView() {
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={endPointer}
-            onPointerCancel={endPointer}
-            onWheel={(event) => {
-              event.preventDefault();
-              const rect = event.currentTarget.getBoundingClientRect();
-              zoom(event.deltaY < 0 ? 1.12 : 0.89, event.clientX - rect.left - size.w / 2, event.clientY - rect.top - size.h / 2);
-            }}
+            onPointerCancel={cancelPointer}
+            onPointerLeave={() => setHoverCell(null)}
             onKeyDown={onKeyDown}
             onBlur={() => setCursor(null)}
           />
@@ -967,12 +1111,13 @@ export function EmbroideryView() {
             <label>
               Nom
               <input
+                ref={liveNameRef}
                 type="text"
                 value={liveName}
                 maxLength={24}
                 onChange={(event) => setLiveName(event.target.value)}
                 onBlur={() => {
-                  const next = liveName.trim() || "Moi";
+                  const next = sanitizeName(liveName);
                   setLiveName(next);
                   try { localStorage.setItem(LIVE_NAME_KEY, next); } catch { /* préférence locale */ }
                 }}
@@ -985,6 +1130,7 @@ export function EmbroideryView() {
                 type="text"
                 value={liveRoom}
                 maxLength={32}
+                disabled={liveEnabled}
                 onChange={(event) => setLiveRoom(event.target.value)}
                 onBlur={() => setLiveRoom((current) => sanitizeRoom(current))}
               />
@@ -995,11 +1141,10 @@ export function EmbroideryView() {
               <button type="button" className="outil" onClick={startLiveSession}><Users size={14} aria-hidden="true" /> Rejoindre</button>
             )}
           </div>
-          <p>
-            {liveEnabled
-              ? `Session active (${sanitizeRoom(liveRoom).toUpperCase()}) · ${activeLivePeers.length} brodeuse${activeLivePeers.length > 1 ? "s" : ""} connectée${activeLivePeers.length > 1 ? "s" : ""}.`
-              : "Session inactive. Donnez ce code et ce patron à l'autre brodeuse, puis cliquez Rejoindre des deux côtés."}
-            {liveEnabled && activeLivePeers.length > 0 && ` Croisées visibles : ${liveDoneTotal.toLocaleString("fr-FR")}.`}
+          <p role="status">{liveStatus}</p>
+          <p className="broder-live-note">
+            Cette session relie les onglets d'un même navigateur, sur cet appareil. Pour broder avec une amie sur un autre appareil,
+            échangez vos projets avec « Projet » puis « Importer calque ».
           </p>
           {activeLivePeers.length > 0 && (
             <ul className="broder-live-list" role="list" aria-label="Brodeuses connectées">
@@ -1008,7 +1153,7 @@ export function EmbroideryView() {
                 return (
                   <li key={participant.id}>
                     <i style={{ background: participant.color }} aria-hidden="true" />
-                    <span>{participant.name}</span>
+                    <span>{peerLabels[participant.id] ?? participant.name}</span>
                     <small>{done.toLocaleString("fr-FR")} croix</small>
                   </li>
                 );
@@ -1062,6 +1207,7 @@ export function EmbroideryView() {
             type="file"
             accept="application/json,.json"
             className="sr-only"
+            tabIndex={-1}
             aria-label="Afficher la progression d'une amie sur ce même ouvrage"
             onChange={(event) => {
               const file = event.target.files?.[0];
@@ -1070,15 +1216,19 @@ export function EmbroideryView() {
             }}
           />
           {confirmReset ? (
-            <button className="bouton bouton-petit broder-danger" onClick={resetProgress}>Confirmer le zéro</button>
+            <>
+              <button ref={confirmButtonRef} className="bouton bouton-petit broder-danger" onClick={resetProgress}>Confirmer le zéro</button>
+              <button className="bouton bouton-petit" onClick={() => disarmReset(true)}>Annuler</button>
+            </>
           ) : (
-            <button className="bouton bouton-petit" onClick={() => setConfirmReset(true)}><RotateCcw size={15} aria-hidden="true" /> Zéro</button>
+            <button ref={zeroButtonRef} className="bouton bouton-petit" onClick={() => setConfirmReset(true)}><RotateCcw size={15} aria-hidden="true" /> Zéro</button>
           )}
           <input
             ref={fileRef}
             type="file"
             accept="application/json,.json"
             className="sr-only"
+            tabIndex={-1}
             aria-label="Importer un projet ROSACE"
             onChange={(event) => {
               const file = event.target.files?.[0];
