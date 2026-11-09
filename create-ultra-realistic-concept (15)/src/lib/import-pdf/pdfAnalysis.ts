@@ -1,6 +1,6 @@
 import { flossIndex, labOf, nearestFloss } from "./floss";
 import { rectify, type Corners } from "./rectify";
-import { openPdf, type PdfHandle } from "./pdfimport";
+import { openPdf, throwIfAborted, type PdfHandle } from "./pdfimport";
 import { codeOfText } from "./pdfVector";
 import { quantizePixels } from "./quantize";
 
@@ -414,8 +414,18 @@ async function legendEntries(handle: PdfHandle, pageN: number): Promise<SymbolEn
 
 /* ------------------------------ Analyse ------------------------------ */
 
-export async function analyzePdf(file: File, onProgress: (msg: string) => void): Promise<{ analysis: PdfAnalysis; handle: PdfHandle }> {
-  const handle = await openPdf(file);
+/** Le handle est détruit si la lecture échoue ou qu'on l'interrompt par `signal` ; sinon il revient à l'appelant, qui le détruit. */
+export async function analyzePdf(file: File, onProgress: (msg: string) => void, signal?: AbortSignal): Promise<{ analysis: PdfAnalysis; handle: PdfHandle }> {
+  const handle = await openPdf(file, signal);
+  try {
+    return { analysis: await analyzePages(handle, file.name, onProgress, signal), handle };
+  } catch (error) {
+    handle.destroy();
+    throw error;
+  }
+}
+
+async function analyzePages(handle: PdfHandle, fileName: string, onProgress: (msg: string) => void, signal?: AbortSignal): Promise<PdfAnalysis> {
   const pages: PageInfo[] = [];
   let title = "";
   let author = "";
@@ -425,6 +435,7 @@ export async function analyzePdf(file: File, onProgress: (msg: string) => void):
   let modelScore = 0;
 
   for (let n = 1; n <= handle.pages; n++) {
+    throwIfAborted(signal);
     onProgress(`Analyse de la page ${n}/${handle.pages}…`);
     await tick();
     const canvas = await handle.render(n, 1400);
@@ -490,10 +501,7 @@ export async function analyzePdf(file: File, onProgress: (msg: string) => void):
     });
   }
 
-  return {
-    analysis: { title: title || file.name.replace(/\.pdf$/i, ""), author, pages, legendPage, legend, modelAspect },
-    handle,
-  };
+  return { title: title || fileName.replace(/\.pdf$/i, ""), author, pages, legendPage, legend, modelAspect };
 }
 
 /* ----------------------------- Conversion ----------------------------- */

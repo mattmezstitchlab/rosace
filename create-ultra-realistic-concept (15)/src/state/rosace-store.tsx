@@ -27,6 +27,8 @@ const FAVORITES_KEY = "aime-rosace-favorites-v1";
 const IMPORTED_KEY = "aime-rosace-imported-v1";
 /** Hash de l'atelier quand l'ouvrage actif est un patron importé : aucune recette à partager. */
 export const IMPORTED_HASH = "#atelier-patron";
+/** Un projet ROSACE pèse quelques centaines de Ko : au-delà, ce n'est pas un projet (et la lecture bloquerait l'onglet). */
+const MAX_PROJECT_FILE_BYTES = 10 * 1024 * 1024;
 
 export type FamilyFilter = ThreadFamily | "toutes";
 /** Catégories du dock dont les réglages s'affichent dans le panneau. Grille et Collection sont des actions. */
@@ -66,7 +68,8 @@ function readInitialConfig(): RosaceConfig {
   return normalizeConfig(DEFAULT_CONFIG);
 }
 
-function readImportedWork(): StitchWork | null {
+/** Ouvrage importé enregistré : relu par la même validation qu'un import, jamais comme JSON brut dans l'état. */
+export function readImportedWork(): StitchWork | null {
   try {
     const stored = localStorage.getItem(IMPORTED_KEY);
     if (!stored) return null;
@@ -75,20 +78,35 @@ function readImportedWork(): StitchWork | null {
   } catch { return null; }
 }
 
-function readFavorites(): SavedRosace[] {
+const MAX_FAVORITES = 24;
+
+/**
+ * Collection enregistrée, validée entrée par entrée : une entrée abîmée est ignorée, les autres survivent.
+ * `null` = stockage illisible : l'appelant ne doit surtout pas l'écraser par une liste vide.
+ */
+export function readFavorites(): SavedRosace[] | null {
   try {
     const stored = localStorage.getItem(FAVORITES_KEY);
     if (!stored) return [];
-    const entries = JSON.parse(stored);
-    if (!Array.isArray(entries)) return [];
-    return entries.slice(0, 24).map((entry, index) => ({
-      id: typeof entry.id === "string" ? entry.id : `saved-${index}`,
-      name: typeof entry.name === "string" ? entry.name : `Rosace ${index + 1}`,
-      config: normalizeConfig(entry.config),
-      createdAt: typeof entry.createdAt === "string" ? entry.createdAt : new Date().toISOString(),
-      stitches: Number(entry.stitches) || 0,
-    }));
-  } catch { return []; }
+    const entries: unknown = JSON.parse(stored);
+    if (!Array.isArray(entries)) return null;
+    const ids = new Set<string>();
+    const list: SavedRosace[] = [];
+    entries.slice(0, MAX_FAVORITES).forEach((entry, index) => {
+      if (!entry || typeof entry !== "object") return;
+      try {
+        const raw = entry as Record<string, unknown>;
+        let id = typeof raw.id === "string" && raw.id ? raw.id.slice(0, 80) : `saved-${index}`;
+        while (ids.has(id)) id = `${id}-${index}`;
+        ids.add(id);
+        const name = typeof raw.name === "string" && raw.name.trim() ? raw.name.slice(0, 80) : `Rosace ${index + 1}`;
+        const createdAt = typeof raw.createdAt === "string" && Number.isFinite(Date.parse(raw.createdAt)) ? raw.createdAt : new Date().toISOString();
+        const stitches = Number(raw.stitches);
+        list.push({ id, name, config: normalizeConfig(raw.config as RosaceConfig), createdAt, stitches: Number.isFinite(stitches) && stitches > 0 ? Math.round(stitches) : 0 });
+      } catch { /* Entrée illisible : ignorée, la collection reste utilisable. */ }
+    });
+    return entries.length && !list.length ? null : list;
+  } catch { return null; }
 }
 
 function nextSeed(current: number) {
@@ -111,7 +129,15 @@ function useRosaceState() {
   const [config, setConfigState] = useState<RosaceConfig>(readInitialConfig);
   const configRef = useRef(config);
   /** Ouvrage importé actif ; `null` = l'ouvrage actif est la rosace calculée depuis `config`. */
-  const [imported, setImported] = useState<StitchWork | null>(() => (window.location.hash.startsWith("#r=") ? null : readImportedWork()));
+  const [imported, setImported] = useState<StitchWork | null>(() =>
+    // Un lien `#r=` montre la rosace partagée, sans toucher à l'ouvrage importé enregistré sur l'appareil.
+    window.location.hash.startsWith("#r=") ? null : readImportedWork());
+  /** Dernier ouvrage relu du stockage : il y est déjà, l'effet de persistance ne le réécrit pas. Pris sur l'état retenu, car StrictMode appelle l'initialiseur deux fois. */
+  const bootImported = useRef(imported);
+  const importedRef = useRef(imported);
+  importedRef.current = imported;
+  /** Retrait du patron importé en attente de confirmation ; `apply` reprend l'action interrompue. */
+  const [discardPrompt, setDiscardPrompt] = useState<{ apply: () => void } | null>(null);
   const historyRef = useRef<RosaceConfig[]>([]);
   const futureRef = useRef<RosaceConfig[]>([]);
   const [future, setFuture] = useState<RosaceConfig[]>([]);
@@ -120,7 +146,12 @@ function useRosaceState() {
   const [activeColorIndex, setActiveColorIndex] = useState(0);
   const [inspectCode, setInspectCode] = useState<string | null>(null);
   const [activeDimension, setActiveDimension] = useState<DimensionKey>("structure");
-  const [favorites, setFavorites] = useState<SavedRosace[]>(readFavorites);
+  const unreadableFavorites = useRef(false);
+  const [favorites, setFavorites] = useState<SavedRosace[]>(() => {
+    const stored = readFavorites();
+    unreadableFavorites.current = stored === null;
+    return stored ?? [];
+  });
   const [embroideryOpen, setEmbroideryOpen] = useState(() => window.location.hash.startsWith("#atelier-broder"));
   /** Import PDF : ouvert par le dock, la landing ou `#atelier-importer` ; le fichier n'est lu qu'ici. */
   const [importOpen, setImportOpen] = useState(() => window.location.hash.startsWith("#atelier-importer"));
@@ -162,28 +193,51 @@ function useRosaceState() {
     try { localStorage.setItem(CURRENT_KEY, configSignature); } catch { /* Mode privé : la séance reste utilisable. */ }
   }, [configSignature]);
   useEffect(() => {
+    // Écriture seulement : retirer l'ouvrage du stockage est une action explicite (`discardImportedWork`), jamais
+    // l'effet de bord d'un lien `#r=` ou d'une recette inchangée. Un ouvrage relu au démarrage y est déjà.
+    if (!imported || imported === bootImported.current) return;
     try {
-      if (imported) localStorage.setItem(IMPORTED_KEY, JSON.stringify(serializeImportedWork(imported)));
-      else localStorage.removeItem(IMPORTED_KEY);
+      localStorage.setItem(IMPORTED_KEY, JSON.stringify(serializeImportedWork(imported)));
     } catch {
-      notify("Patron importé non enregistré", "Le stockage du navigateur est plein : exportez le projet pour le conserver.");
+      notify("Patron importé non enregistré", "Le stockage du navigateur est plein ou indisponible : exportez le projet pour le conserver.");
     }
     // volontairement lié à l'ouvrage importé seul
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [imported]);
   useEffect(() => {
+    // Une collection illisible n'est jamais remplacée par une liste vide : seul un ajout de l'utilisateur la réécrit.
+    if (unreadableFavorites.current && !favorites.length) return;
+    unreadableFavorites.current = false;
     try { localStorage.setItem(FAVORITES_KEY, JSON.stringify(favorites)); } catch { /* Les favoris restent disponibles pendant la séance. */ }
   }, [favorites]);
   useEffect(() => {
     if (window.location.hash.startsWith("#r=")) window.setTimeout(() => scrollToSequence("composer"), 250);
   }, []);
 
-  /** Unique point d'entrée de modification de la recette. Un geste continu (glisser une poignée) = une seule entrée d'historique. */
-  const commit = useCallback((next: RosaceConfig, options?: { history?: boolean }) => {
+  /** Retrait explicite du patron importé : le seul endroit qui l'efface du stockage de l'appareil. */
+  const discardImportedWork = useCallback(() => {
+    importedRef.current = null;
+    setImported(null);
+    try { localStorage.removeItem(IMPORTED_KEY); } catch { /* Stockage indisponible : rien n'y était enregistré. */ }
+  }, []);
+
+  /** Un patron importé ne disparaît jamais en silence : l'action qui le remplacerait attend la confirmation. */
+  const requestDiscard = useCallback((apply: () => void) => {
+    if (importedRef.current) setDiscardPrompt({ apply });
+    else apply();
+  }, []);
+  const cancelDiscardImport = useCallback(() => setDiscardPrompt(null), []);
+  const confirmDiscardImport = useCallback(() => {
+    if (!discardPrompt) return;
+    setDiscardPrompt(null);
+    discardImportedWork();
+    discardPrompt.apply();
+  }, [discardImportedWork, discardPrompt]);
+
+  /** Modifie la recette, sans rien décider de l'ouvrage importé. Un geste continu (glisser une poignée) = une seule entrée d'historique. */
+  const applyRecipe = useCallback((next: RosaceConfig, options?: { history?: boolean }) => {
     const current = configRef.current;
     const normalized = normalizeConfig(next);
-    // Toute modification de recette ramène à la rosace : un patron importé ne se règle pas.
-    setImported(null);
     if (JSON.stringify(normalized) === JSON.stringify(current)) return;
     const flow = gesture.current;
     if (options?.history !== false && !(flow.active && flow.pushed)) {
@@ -197,16 +251,28 @@ function useRosaceState() {
     setConfigState(normalized);
   }, []);
 
+  /**
+   * Unique point d'entrée de modification de la recette. Un patron importé ne se règle pas : la modifier le retire de
+   * l'appareil, donc seulement après confirmation. Une recette inchangée ne touche à rien.
+   */
+  const commit = useCallback((next: RosaceConfig, options?: { history?: boolean }) => {
+    if (importedRef.current && JSON.stringify(normalizeConfig(next)) === JSON.stringify(configRef.current)) return;
+    requestDiscard(() => applyRecipe(next, options));
+  }, [applyRecipe, requestDiscard]);
+
   /** Applique la recette portée par l'URL sans polluer l'historique Annuler de l'atelier. */
   const applyLocationRecipe = useCallback(() => {
     const shared = window.location.hash.match(/^#r=([A-Za-z0-9_-]+)/)?.[1];
     if (!shared) return;
     const decoded = decodeConfig(shared);
     if (decoded) {
+      // Suivre un lien est une navigation : la rosace partagée s'affiche, l'ouvrage importé reste enregistré.
+      importedRef.current = null;
       setImported(null);
-      commit(decoded, { history: false });
+      setDiscardPrompt(null);
+      applyRecipe(decoded, { history: false });
     }
-  }, [commit]);
+  }, [applyRecipe]);
 
   /**
    * L'URL reflète toujours l'ouvrage courant, sans créer d'entrée d'historique navigateur :
@@ -248,12 +314,15 @@ function useRosaceState() {
     }
   }, []);
 
-  /** Quitte le patron importé : la rosace de la recette redevient l'ouvrage actif. */
+  /** « Revenir à ma rosace » : retire le patron importé de l'appareil, après confirmation. */
   const clearImportedWork = useCallback(() => {
-    setImported(null);
-    setEmbroideryOpen(false);
-    setProgressRevision((value) => value + 1);
-  }, []);
+    const wasImported = Boolean(importedRef.current);
+    requestDiscard(() => {
+      setEmbroideryOpen(false);
+      setProgressRevision((value) => value + 1);
+      if (wasImported) notify("Patron importé retiré de cet appareil", "La rosace de votre recette est de retour");
+    });
+  }, [notify, requestDiscard]);
 
   /** hashchange + popstate : liens de recette, liens de panneau, retour et avant du navigateur. */
   useEffect(() => {
@@ -262,6 +331,15 @@ function useRosaceState() {
       if (target) setPanel(target);
       if (window.location.hash.startsWith("#atelier-broder")) setEmbroideryOpen(true);
       if (window.location.hash.startsWith("#atelier-importer")) setImportOpen(true);
+      if (window.location.hash === IMPORTED_HASH && !importedRef.current) {
+        // Retour vers l'ouvrage importé (bouton Précédent après un lien `#r=`) : il est resté enregistré.
+        const stored = readImportedWork();
+        if (stored) {
+          bootImported.current = stored;
+          setImported(stored);
+          setProgressRevision((value) => value + 1);
+        }
+      }
       applyLocationRecipe();
     };
     window.addEventListener("hashchange", onNavigate);
@@ -352,14 +430,18 @@ function useRosaceState() {
 
   /** Ouvre une recette exacte (étude de la bibliothèque, favori) dans l'unique instrument. */
   const loadRecipe = useCallback((recipe: RosaceConfig, title: string, detail?: string) => {
-    commit({ ...recipe, palette: [...recipe.palette] });
-    setActiveColorIndex(0);
-    setInspectCode(null);
-    setEmbroideryOpen(false);
-    setCollectionOpen(false);
-    window.setTimeout(() => scrollToSequence("composer"), 30);
-    notify(`${title} est sur le tambour`, detail ?? `Recette exacte · signature ${formatSeed(recipe.seed)}`);
-  }, [commit, notify]);
+    // Pas deux fenêtres modales empilées : la collection se referme avant la confirmation.
+    if (importedRef.current) setCollectionOpen(false);
+    requestDiscard(() => {
+      applyRecipe({ ...recipe, palette: [...recipe.palette] });
+      setActiveColorIndex(0);
+      setInspectCode(null);
+      setEmbroideryOpen(false);
+      setCollectionOpen(false);
+      window.setTimeout(() => scrollToSequence("composer"), 30);
+      notify(`${title} est sur le tambour`, detail ?? `Recette exacte · signature ${formatSeed(recipe.seed)}`);
+    });
+  }, [applyRecipe, notify, requestDiscard]);
 
   const selectSlot = useCallback((index: number) => {
     setActiveColorIndex(index);
@@ -418,13 +500,16 @@ function useRosaceState() {
 
   /** Un clic sur une couleur : le fil choisi devient le corps, les quatre autres suivent l'harmonie. */
   const applyColor = useCallback((code: string, scheme: Harmony = harmony) => {
-    const current = configRef.current;
-    const fabric = FABRIC_COLORS[current.fabric].base;
-    const [p0, p1, p2, p3, p4] = harmonyCodes(code, scheme, fabric);
-    commit({ ...current, palette: [p0, p1, p2, p3, p4], paletteShift: 1 });
-    setInspectCode(code);
-    notify(`Rosace teintée · DMC ${code}`, `${getThread(code).name} · harmonie ${scheme}`);
-  }, [commit, harmony, notify]);
+    // Avec un patron importé actif, teinter la rosace le retire de l'appareil : la confirmation passe avant tout effet.
+    requestDiscard(() => {
+      const current = configRef.current;
+      const fabric = FABRIC_COLORS[current.fabric].base;
+      const [p0, p1, p2, p3, p4] = harmonyCodes(code, scheme, fabric);
+      applyRecipe({ ...current, palette: [p0, p1, p2, p3, p4], paletteShift: 1 });
+      setInspectCode(code);
+      notify(`Rosace teintée · DMC ${code}`, `${getThread(code).name} · harmonie ${scheme}`);
+    });
+  }, [applyRecipe, harmony, notify, requestDiscard]);
 
   const changeHarmony = useCallback((scheme: Harmony) => {
     setHarmony(scheme);
@@ -488,6 +573,7 @@ function useRosaceState() {
       }
     },
     projectImport: async (file: File) => {
+      if (file.size > MAX_PROJECT_FILE_BYTES) { notify("Projet refusé", "Ce fichier dépasse 10 Mo : ce n'est pas un projet ROSACE."); return; }
       let raw: unknown;
       try { raw = JSON.parse(await file.text()); }
       catch { notify("Projet illisible", "Le fichier n'est pas un JSON valide."); return; }
@@ -496,20 +582,24 @@ function useRosaceState() {
       try { saveProgress(result.progress); }
       catch { notify("Progression non enregistrée", "Le stockage du navigateur est plein ou indisponible."); return; }
       if (result.config) {
-        setImported(null);
-        commit(result.config);
+        // Ouvrir un projet est un choix explicite : il remplace l'ouvrage importé, qui n'est alors plus enregistré.
+        discardImportedWork();
+        applyRecipe(result.config);
       } else {
         setImported(result.work);
       }
       setEmbroideryOpen(false);
       setProgressRevision((value) => value + 1);
       const title = result.migratedFrom ? "Projet version 1 migré" : "Projet importé";
-      const detail = result.warning ?? `${result.config ? "Recette" : "Patron importé"} et progression restaurés · ${shortFingerprint(result.progress.fingerprint)}`;
+      const merged = "progression fusionnée avec celle de cet appareil";
+      const detail = result.warning ? `${result.warning} Progression fusionnée avec celle de cet appareil.` : `${result.config ? "Recette" : "Patron importé"} · ${merged} · ${shortFingerprint(result.progress.fingerprint)}`;
       notify(title, detail);
     },
     print: () => {
-      if (!printWorksheet(work)) notify("La fenêtre d'impression est bloquée", "Autorisez les fenêtres pop-up pour créer la fiche PDF");
-      else notify("Fiche technique ouverte", "Utilisez « Imprimer / PDF » dans la nouvelle fenêtre");
+      try {
+        if (!printWorksheet(work)) notify("La fenêtre d'impression est bloquée", "Autorisez les fenêtres pop-up pour créer la fiche PDF");
+        else notify("Fiche technique ouverte", "Utilisez « Imprimer / PDF » dans la nouvelle fenêtre");
+      } catch { notify("Fiche technique impossible", "Le navigateur n'a pas pu la préparer : réessayez dans un instant."); }
     },
     png: async (chart: boolean) => {
       try {
@@ -518,12 +608,16 @@ function useRosaceState() {
       } catch (error) { notify("Export impossible", error instanceof Error ? error.message : "Réessayez dans un instant"); }
     },
     svg: (chart: boolean) => {
-      exportSvg(work, chart);
-      notify("SVG exporté", `${chart ? "Grille" : "Motif"} vectoriel · croix groupées par référence DMC`);
+      try {
+        exportSvg(work, chart);
+        notify("SVG exporté", `${chart ? "Grille" : "Motif"} vectoriel · croix groupées par référence DMC`);
+      } catch { notify("Export SVG impossible", "Le navigateur n'a pas pu produire le fichier : réessayez dans un instant."); }
     },
     csv: () => {
-      exportThreadCsv(work);
-      notify("Liste de fils exportée", "Compatible avec votre tableur");
+      try {
+        exportThreadCsv(work);
+        notify("Liste de fils exportée", "Compatible avec votre tableur");
+      } catch { notify("Export de la liste impossible", "Le navigateur n'a pas pu produire le fichier : réessayez dans un instant."); }
     },
     share: async () => {
       if (imported) {
@@ -546,10 +640,11 @@ function useRosaceState() {
         notify("Lien de partage copié", "La signature, la palette et tous les réglages sont inclus");
       } catch { notify("Copie automatique impossible", "Sélectionnez manuellement le lien affiché dans Outils"); }
     },
-  }), [work, imported, notify, shareUrl, commit]);
+  }), [work, imported, notify, shareUrl, applyRecipe, discardImportedWork]);
 
   return {
     config, pattern, work, imported, loadImportedWork, clearImportedWork, canFavorite,
+    discardPromptOpen: discardPrompt !== null, confirmDiscardImport, cancelDiscardImport,
     importOpen, importFile, setImportFile, openImport, closeImport,
     warnings, history, future, isDefault, shareUrl,
     activeIndex, inspectedCode, activeDimension, setActiveDimension,

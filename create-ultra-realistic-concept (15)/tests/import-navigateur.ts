@@ -14,7 +14,8 @@ import { mkdir, writeFile } from "node:fs/promises";
 import os from "node:os";
 import { deflateSync } from "node:zlib";
 import path from "node:path";
-import { chromium, type Page } from "playwright-core";
+import AxeBuilder from "@axe-core/playwright";
+import { chromium, type Browser, type BrowserContext, type Page } from "playwright-core";
 import { worksheetHtml } from "../src/lib/exporters";
 import { buildProject, emptyProgress, serializeRuns, stitchIndex } from "../src/lib/progress";
 import { DEFAULT_CONFIG, generateRosace } from "../src/lib/rosace";
@@ -105,6 +106,274 @@ function pdfHtml() {
 
 async function expectText(page: Page, selector: string, pattern: RegExp, timeout = 20000) {
   await page.locator(selector).filter({ hasText: pattern }).first().waitFor({ state: "visible", timeout });
+}
+
+/* ---------- Robustesse de l'import : navigateur ancien, worker muet, annulation, gros PDF. Un contexte isolé par scénario. ---------- */
+
+/** Un navigateur d'il y a deux ans : les API que le build moderne de pdf.js appelle sans les fournir n'existent pas (thread principal comme worker). */
+const OLD_BROWSER_SCRIPT = `for (const [target, names] of [
+  [Map.prototype, ["getOrInsert", "getOrInsertComputed"]],
+  [WeakMap.prototype, ["getOrInsert", "getOrInsertComputed"]],
+  [Promise, ["try"]],
+  [URL, ["parse"]],
+  [Uint8Array.prototype, ["toHex", "toBase64", "setFromBase64", "setFromHex"]],
+  [Uint8Array, ["fromBase64", "fromHex"]],
+  [Math, ["sumPrecise"]],
+]) for (const name of names) delete target[name];`;
+/** Un worker qui accepte la poignée de main puis ne répond jamais à l'ouverture du document : l'ancien spinner sans fin. */
+const MUTE_WORKER_SCRIPT = `self.addEventListener("message", (event) => { if (event.data && event.data.action === "GetDocRequest") event.stopImmediatePropagation(); });`;
+/** Le script du worker de pdf.js (et non le module `?url` que le serveur de dev sert pour en donner l'adresse). */
+const isPdfWorkerScript = (url: URL) => /\/pdf\.worker\.min[^/]*\.mjs$/.test(url.pathname) && !url.search;
+const ALERT = ".importer-alerte[role=\"alert\"]";
+
+async function isolatedPage(browser: Browser) {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 860 }, locale: "fr-FR" });
+  const page = await context.newPage();
+  const errors: string[] = [];
+  page.on("pageerror", (error) => errors.push(String(error)));
+  return { context, page, errors };
+}
+
+/** Les routes sont retirées avant la fermeture : une requête de worker encore en vol ferait échouer le close(). */
+async function closeIsolated(context: BrowserContext) {
+  await context.unrouteAll({ behavior: "ignoreErrors" });
+  await context.close();
+}
+
+async function rewritePdfWorker(context: BrowserContext, prelude: string) {
+  let rewrites = 0;
+  await context.route(isPdfWorkerScript, async (route) => {
+    const response = await route.fetch();
+    rewrites += 1;
+    await route.fulfill({ response, body: `${prelude}\n${await response.text()}` });
+  });
+  return () => rewrites;
+}
+
+/** pdf.js garde son worker vivant tant qu'on ne le détruit pas : après une erreur ou une annulation, il doit avoir disparu. */
+async function expectWorkers(page: Page, expected: number, message: string, timeout = 8000) {
+  const deadline = Date.now() + timeout;
+  while (page.workers().length !== expected && Date.now() < deadline) await page.waitForTimeout(100);
+  assert.equal(page.workers().length, expected, message);
+}
+
+async function openImporter(page: Page) {
+  await page.goto(`${BASE_URL}#atelier-importer`);
+  await page.locator(".importer-depot").waitFor({ state: "visible" });
+}
+
+async function importRobustness(browser: Browser, pdfPath: string) {
+  const choosePdf = (page: Page, file = pdfPath) => page.locator("input[accept*=\"pdf\"]").setInputFiles(file);
+
+  // 1. Navigateur ancien : le build legacy de pdf.js embarque ses polyfills, l'import marche sans les API récentes.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await context.addInitScript(OLD_BROWSER_SCRIPT);
+    const workerRewrites = await rewritePdfWorker(context, OLD_BROWSER_SCRIPT);
+    await openImporter(page);
+    const missing = await page.evaluate(() => {
+      const modern = window as unknown as { Promise: { try?: unknown }; URL: { parse?: unknown }; Map: { prototype: { getOrInsertComputed?: unknown } } };
+      return [typeof modern.Promise.try, typeof modern.URL.parse, typeof modern.Map.prototype.getOrInsertComputed];
+    });
+    assert.deepEqual(missing, ["undefined", "undefined", "undefined"], "le navigateur simulé ne connaît pas les API récentes");
+    await choosePdf(page);
+    await expectText(page, ".importer-h2", /2 pages de grille/, 60000);
+    assert.ok(workerRewrites() >= 1, "le worker de pdf.js a bien tourné sans les API récentes");
+    assert.equal(await page.locator(ALERT).count(), 0, "aucune erreur affichée");
+    assert.deepEqual(errors, [], `erreurs JavaScript (navigateur ancien) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 2. Sans Promise.withResolvers, aucun build ne marche : message français net, pas de spinner, pas de worker.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await context.addInitScript("delete Promise.withResolvers;");
+    await openImporter(page);
+    await choosePdf(page);
+    await expectText(page, ALERT, /Votre navigateur est trop ancien pour lire un PDF\. Essayez « Photo » ou mettez-le à jour\./, 15000);
+    assert.equal(await page.locator(".importer-busy").count(), 0, "pas d'attente sans fin");
+    await expectWorkers(page, 0, "aucun worker créé pour un navigateur qui ne peut pas lire le PDF");
+    assert.deepEqual(errors, [], `erreurs JavaScript (sans withResolvers) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 3. Worker muet : le garde-fou de 30 s (horloge simulée) remplace le spinner par un message, et le worker est détruit.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await rewritePdfWorker(context, MUTE_WORKER_SCRIPT);
+    await page.clock.install();
+    await openImporter(page);
+    await choosePdf(page);
+    await page.locator(".importer-busy").waitFor({ state: "visible" });
+    // Le garde-fou n'est armé qu'après le chargement de pdf.js : on avance l'horloge jusqu'à ce qu'il tombe.
+    for (let i = 0; i < 8 && !(await page.locator(ALERT).count()); i += 1) {
+      await page.clock.fastForward(31_000);
+      await page.waitForTimeout(500);
+    }
+    await expectText(page, ALERT, /Le PDF met trop de temps à s'ouvrir \(30 s sans réponse\)/, 5000);
+    assert.equal(await page.locator(".importer-busy").count(), 0, "plus de spinner une fois le délai écoulé");
+    await page.clock.fastForward(5000);
+    await expectWorkers(page, 0, "le worker muet est détruit d'office");
+    assert.deepEqual(errors, [], `erreurs JavaScript (worker muet) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 4. Fichier qui n'est pas un PDF : message français (pas « Invalid PDF structure. »), et le worker n'est pas laissé en vie.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    const fakePath = path.join(ARTIFACT_DIR, "faux-patron.pdf");
+    await writeFile(fakePath, "Ceci n'est pas un PDF.\n".repeat(30));
+    await openImporter(page);
+    await choosePdf(page, fakePath);
+    await expectText(page, ALERT, /Ce fichier n'est pas un PDF valide, ou il est abîmé/);
+    assert.equal(await page.locator(".importer-busy").count(), 0);
+    await expectWorkers(page, 0, "le worker est libéré après une erreur d'ouverture");
+    assert.deepEqual(errors, [], `erreurs JavaScript (faux PDF) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 5. Pendant la lecture (worker muet, donc interminable) : fermer, Échap et Annuler fonctionnent, le worker est détruit.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await rewritePdfWorker(context, MUTE_WORKER_SCRIPT);
+    await openImporter(page);
+    await choosePdf(page);
+    await page.locator(".importer-busy").waitFor({ state: "visible" });
+    const axe = await new AxeBuilder({ page }).analyze();
+    assert.deepEqual(axe.violations.map((violation) => `${violation.id}×${violation.nodes.length}`), [], "lecture en cours, avec « Annuler » : aucune violation axe");
+    assert.equal(await page.getByRole("button", { name: "Fermer l'import" }).isEnabled(), true, "fermer reste actif pendant la lecture");
+    await page.getByRole("button", { name: "Annuler", exact: true }).click();
+    await page.locator(".importer-depot").waitFor({ state: "visible", timeout: 5000 });
+    assert.equal(await page.locator(".importer-busy").count(), 0, "Annuler ramène au dépôt, sans attente");
+    await expectWorkers(page, 0, "Annuler détruit le worker de la lecture abandonnée");
+
+    await choosePdf(page);
+    await page.locator(".importer-busy").waitFor({ state: "visible" });
+    await page.keyboard.press("Escape");
+    await page.locator(".importer").waitFor({ state: "detached", timeout: 5000 });
+    await expectWorkers(page, 0, "Échap détruit le worker de la lecture abandonnée");
+
+    await openImporter(page);
+    await choosePdf(page);
+    await page.locator(".importer-busy").waitFor({ state: "visible" });
+    await page.getByRole("button", { name: "Fermer l'import" }).click();
+    await page.locator(".importer").waitFor({ state: "detached", timeout: 5000 });
+    await expectWorkers(page, 0, "le bouton fermer détruit le worker de la lecture abandonnée");
+    assert.deepEqual(errors, [], `erreurs JavaScript (annulation) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 6. « Caler » en pleine lecture des cartes (horloge en pause, donc la lecture reste en cours) ne fige plus l'importeur.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await page.clock.install();
+    await openImporter(page);
+    await choosePdf(page);
+    await expectText(page, ".importer-h2", /2 pages de grille/, 60000);
+    await page.locator(".importer-actions .bouton", { hasText: /Caler les grilles/ }).click();
+    await page.locator(".importer-feuille").waitFor({ state: "visible" });
+    await page.locator(".importer-actions .bouton.noir", { hasText: /Assembler/ }).click();
+    await page.locator(".importer-resume").waitFor({ state: "visible", timeout: 60000 });
+    await page.clock.pauseAt(new Date(Date.now() + 60_000));
+    await page.getByRole("button", { name: "Automatique" }).click();
+    await expectText(page, ".importer-busy", /Lecture de la carte 1\/2/, 5000);
+    assert.equal(await page.getByRole("button", { name: "Annuler", exact: true }).count(), 0, "Annuler ne concerne que la lecture du PDF");
+    await page.locator(".importer-cote .importer-actions").getByRole("button", { name: "Caler", exact: true }).click();
+    await page.locator(".importer-feuille").waitFor({ state: "visible" });
+    assert.equal(await page.locator(".importer-busy").count(), 0, "revenir à « Caler » abandonne la lecture et retire l'attente");
+    assert.ok(await page.locator(".importer-etapes button:not([disabled])").count() >= 2, "les étapes redeviennent utilisables");
+    await page.keyboard.press("Escape");
+    await page.locator(".importer").waitFor({ state: "detached", timeout: 5000 });
+    assert.deepEqual(errors, [], `erreurs JavaScript (Caler en pleine lecture) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 7. Un PDF de 105 pages : les 100 premières seulement sont lues, et l'avis le dit (Analyser, puis Vérifier).
+  {
+    const manyPath = path.join(ARTIFACT_DIR, "patron-105-pages.pdf");
+    const maker = await browser.newPage();
+    await maker.setContent(`<!doctype html><style>@page{size:60mm 60mm;margin:0}body{margin:0}section{width:60mm;height:60mm;page-break-after:always;font:12px sans-serif}</style>${Array.from({ length: 105 }, (_, i) => `<section>Page ${i + 1}</section>`).join("")}`, { waitUntil: "load" });
+    await maker.pdf({ path: manyPath, preferCSSPageSize: true });
+    await maker.close();
+    const { context, page, errors } = await isolatedPage(browser);
+    await openImporter(page);
+    await choosePdf(page, manyPath);
+    await expectText(page, ".importer-alerte[role=\"status\"]", /^Ce PDF compte 105 pages : seules les 100 premières sont lues\.$/, 120000);
+    assert.equal(await page.locator(".importer-page").count(), 100, "100 pages analysées sur 105");
+    assert.deepEqual(errors, [], `erreurs JavaScript (105 pages) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 8. Champs numériques du calage : on peut vider le champ et retaper ; la valeur n'est bornée (5–400) qu'à la sortie du champ, à Entrée ou à l'étape suivante.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await openImporter(page);
+    await choosePdf(page);
+    await expectText(page, ".importer-h2", /2 pages de grille/, 60000);
+    const calage = () => page.locator(".importer-actions .bouton", { hasText: /Caler les grilles/ }).click();
+    await calage();
+    await page.locator(".importer-feuille").waitFor({ state: "visible" });
+    const repere = page.locator(".importer-bloc span").first();
+    const cols = page.getByRole("spinbutton", { name: "Colonnes du bloc 1" });
+    const rows = page.getByRole("spinbutton", { name: "Rangées du bloc 1" });
+    await expectText(page, ".importer-bloc span", /16 × 16/);
+    await cols.fill("");
+    assert.equal(await cols.inputValue(), "", "le champ peut être vidé pour retaper (il ne saute plus au minimum)");
+    await cols.pressSequentially("20");
+    assert.equal(await cols.inputValue(), "20");
+    assert.match(await repere.innerText(), /16 × 16/, "rien n'est appliqué tant qu'on tape");
+    await cols.press("Enter");
+    await expectText(page, ".importer-bloc span", /20 × 16/);
+    await cols.fill("9999");
+    await cols.press("Tab");
+    await expectText(page, ".importer-bloc span", /400 × 16/);
+    assert.equal(await cols.inputValue(), "400", "borné à 400 en quittant le champ");
+    await cols.fill("");
+    await cols.press("Tab");
+    assert.equal(await cols.inputValue(), "400", "un champ laissé vide garde sa valeur");
+    await rows.fill("2");
+    await rows.press("Tab");
+    await expectText(page, ".importer-bloc span", /400 × 5/);
+    await cols.fill("16");
+    await cols.press("Tab");
+    await rows.fill("16");
+    await rows.press("Tab");
+    await expectText(page, ".importer-bloc span", /16 × 16/);
+    // Sans quitter le champ (clic simulé : le focus ne bouge pas), la saisie est appliquée quand le champ disparaît.
+    await cols.fill("17");
+    await page.getByRole("button", { name: "Retour", exact: true }).dispatchEvent("click");
+    await page.locator(".importer-depot, .importer-actions .bouton.noir").first().waitFor({ state: "visible" });
+    await calage();
+    await expectText(page, ".importer-bloc span", /17 × 16/);
+    assert.deepEqual(errors, [], `erreurs JavaScript (champs du calage) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
+
+  // 9. Signature de la rosace (panneau Ajuster) : même règle, et un champ vidé garde la signature en cours.
+  {
+    const { context, page, errors } = await isolatedPage(browser);
+    await page.goto(`${BASE_URL}#atelier-reglages`);
+    const signature = page.getByRole("spinbutton", { name: "Signature, de 1 à 9999" });
+    await signature.waitFor({ state: "visible" });
+    const initial = await signature.inputValue();
+    await signature.fill("");
+    assert.equal(await signature.inputValue(), "", "la signature peut être vidée pour en taper une autre");
+    await signature.press("Tab");
+    assert.equal(await signature.inputValue(), initial, "un champ laissé vide garde la signature en cours");
+    await signature.fill("");
+    await signature.pressSequentially("77");
+    assert.equal(await signature.inputValue(), "77");
+    await signature.press("Enter");
+    assert.equal(await signature.inputValue(), "77", "Entrée applique la signature");
+    await signature.fill("123456");
+    await signature.press("Tab");
+    assert.equal(await signature.inputValue(), "9999", "bornée à 9999 en quittant le champ");
+    await signature.fill("0");
+    await signature.press("Tab");
+    assert.equal(await signature.inputValue(), "1", "bornée à 1 en quittant le champ");
+    assert.deepEqual(errors, [], `erreurs JavaScript (signature) : ${errors.join(" | ")}`);
+    await closeIsolated(context);
+  }
 }
 
 async function main() {
@@ -236,6 +505,8 @@ async function main() {
     await page.locator(".studio-dock button", { hasText: /^Composer/ }).click();
     await expectText(page, ".panneau-import", /Patron de test/);
     await page.getByRole("button", { name: "Revenir à ma rosace" }).click();
+    // Un patron importé ne quitte jamais l'appareil en silence : le retrait passe par une confirmation.
+    await page.getByRole("button", { name: "Retirer le patron", exact: true }).click();
     await expectText(page, ".studio-stats p", /3\s?381 croix/);
     assert.match(page.url(), /#r=/);
 
@@ -330,11 +601,15 @@ async function main() {
     await page.screenshot({ path: path.join(ARTIFACT_DIR, "innovation-fiche.png") });
     await page.getByRole("button", { name: "Retrouver cette rosace" }).click();
     await page.locator(".importer").waitFor({ state: "detached" });
+    // L'ouvrage actif est la photo importée plus haut : la remplacer par la rosace retrouvée demande confirmation.
+    await page.getByRole("button", { name: "Retirer le patron", exact: true }).click();
     await expectText(page, ".studio-stats p", /3\s?381 croix/);
     assert.match(page.url(), /#r=/);
 
     await context.close();
     assert.deepEqual(errors, [], `erreurs JavaScript : ${errors.join(" | ")}`);
+
+    await importRobustness(browser, pdfPath);
     console.log(`Parcours d'import PDF réussi · ${EXPECTED_CROSSES} croix importées · captures dans ${ARTIFACT_DIR}`);
   } finally {
     await browser.close();

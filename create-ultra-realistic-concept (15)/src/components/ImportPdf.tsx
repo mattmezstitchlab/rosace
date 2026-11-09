@@ -9,7 +9,7 @@ import {
   type PdfAnalysis, type PdfBlock,
 } from "../lib/import-pdf/pdfAnalysis";
 import { readCompleteGlyphChart, type CompleteGlyphChart } from "../lib/import-pdf/pdfGlyphChart";
-import type { PdfHandle } from "../lib/import-pdf/pdfimport";
+import { friendlyPdfError, pageLimitNotice, type PdfHandle } from "../lib/import-pdf/pdfimport";
 import { readVectorChart, type VectorResult } from "../lib/import-pdf/pdfVector";
 import { paintPattern } from "../lib/paint";
 import { readRosaceWorksheet, type WorksheetReading } from "../lib/import-pdf/worksheet";
@@ -40,7 +40,8 @@ const tick = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 const keyOf = (b: PdfBlock, mode: Mode, colors: number) =>
   `${mode}|${colors}|${b.id}|${b.page}|${b.x0.toFixed(2)},${b.y0.toFixed(2)},${b.x1.toFixed(2)},${b.y1.toFixed(2)}|${b.cols}x${b.rows}`;
 const clampInt = (raw: string | number, min: number, max: number, fallback: number) => {
-  const n = Math.round(Number(raw));
+  // Un champ vidé n'est pas un 0 : il garde la valeur précédente au lieu de sauter au minimum.
+  const n = typeof raw === "string" && !raw.trim() ? NaN : Math.round(Number(raw));
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 };
 const autoOrder = (blocks: PdfBlock[]) => [...blocks].sort((a, b) => a.page - b.page || a.y0 - b.y0 || a.x0 - b.x0);
@@ -69,7 +70,7 @@ export function ImportPdf() {
     ? "photo"
     : window.location.hash.startsWith("#atelier-importer-texte") ? "texte" : "pdf";
   return importFile
-    ? <ImportWorkbench key={`${importFile.name}-${importFile.size}-${importFile.lastModified}`} file={importFile} onClose={closeImport} onUse={onUse} onRosace={onRosace} />
+    ? <ImportWorkbench key={`${importFile.name}-${importFile.size}-${importFile.lastModified}`} file={importFile} onClose={closeImport} onCancel={() => setImportFile(null)} onUse={onUse} onRosace={onRosace} />
     : <DropZone onFile={setImportFile} onClose={closeImport} onUse={onUse} activeTitle={activeWork.origin.kind !== "rosace" ? activeWork.origin.provenance.file : null} initialMode={initialMode} />;
 }
 
@@ -303,7 +304,28 @@ function DropZone({ onFile, onClose, onUse, activeTitle, initialMode }: {
   );
 }
 
-function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClose: () => void; onUse: (work: StitchWork) => void; onRosace: (config: RosaceConfig, fingerprint: string) => void }) {
+/** Champ entier : le texte tapé reste tel quel (on peut le vider pour retaper) ; la valeur n'est bornée qu'en quittant le champ, à Entrée ou quand le champ disparaît (étape suivante). */
+function ChampEntier({ value, min, max, label, onCommit }: { value: number; min: number; max: number; label: string; onCommit: (value: number) => void }) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    setDraft(null);
+    onCommit(clampInt(draft, min, max, value));
+  };
+  const settle = useRef(commit);
+  useEffect(() => { settle.current = commit; });
+  useEffect(() => () => settle.current(), []);
+  return (
+    <input
+      type="number" min={min} max={max} value={draft ?? value} aria-label={label}
+      onChange={(event) => setDraft(event.target.value)}
+      onBlur={commit}
+      onKeyDown={(event) => { if (event.key === "Enter") commit(); }}
+    />
+  );
+}
+
+function ImportWorkbench({ file, onClose, onCancel, onUse, onRosace }: { file: File; onClose: () => void; onCancel: () => void; onUse: (work: StitchWork) => void; onRosace: (config: RosaceConfig, fingerprint: string) => void }) {
   const [analysis, setAnalysis] = useState<PdfAnalysis | null>(null);
   const [handle, setHandle] = useState<PdfHandle | null>(null);
   const [vector, setVector] = useState<VectorResult | null>(null);
@@ -359,7 +381,8 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
     setCorrections({});
     setCompleteGlyph(null);
     setError("");
-    analyzePdf(file, (message) => { if (live) setBusy(message); })
+    const controller = new AbortController();
+    analyzePdf(file, (message) => { if (live) setBusy(message); }, controller.signal)
       .then(async ({ analysis: a, handle: h }) => {
         if (!live) { h.destroy(); return; }
         handleRef.current = h;
@@ -412,18 +435,24 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
         setCenterTab(v.ok ? "preview" : "puzzle");
         setBusy("");
       })
-      .catch((e) => { if (live) { setError(e instanceof Error ? e.message : "PDF illisible"); setBusy(""); } });
-    return () => { live = false; handleRef.current?.destroy(); handleRef.current = null; };
+      .catch((e) => {
+        if (!live) return;
+        console.warn("[ROSACE] Lecture du PDF impossible", e); // le bandeau est en français ; la cause brute reste lisible ici
+        setError(friendlyPdfError(e));
+        setBusy("");
+      });
+    return () => { live = false; controller.abort(); handleRef.current?.destroy(); handleRef.current = null; };
   }, [file]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => closeRef.current?.focus(), 60);
-    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape" && !busy) onClose(); };
+    // Échap ferme à tout moment, même pendant une lecture : fermer abandonne le travail en cours (nettoyage de l'effet d'analyse).
+    const onKey = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", onKey);
     return () => { window.clearTimeout(timer); window.removeEventListener("keydown", onKey); document.body.style.overflow = previousOverflow; };
-  }, [busy, onClose]);
+  }, [onClose]);
 
   useEffect(() => {
     const element = boardRef.current;
@@ -463,6 +492,7 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
   };
 
   const page = analysis?.pages.find((p) => p.n === pageN);
+  const pageNotice = handle ? pageLimitNotice(handle) : "";
   const pageBlocks = blocks.filter((b) => b.page === pageN);
   const byId = useMemo(() => new Map(blocks.map((b) => [b.id, b])), [blocks]);
   const effective = useMemo(() => order.map((id) => byId.get(id)).filter((b): b is PdfBlock => !!b && !excluded.has(b.id)), [order, byId, excluded]);
@@ -604,7 +634,8 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
         if (!dead) setBusy("");
       }
     })();
-    return () => { dead = true; };
+    // Revenir à « Caler » en pleine lecture abandonne celle-ci : sans cette remise à zéro, l'indicateur d'attente resterait affiché pour toujours.
+    return () => { dead = true; setBusy(""); };
   }, [stage, handle, analysis, sig, layoutSig, mode, colors, vector, completeGlyph]);
 
   /* ---------- Grille importée, corrections, ouvrage d'aperçu ---------- */
@@ -655,8 +686,9 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
     items.push({ id: null, level: "ok", text: `${previewWork.palette.length} fil(s) DMC, dont ${previewWork.palette.filter((_, i) => grid?.colors[i]?.fromLegend).length} confirmé(s) par la légende du PDF ; ${previewWork.stitches.length.toLocaleString("fr-FR")} croix.` });
     items.push({ id: "lost", level: "attention", text: "Points non repris : demi-points, quarts de point, points arrière, nœuds et mélanges de fils ne sont pas lus. Si le patron en contient, gardez le PDF pour ces détails." });
     if (a.scaled) items.push({ id: null, level: "attention", text: `Grille réduite pour tenir dans l'atelier (plateau d'origine ${a.rawWidth} × ${a.rawHeight}) : ce n'est pas la grille exacte du PDF.` });
+    if (pageNotice) items.push({ id: null, level: "attention", text: `${pageNotice} Les pages suivantes manquent peut-être à la grille.` });
     return items;
-  }, [montage, previewWork, completeGlyph, declaredFromText, grid]);
+  }, [montage, previewWork, completeGlyph, declaredFromText, grid, pageNotice]);
   const blocking = checks.some((item) => item.level === "bloquant" && item.id && !checked[item.id]) || checks.some((item) => item.id && item.level === "attention" && !checked[item.id]);
   const canUse = !!previewWork && !busy && !blocking;
 
@@ -673,7 +705,7 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
   return (
     <section className="importer" role="dialog" aria-modal="true" aria-label={`Importer un patron PDF, étape ${stage + 1} sur 4 : ${stageTitle}`}>
       <div className="importer-tete">
-        <button ref={closeRef} className="outil outil-icone" onClick={onClose} disabled={!!busy} aria-label="Fermer l'import sans rien changer à l'ouvrage actuel"><ArrowLeft size={21} aria-hidden="true" /></button>
+        <button ref={closeRef} className="outil outil-icone" onClick={onClose} aria-label="Fermer l'import sans rien changer à l'ouvrage actuel"><ArrowLeft size={21} aria-hidden="true" /></button>
         <div className="importer-titre">
           <strong>{analysis?.title || file.name}</strong>
           <span>{file.name}{analysis ? ` · ${analysis.pages.length} page${analysis.pages.length > 1 ? "s" : ""}` : ""}{stage >= 2 ? ` · plateau ${boardSize.w} × ${boardSize.h}` : ""}</span>
@@ -696,6 +728,7 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
         {stage === 0 && analysis && (
           <div className="importer-colonne">
             <p className="surtitre">Analyser</p>
+            {pageNotice && <p className="importer-alerte" role="status">{pageNotice}</p>}
             {worksheet.kind === "rosace" && (
               <div className="importer-fiche" role="status">
                 <strong>Fiche ROSACE reconnue</strong>
@@ -769,9 +802,9 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
                 {pageBlocks.map((b, i) => (
                   <li key={b.id} className={excluded.has(b.id) ? "is-exclu" : ""}>
                     <span>Bloc {i + 1}</span>
-                    <label>cases<input type="number" min={5} max={400} value={b.cols} aria-label={`Colonnes du bloc ${i + 1}`} onChange={(event) => setBlocks((all) => all.map((v) => (v.id === b.id ? { ...v, cols: clampInt(event.target.value, 5, 400, v.cols) } : v)))} /></label>
+                    <label>cases<ChampEntier value={b.cols} min={5} max={400} label={`Colonnes du bloc ${i + 1}`} onCommit={(cols) => setBlocks((all) => all.map((v) => (v.id === b.id ? { ...v, cols } : v)))} /></label>
                     <span aria-hidden="true">×</span>
-                    <input type="number" min={5} max={400} value={b.rows} aria-label={`Rangées du bloc ${i + 1}`} onChange={(event) => setBlocks((all) => all.map((v) => (v.id === b.id ? { ...v, rows: clampInt(event.target.value, 5, 400, v.rows) } : v)))} />
+                    <ChampEntier value={b.rows} min={5} max={400} label={`Rangées du bloc ${i + 1}`} onCommit={(rows) => setBlocks((all) => all.map((v) => (v.id === b.id ? { ...v, rows } : v)))} />
                     <button type="button" className="outil outil-icone" aria-pressed={excluded.has(b.id)} aria-label={excluded.has(b.id) ? `Réintégrer le bloc ${i + 1}` : `Écarter le bloc ${i + 1}`} onClick={() => toggleExcluded(b.id)}><X size={15} aria-hidden="true" /></button>
                   </li>
                 ))}
@@ -961,7 +994,12 @@ function ImportWorkbench({ file, onClose, onUse, onRosace }: { file: File; onClo
           </div>
         )}
 
-        {busy && <div className="importer-busy" role="status"><span className="importer-spinner" aria-hidden="true" />{busy}</div>}
+        {busy && (
+          <div className="importer-busy">
+            <span className="importer-busy-texte" role="status"><span className="importer-spinner" aria-hidden="true" />{busy}</span>
+            {stage === 0 && <button type="button" className="bouton bouton-petit" onClick={onCancel}>Annuler</button>}
+          </div>
+        )}
       </div>
     </section>
   );

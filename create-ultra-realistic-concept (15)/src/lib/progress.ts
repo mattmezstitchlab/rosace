@@ -1,7 +1,7 @@
 import { resolveThreadCode } from "../data/dmc";
 import { generateRosace, normalizeConfig, type RosaceConfig, type RosacePattern } from "./rosace";
 import {
-  fromRosace, restoreImportedWork, serializeImportedWork, toWork,
+  WORK_MAX_CELLS, fromRosace, restoreImportedWork, serializeImportedWork, toWork,
   type ImportedWorkRecord, type StitchWork,
 } from "./work";
 import { sanitizeSessions, type StitchSession } from "./sessions";
@@ -162,7 +162,7 @@ export function emptyProgress(pattern: WorkLike): EmbroideryProgress {
 }
 
 export function serializeRuns(indices: Iterable<number>): string {
-  const sorted = [...new Set(indices)].filter((value) => Number.isInteger(value) && value >= 0).sort((a, b) => a - b);
+  const sorted = [...new Set(indices)].filter((value) => Number.isSafeInteger(value) && value >= 0).sort((a, b) => a - b);
   const runs: string[] = [];
   let start = -1;
   let previous = -1;
@@ -182,16 +182,71 @@ export function serializeRuns(indices: Iterable<number>): string {
   return runs.join(",");
 }
 
-export function parseRuns(runs: string): Set<number> {
-  const set = new Set<number>();
-  if (!runs) return set;
-  for (const part of runs.split(",")) {
-    const [from, to] = part.split("-").map((value) => Number(value));
-    if (!Number.isInteger(from) || from < 0) continue;
-    const end = Number.isInteger(to) ? to : from;
-    for (let i = from; i <= end && i - from < 100000; i += 1) set.add(i);
+/**
+ * Longueur maximale d'une liste de plages pour `cellCount` cases. `serializeRuns` produit au pire
+ * ~5 caractères par case (« 123456-123457, » couvre 3 cases) : 8 laisse de la marge aux listes
+ * écrites à la main, et borne le travail d'un fichier hostile (≈ 8 Mo pour 1 million de cases).
+ */
+const runsMaxLength = (cellCount: number) => cellCount * 8 + 64;
+
+const RUN_TOKEN = /^(\d+)(?:-(\d+))?$/;
+
+interface RunsScan {
+  indices: Set<number>;
+  /** Jetons illisibles (syntaxe, entier non sûr, plage inversée) : ignorés. */
+  malformed: number;
+  /** Cases au-delà de la grille : ignorées, mais comptées pour que l'appelant puisse refuser le fichier. */
+  beyond: number;
+  /** Liste trop longue pour la grille : rien n'est lu. */
+  oversize: boolean;
+}
+
+/**
+ * Lecture stricte d'une liste « 0-2,5,9-12 ». Le coût ne dépend ni de l'étendue des plages ni de leur
+ * répétition : un tableau de différences les ajoute en O(1) chacune, puis une seule passe borne le résultat à `cellCount`.
+ */
+function scanRuns(runs: unknown, cellCount: number): RunsScan {
+  const scan: RunsScan = { indices: new Set<number>(), malformed: 0, beyond: 0, oversize: false };
+  if (typeof runs !== "string" || runs === "") return scan;
+  const limit = Number.isSafeInteger(cellCount) && cellCount >= 0 ? Math.min(cellCount, WORK_MAX_CELLS) : WORK_MAX_CELLS;
+  if (runs.length > runsMaxLength(limit)) {
+    scan.oversize = true;
+    return scan;
   }
-  return set;
+  const marks = new Int32Array(limit + 1);
+  let start = 0;
+  while (start <= runs.length) {
+    let end = runs.indexOf(",", start);
+    if (end < 0) end = runs.length;
+    const token = runs.slice(start, end).trim();
+    start = end + 1;
+    if (token === "") continue;
+    const match = RUN_TOKEN.exec(token);
+    const from = match ? Number(match[1]) : NaN;
+    const to = match && match[2] !== undefined ? Number(match[2]) : from;
+    if (!Number.isSafeInteger(from) || !Number.isSafeInteger(to) || from > to) {
+      scan.malformed += 1;
+      continue;
+    }
+    if (to >= limit) scan.beyond += to - Math.max(from, limit) + 1;
+    if (from >= limit) continue;
+    marks[from] += 1;
+    marks[Math.min(to, limit - 1) + 1] -= 1;
+  }
+  let depth = 0;
+  for (let index = 0; index < limit; index += 1) {
+    depth += marks[index];
+    if (depth > 0) scan.indices.add(index);
+  }
+  return scan;
+}
+
+/**
+ * Cases cochées d'une liste de plages. Tolérante : tout jeton illisible ou hors grille est ignoré.
+ * `cellCount` est le nombre de cases du patron quand on le connaît (sinon le maximum d'un ouvrage).
+ */
+export function parseRuns(runs: string, cellCount = WORK_MAX_CELLS): Set<number> {
+  return scanRuns(runs, cellCount).indices;
 }
 
 /** Index linéaire d'une case : `width` est la largeur de la grille (pour une rosace, sa taille). */
@@ -244,15 +299,16 @@ export function migrateLegacyProgressRecord(raw: unknown, pattern: WorkLike): { 
   let runs = "";
   if (typeof source.completedRuns === "string") runs = source.completedRuns;
   else if (typeof source.completed === "string") runs = source.completed;
-  else if (Array.isArray(source.completed)) runs = serializeRuns(source.completed.filter((value): value is number => Number.isInteger(value) && value >= 0));
-  else if (Array.isArray(source.completedIndices)) runs = serializeRuns(source.completedIndices.filter((value): value is number => Number.isInteger(value) && value >= 0));
+  else if (Array.isArray(source.completed)) runs = serializeRuns(source.completed.filter((value): value is number => Number.isSafeInteger(value) && value >= 0));
+  else if (Array.isArray(source.completedIndices)) runs = serializeRuns(source.completedIndices.filter((value): value is number => Number.isSafeInteger(value) && value >= 0));
   else return null;
 
-  const parsed = [...parseRuns(runs)];
-  const valid = parsed.filter((index) => isStitchIndex(pattern, index));
-  const dropped = parsed.length - valid.length;
-  const codes = paletteCodes(pattern);
-  const fingerprint = toWork(pattern).fingerprint;
+  const work = toWork(pattern);
+  const scan = scanRuns(runs, work.cells.length);
+  const valid = [...scan.indices].filter((index) => isStitchIndex(work, index));
+  const dropped = scan.indices.size - valid.length + scan.beyond + scan.malformed;
+  const codes = paletteCodes(work);
+  const fingerprint = work.fingerprint;
   return {
     progress: {
       version: 2,
@@ -263,7 +319,9 @@ export function migrateLegacyProgressRecord(raw: unknown, pattern: WorkLike): { 
       journal: sanitizeJournal(pattern, source.journal),
       updatedAt: typeof source.updatedAt === "string" ? source.updatedAt : new Date().toISOString(),
     },
-    warning: dropped > 0 ? `${dropped} case(s) v1 ignorée(s) : elles n'appartiennent pas au patron.` : undefined,
+    warning: scan.oversize
+      ? "La progression v1 est trop volumineuse pour ce patron : elle a été ignorée."
+      : dropped > 0 ? `${dropped} case(s) v1 ignorée(s) : elles n'appartiennent pas au patron.` : undefined,
   };
 }
 
@@ -311,7 +369,7 @@ export function loadPatternProgress(pattern: WorkLike): EmbroideryProgress | nul
   const saved = loadProgress(fingerprint);
   const source = saved ?? loadLegacyProgress(work);
   if (!source) return null;
-  const completed = [...parseRuns(String(source.completedRuns ?? ""))].filter((index) => isStitchIndex(work, index));
+  const completed = [...parseRuns(String(source.completedRuns ?? ""), work.cells.length)].filter((index) => isStitchIndex(work, index));
   const codes = paletteCodes(work);
   return {
     version: 2,
@@ -352,7 +410,7 @@ export function buildProject(pattern: WorkLike, progress: EmbroideryProgress): P
   const work = toWork(pattern);
   const fingerprint = work.fingerprint;
   if (progress.fingerprint !== fingerprint) throw new Error("La progression ne correspond pas au patron.");
-  const completed = [...parseRuns(String(progress.completedRuns ?? ""))].filter((index) => isStitchIndex(work, index));
+  const completed = [...parseRuns(String(progress.completedRuns ?? ""), work.cells.length)].filter((index) => isStitchIndex(work, index));
   const selectedCode = canonicalSelection(progress.selectedCode, paletteCodes(work));
   const cleaned: ProjectProgress = {
     completedRuns: serializeRuns(completed),
@@ -420,8 +478,12 @@ function importProjectV3(raw: unknown): ImportResult {
 }
 
 function validatedProgress(work: StitchWork, progress: Partial<ProjectProgress>, config: RosaceConfig | null): ImportResult {
-  const completed = [...parseRuns(String(progress.completedRuns ?? ""))];
-  if (completed.some((index) => !isStitchIndex(work, index))) {
+  const scan = scanRuns(String(progress.completedRuns ?? ""), work.cells.length);
+  if (scan.oversize) {
+    return { ok: false, error: "La progression est trop volumineuse pour ce patron : import refusé." };
+  }
+  const completed = [...scan.indices];
+  if (scan.beyond > 0 || completed.some((index) => !isStitchIndex(work, index))) {
     return { ok: false, error: "La progression contient des cases vides ou hors de la grille : import refusé." };
   }
   const selectedCode = canonicalSelection(progress.selectedCode, paletteCodes(work));
@@ -439,6 +501,7 @@ function validatedProgress(work: StitchWork, progress: Partial<ProjectProgress>,
       sessions: sanitizeSessions(progress.sessions),
       updatedAt: typeof progress.updatedAt === "string" ? progress.updatedAt : new Date().toISOString(),
     },
+    warning: scan.malformed > 0 ? `${scan.malformed} plage(s) illisible(s) ignorée(s) dans la progression.` : undefined,
   };
 }
 
@@ -457,7 +520,7 @@ export function readPeerProgress(raw: unknown, work: StitchWork): PeerResult {
   if (result.work.fingerprint !== work.fingerprint) {
     return { ok: false, error: "Ce projet n'est pas le même ouvrage : les empreintes diffèrent. Pour broder ensemble, partagez le même patron." };
   }
-  return { ok: true, completed: parseRuns(result.progress.completedRuns), updatedAt: result.progress.updatedAt, sessions: result.progress.sessions ?? [] };
+  return { ok: true, completed: parseRuns(result.progress.completedRuns, work.cells.length), updatedAt: result.progress.updatedAt, sessions: result.progress.sessions ?? [] };
 }
 
 /** Unique validateur de projet : v2 strict (rosace), v3 strict (ouvrage importé), v1 migré explicitement, sinon message clair. */
@@ -482,8 +545,13 @@ export function importProject(raw: unknown): ImportResult {
       return { ok: false, error: "L'empreinte du patron ne correspond pas à sa recette : import refusé." };
     }
     return validatedProgress(regenerated, project.progress, config);
-  } catch {
-    return { ok: false, error: "Fichier illisible ou JSON invalide." };
+  } catch (error) {
+    return {
+      ok: false,
+      error: error instanceof RangeError
+        ? "Fichier trop volumineux ou trop complexe pour être lu : import refusé."
+        : "Fichier illisible ou JSON invalide.",
+    };
   }
 }
 

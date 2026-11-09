@@ -42,6 +42,7 @@ export function Disque() {
   const { config, work, baseCode, inspectedCode, applyColor, inspectThread } = api;
   const reduceMotion = useReducedMotion();
   const svgRef = useRef<SVGSVGElement>(null);
+  const spaceArmed = useRef(false);
 
   const onCrownKey = useCallback((event: KeyboardEvent) => {
     const index = CROWN_INDEX.get(inspectedCode) ?? CROWN_INDEX.get(baseCode) ?? 0;
@@ -51,9 +52,14 @@ export function Disque() {
     else if (event.key === "ArrowLeft" || event.key === "ArrowUp") next = (index - 1 + count) % count;
     else if (event.key === "Home") next = 0;
     else if (event.key === "End") next = count - 1;
-    else if (event.key === "Enter" || event.key === " ") {
+    else if (event.key === "Enter") {
       event.preventDefault();
-      applyColor(inspectedCode ?? baseCode);
+      if (!event.repeat) applyColor(inspectedCode ?? baseCode);
+      return;
+    } else if (event.key === " ") {
+      // Comme un bouton, Espace agit au relâchement : la confirmation qui peut s'ouvrir prend le focus, et ce relâchement ne doit pas lui parvenir.
+      event.preventDefault();
+      spaceArmed.current = true;
       return;
     } else return;
     event.preventDefault();
@@ -61,6 +67,13 @@ export function Disque() {
     inspectThread(code);
     window.requestAnimationFrame(() => document.getElementById(`crown-${code}`)?.focus());
   }, [applyColor, baseCode, inspectedCode, inspectThread]);
+
+  const onCrownKeyUp = useCallback((event: KeyboardEvent) => {
+    if (event.key !== " " || !spaceArmed.current) return;
+    spaceArmed.current = false;
+    event.preventDefault();
+    applyColor(inspectedCode ?? baseCode);
+  }, [applyColor, baseCode, inspectedCode]);
 
   const activeCrownIndex = CROWN_INDEX.get(inspectedCode) ?? CROWN_INDEX.get(baseCode) ?? 0;
   const activeThread = getThread(inspectedCode ?? baseCode);
@@ -74,6 +87,7 @@ export function Disque() {
             role="listbox"
             aria-label={`Nuancier DMC, ${CROWN_THREADS.length} références. Un clic applique la couleur ; les flèches parcourent, Entrée applique.`}
             onKeyDown={onCrownKey}
+            onKeyUp={onCrownKeyUp}
           >
             {CROWN_PATHS.map(({ thread, d }) => {
               const selected = thread.code === baseCode;

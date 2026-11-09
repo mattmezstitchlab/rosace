@@ -34,8 +34,11 @@ function workSubtitle(work: StitchWork) {
   return `Patron importé · ${provenance.pages} page${provenance.pages > 1 ? "s" : ""} · lecture ${provenance.mode}`;
 }
 
-function xml(value: string) {
-  return value.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+// Interdits en XML 1.0 (contrôles C0 hors tabulation et sauts de ligne) : un seul suffit à rendre un SVG illisible.
+const XML_ILLEGAL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\uFFFE\uFFFF]/g;
+
+function xml(value: unknown) {
+  return String(value ?? "").replace(XML_ILLEGAL, "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function withoutXmlDeclaration(svg: string) {
@@ -62,7 +65,8 @@ export function downloadBlob(blob: Blob, filename: string) {
   document.body.appendChild(anchor);
   anchor.click();
   anchor.remove();
-  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  // Certains navigateurs (Safari iOS surtout) lisent le blob après le clic : le révoquer trop tôt peut annuler le téléchargement.
+  window.setTimeout(() => URL.revokeObjectURL(url), 30_000);
 }
 
 /**
@@ -151,7 +155,18 @@ export function exportPng(pattern: WorkLike, chart: boolean) {
   });
 }
 
-export function exportThreadCsv(source: WorkLike) {
+/**
+ * Un tableur exécute une cellule texte qui commence par = + - @ (ou tabulation, retour chariot) : une apostrophe
+ * la neutralise. Un opérateur seul (le symbole « + » d'une rosace) n'exécute rien et reste tel quel.
+ */
+const csvCell = (cell: string | number) => {
+  const text = String(cell);
+  const guarded = typeof cell === "string" && text.length > 1 && /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
+  return `"${guarded.replace(/"/g, '""')}"`;
+};
+
+/** Le contenu CSV de la liste de fils (séparateur « ; », BOM UTF-8 pour Excel) : sépare la construction du téléchargement. */
+export function threadCsv(source: WorkLike): string {
   const pattern = toWork(source);
   const rows = [
     ["Symbole", "Référence DMC", "Nom", "Croix", "Longueur de brins (m)", `Longueur aiguille ${pattern.textile.strands} brins (m)`, "Échevettes commerciales"],
@@ -166,8 +181,11 @@ export function exportThreadCsv(source: WorkLike) {
     ]),
     ["Total", "", "Toutes références", pattern.stitches.length, String(pattern.totalStrandMeters).replace(".", ","), String(pattern.totalNeedleMeters).replace(".", ","), pattern.totalSkeins],
   ];
-  const csv = `\uFEFF${rows.map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(";")).join("\n")}`;
-  downloadBlob(new Blob([csv], { type: "text/csv;charset=utf-8" }), `${safeName(pattern)}-fils.csv`);
+  return `\uFEFF${rows.map((row) => row.map(csvCell).join(";")).join("\n")}`;
+}
+
+export function exportThreadCsv(source: WorkLike) {
+  downloadBlob(new Blob([threadCsv(source)], { type: "text/csv;charset=utf-8" }), `${safeName(source)}-fils.csv`);
 }
 
 /** Marqueur imprimé sur la couverture d'une fiche ROSACE : il permet de réimporter la fiche sans lire l'image. */
@@ -177,10 +195,10 @@ export const WORKSHEET_END = "FIN-FICHE";
 /** La fiche imprimable complète (couverture + planches), comme chaîne HTML : sert à l'impression et aux tests. */
 export function worksheetHtml(source: WorkLike): string {
   const pattern = toWork(source);
-  const fingerprint = pattern.fingerprint;
+  const fingerprint = xml(pattern.fingerprint);
   const rows = pattern.usage.filter((usage) => usage.count > 0).map((usage) => {
     const thread = getThread(usage.code);
-    return `<tr><td class="symbol">${usage.symbol}</td><td><span class="color" style="background:${thread.hex}"></span></td><td><strong>${usage.code}</strong><br><small>${thread.name}</small></td><td>${usage.count.toLocaleString("fr-FR")}</td><td>${String(usage.strandMeters).replace(".", ",")} m</td><td>${String(usage.meters).replace(".", ",")} m</td><td>${usage.skeins}</td></tr>`;
+    return `<tr><td class="symbol">${xml(usage.symbol)}</td><td><span class="color" style="background:${thread.hex}"></span></td><td><strong>${xml(usage.code)}</strong><br><small>${xml(thread.name)}</small></td><td>${usage.count.toLocaleString("fr-FR")}</td><td>${String(usage.strandMeters).replace(".", ",")} m</td><td>${String(usage.meters).replace(".", ",")} m</td><td>${usage.skeins}</td></tr>`;
   }).join("");
   const regions = chartRegions(pattern.width, pattern.height);
   const tiles = regions.map((region, index) => `<section class="tile-page"><div class="tile-head"><div><span>ROSACE · ${fingerprint.slice(0, 8)}</span><h1>Patron · planche ${index + 1} / ${regions.length}</h1></div><div><strong>Colonnes ${region.x + 1}–${region.x + region.width}</strong><br>Lignes ${region.y + 1}–${region.y + region.height}<br>${region.width} × ${region.height} cases</div></div><div class="chart">${withoutXmlDeclaration(patternToSvg(pattern, true, region))}</div><p class="tile-note">1 case = 1 croix · Repères lourds toutes les 10 cases · Cette planche couvre exactement ses colonnes et lignes, sans recouvrement.</p></section>`).join("");
@@ -188,18 +206,26 @@ export function worksheetHtml(source: WorkLike): string {
   const pageCount = 1 + regions.length;
   const textile = pattern.textile;
   const recipeBlock = pattern.origin.kind === "rosace"
-    ? `<div class="print-hint"><strong>Recette exacte</strong><br>Empreinte ${fingerprint}<br><span class="recette-code">${WORKSHEET_MARK} ${fingerprint} r=${encodeConfig(pattern.origin.config).replace(/(.{36})/g, "$1 ")} ${WORKSHEET_END}</span><br>Structure ${pattern.origin.config.structure} · Tracé ${pattern.origin.config.trace} · Densité ${pattern.origin.config.density} · Échelle ${pattern.origin.config.scale} · Géométrie ${pattern.origin.config.geometry} · Tourbillon ${pattern.origin.config.twist} · Ondulation ${pattern.origin.config.wave}<br>Toile ${textile.fabric} · Aïda ${textile.aida} · ${textile.strands} brins · marge ${textile.wastePercent} %</div>`
-    : `<div class="print-hint"><strong>Provenance</strong><br>Empreinte ${fingerprint}<br>Fichier ${xml(pattern.origin.provenance.file)} · ${pattern.origin.provenance.pages} page(s) · lecture ${pattern.origin.provenance.mode}${pattern.origin.provenance.author ? ` · ${xml(pattern.origin.provenance.author)}` : ""}<br>Montage : ${pattern.origin.montage.tiles.length} carte(s), ${pattern.origin.montage.overlaps} recouvrement(s), ${pattern.origin.montage.holes} case(s) non couverte(s)${pattern.origin.montage.scaled ? " · grille réduite pour l'atelier" : ""}<br>Toile ${textile.fabric} · Aïda ${textile.aida} · ${textile.strands} brins · marge ${textile.wastePercent} %</div>`;
+    ? `<div class="print-hint"><strong>Recette exacte</strong><br>Empreinte ${fingerprint}<br><span class="recette-code">${WORKSHEET_MARK} ${fingerprint} r=${xml(encodeConfig(pattern.origin.config)).replace(/(.{36})/g, "$1 ")} ${WORKSHEET_END}</span><br>Structure ${Number(pattern.origin.config.structure)} · Tracé ${Number(pattern.origin.config.trace)} · Densité ${Number(pattern.origin.config.density)} · Échelle ${Number(pattern.origin.config.scale)} · Géométrie ${Number(pattern.origin.config.geometry)} · Tourbillon ${Number(pattern.origin.config.twist)} · Ondulation ${Number(pattern.origin.config.wave)}<br>Toile ${xml(textile.fabric)} · Aïda ${Number(textile.aida)} · ${Number(textile.strands)} brins · marge ${Number(textile.wastePercent)} %</div>`
+    : `<div class="print-hint"><strong>Provenance</strong><br>Empreinte ${fingerprint}<br>Fichier ${xml(pattern.origin.provenance.file)} · ${Number(pattern.origin.provenance.pages)} page(s) · lecture ${xml(pattern.origin.provenance.mode)}${pattern.origin.provenance.author ? ` · ${xml(pattern.origin.provenance.author)}` : ""}<br>Montage : ${Number(pattern.origin.montage.tiles.length)} carte(s), ${Number(pattern.origin.montage.overlaps)} recouvrement(s), ${Number(pattern.origin.montage.holes)} case(s) non couverte(s)${pattern.origin.montage.scaled ? " · grille réduite pour l'atelier" : ""}<br>Toile ${xml(textile.fabric)} · Aïda ${Number(textile.aida)} · ${Number(textile.strands)} brins · marge ${Number(textile.wastePercent)} %</div>`;
   return `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>Fiche ${xml(workTitle(pattern))}</title><style>
   @page{size:A4 portrait;margin:10mm}*{box-sizing:border-box}body{font-family:Arial,sans-serif;color:#241f22;margin:0;font-size:11px}header,.tile-head{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:1px solid #bbb;padding-bottom:12px}h1{font-family:Georgia,serif;font-weight:400;font-size:29px;margin:4px 0}h2{font-size:12px;text-transform:uppercase;letter-spacing:1.3px;margin:16px 0 9px}.meta,.tile-head>div:last-child{text-align:right;line-height:1.65}.cover{display:grid;grid-template-columns:.78fr 1.22fr;gap:10mm;margin-top:15px}.preview svg,.chart svg{display:block;width:100%;height:auto}.preview{border:1px solid #ddd}.notes{line-height:1.6;color:#5f565b}table{border-collapse:collapse;width:100%}td,th{padding:5px 4px;border-bottom:1px solid #e5e0dc;text-align:left}th{font-size:8px;text-transform:uppercase;letter-spacing:.5px}.symbol{font-size:17px}.color{display:block;width:17px;height:17px;border-radius:50%;border:1px solid #ddd}.print{position:fixed;right:20px;bottom:20px;background:#693c60;color:white;border:0;border-radius:30px;padding:13px 20px;cursor:pointer}.tile-page{break-before:page;page-break-before:always}.tile-head h1{font-size:24px}.tile-head span{font-size:8px;letter-spacing:1px}.tile-page .chart{margin-top:12px}.tile-note{font-size:8px;color:#6f6269;text-align:center}.print-hint{margin-top:14px;padding:9px;border:1px solid #ddd;line-height:1.5}.recette-code{display:block;font-family:monospace;font-size:6px;line-height:1.5;word-break:break-word;color:#8a7f86}@media print{.print{display:none}.cover{grid-template-columns:.78fr 1.22fr}header{padding-bottom:8px}h2{margin-top:10px}td,th{padding:4px 3px}}
-  </style></head><body><button class="print" onclick="window.print()">Imprimer / PDF · ${pageCount} pages</button><section><header><div><div>ROSACE · ATELIER</div><h1>${xml(workTitle(pattern))}</h1><div>${xml(workSubtitle(pattern))}</div></div><div class="meta"><strong>${pattern.stitches.length} croix</strong><br>${pattern.width} × ${pattern.height} points<br>Aïda ${textile.aida} · ${FABRIC_COLORS[textile.fabric].name}<br>Motif ${String(pattern.motifWidthCm).replace(".", ",")} × ${String(pattern.motifHeightCm).replace(".", ",")} cm<br>2 brins par défaut · ${textile.strands} brins choisis<br>Empreinte ${fingerprint}</div></header><div class="cover"><div><h2>Aperçu du motif</h2><div class="preview">${preview}</div><p class="notes">Le patron est divisé en ${regions.length} planches rectangulaires qui couvrent exactement la grille. Chaque planche reprend les coordonnées du motif complet.</p></div><div><h2>Fils et fournitures</h2><table><thead><tr><th>Symb.</th><th>Fil</th><th>DMC</th><th>Croix</th><th>Brins</th><th>Aiguille</th><th>Éch.</th></tr></thead><tbody>${rows}</tbody></table><h2>Hypothèses textiles</h2><p class="notes">Métrage « brins » = somme des brins individuels, marge ${textile.wastePercent} %. Métrage « aiguille » = longueur du faisceau enfilé. Une échevette DMC Mouliné = 8 m à 6 brins (48 m de brins). Base de calcul 2,5 cm par croix pour 2 brins sur Aïda 14, ajustée au comptage Aïda et au nombre de brins. Estimation, non mesure : la tension et les arrêts varient.</p><p class="notes">Temps indicatif ${formatDuration(pattern.minutes)} (${pattern.timeEstimate.assumedRate}). Couleurs écran approximatives, vérifier les échevettes à la lumière naturelle. Color data: craft-color-codes by MakeBead, https://makebead.com — CC BY 4.0.</p>${recipeBlock}</div></div></section>${tiles}</body></html>`;
+  </style></head><body><button class="print">Imprimer / PDF · ${Number(pageCount)} pages</button><section><header><div><div>ROSACE · ATELIER</div><h1>${xml(workTitle(pattern))}</h1><div>${xml(workSubtitle(pattern))}</div></div><div class="meta"><strong>${Number(pattern.stitches.length)} croix</strong><br>${Number(pattern.width)} × ${Number(pattern.height)} points<br>Aïda ${Number(textile.aida)} · ${xml(FABRIC_COLORS[textile.fabric].name)}<br>Motif ${String(pattern.motifWidthCm).replace(".", ",")} × ${String(pattern.motifHeightCm).replace(".", ",")} cm<br>2 brins par défaut · ${Number(textile.strands)} brins choisis<br>Empreinte ${fingerprint}</div></header><div class="cover"><div><h2>Aperçu du motif</h2><div class="preview">${preview}</div><p class="notes">Le patron est divisé en ${regions.length} planches rectangulaires qui couvrent exactement la grille. Chaque planche reprend les coordonnées du motif complet.</p></div><div><h2>Fils et fournitures</h2><table><thead><tr><th>Symb.</th><th>Fil</th><th>DMC</th><th>Croix</th><th>Brins</th><th>Aiguille</th><th>Éch.</th></tr></thead><tbody>${rows}</tbody></table><h2>Hypothèses textiles</h2><p class="notes">Métrage « brins » = somme des brins individuels, marge ${Number(textile.wastePercent)} %. Métrage « aiguille » = longueur du faisceau enfilé. Une échevette DMC Mouliné = 8 m à 6 brins (48 m de brins). Base de calcul 2,5 cm de faisceau par croix sur Aïda 14, ajustée au comptage Aïda ; le nombre de brins multiplie les mètres de brins et le nombre d'échevettes. Estimation, non mesure : la tension et les arrêts varient.</p><p class="notes">Temps indicatif ${formatDuration(pattern.minutes)} (${pattern.timeEstimate.assumedRate}). Couleurs écran approximatives, vérifier les échevettes à la lumière naturelle. Color data: craft-color-codes by MakeBead, https://makebead.com — CC BY 4.0.</p>${recipeBlock}</div></div></section>${tiles}</body></html>`;
 }
 
 export function printWorksheet(source: WorkLike) {
+  // La fiche est construite avant d'ouvrir la fenêtre : si elle échoue, aucun onglet vide ne reste orphelin.
+  const html = worksheetHtml(source);
   const printWindow = window.open("", "_blank", "width=1000,height=800");
   if (!printWindow) return false;
   printWindow.opener = null;
-  printWindow.document.write(worksheetHtml(source));
+  printWindow.document.write(html);
   printWindow.document.close();
+  // Pas de gestionnaire inline dans la fiche (une CSP stricte le bloquerait) : le bouton est branché depuis l'ouverture.
+  try {
+    printWindow.document.querySelector(".print")?.addEventListener("click", () => printWindow.print());
+  } catch {
+    // La fiche reste imprimable avec Ctrl/Cmd+P.
+  }
   return true;
 }

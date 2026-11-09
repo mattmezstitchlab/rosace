@@ -98,6 +98,82 @@ export interface ImportedGrid {
 
 export const DEFAULT_IMPORT_TEXTILE: WorkTextile = { fabric: "naturel", aida: 14, strands: 2, wastePercent: 15 };
 
+/*
+ * Un ouvrage importé arrive d'un PDF, d'un projet partagé ou d'un stockage local ancien : ni ses
+ * étiquettes, ni son montage, ni ses pertes ne sont dignes de confiance. Ce bloc les ramène, à la
+ * seule porte d'entrée (`fromImport`), à des chaînes bornées et des entiers sains. Une donnée valide
+ * traverse inchangée ; une donnée absente ou abîmée devient une valeur neutre, jamais une exception.
+ */
+const MAX_LABEL = 300;
+const MAX_TILES = 2000;
+const IMPORT_MODES: ReadonlyArray<ImportProvenance["mode"]> = ["glyphes", "vectoriel", "auto", "photo"];
+const IMPORT_KINDS: ReadonlyArray<ImportedKind> = ["pdf", "text", "photo"];
+// Contrôles C0/C1 et marques bidirectionnelles : jamais utiles dans un nom, un titre ou un symbole.
+const INVISIBLE = /[\p{Cc}\u2028\u2029\u202a-\u202e\u2066-\u2069]/gu;
+
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === "object" && value !== null && !Array.isArray(value);
+
+/** Au plus `max` points de code ; la coupe a lieu avant le traitement pour qu'une chaîne énorme ne coûte rien. */
+const clip = (value: string, max: number) => Array.from(value.slice(0, max * 2)).slice(0, max).join("");
+
+function cleanLabel(value: unknown): string {
+  return typeof value === "string" ? clip(value.slice(0, MAX_LABEL * 2).replace(INVISIBLE, " "), MAX_LABEL) : "";
+}
+
+/** Symbole de point : au plus 4 caractères (points de code), sans contrôle. `&`, `<`, `●`… restent : l'échappement se fait à la sortie. */
+function cleanSymbol(value: unknown): string {
+  return typeof value === "string" ? clip(value.slice(0, 32).replace(INVISIBLE, ""), 4) : "";
+}
+
+const cleanCount = (value: unknown) =>
+  typeof value === "number" && Number.isFinite(value) && value > 0 ? Math.min(Math.floor(value), Number.MAX_SAFE_INTEGER) : 0;
+const cleanNumber = (value: unknown) => (typeof value === "number" && Number.isFinite(value) ? value : 0);
+
+function cleanProvenance(value: unknown): ImportProvenance {
+  const source = isRecord(value) ? value : {};
+  const title = cleanLabel(source.title);
+  const author = cleanLabel(source.author);
+  const mode = IMPORT_MODES.find((candidate) => candidate === source.mode) ?? "auto";
+  return {
+    file: cleanLabel(source.file),
+    ...(title.trim() ? { title } : {}),
+    ...(author.trim() ? { author } : {}),
+    pages: cleanCount(source.pages),
+    mode,
+  };
+}
+
+function cleanMontage(value: unknown): ImportMontage {
+  const source = isRecord(value) ? value : {};
+  const tiles: ImportMontage["tiles"] = [];
+  if (Array.isArray(source.tiles)) {
+    for (const tile of source.tiles.slice(0, MAX_TILES)) {
+      if (!isRecord(tile)) continue;
+      tiles.push({ page: cleanCount(tile.page), x: cleanNumber(tile.x), y: cleanNumber(tile.y), width: cleanCount(tile.width), height: cleanCount(tile.height) });
+    }
+  }
+  return { tiles, overlaps: cleanCount(source.overlaps), holes: cleanCount(source.holes), scaled: source.scaled === true };
+}
+
+function cleanLosses(value: unknown): ImportLosses {
+  const source = isRecord(value) ? value : {};
+  return {
+    halfStitches: cleanCount(source.halfStitches),
+    quarterStitches: cleanCount(source.quarterStitches),
+    backstitches: cleanCount(source.backstitches),
+    knots: cleanCount(source.knots),
+    blends: cleanCount(source.blends),
+    unresolved: cleanCount(source.unresolved),
+  };
+}
+
+function cleanDeclaredSize(value: unknown): { w: number; h: number } | undefined {
+  if (!isRecord(value)) return undefined;
+  const { w, h } = value;
+  if (typeof w !== "number" || typeof h !== "number" || !Number.isSafeInteger(w) || !Number.isSafeInteger(h)) return undefined;
+  return w > 0 && h > 0 && w <= 1_000_000 && h <= 1_000_000 ? { w, h } : undefined;
+}
+
 export function fromRosace(pattern: RosacePattern): StitchWork {
   const { config, size, cells, cleaned: _cleaned, mirrorSymmetric: _mirror, ...stats } = pattern;
   return {
@@ -135,10 +211,10 @@ export function fromImport(grid: ImportedGrid, textile: WorkTextile = DEFAULT_IM
   const seen = new Set<string>();
   for (const color of grid.colors) {
     const code = resolveThreadCode(color.code);
-    if (!code) return { ok: false, error: `Référence DMC inconnue : « ${color.code} ».` };
+    if (!code) return { ok: false, error: `Référence DMC inconnue : « ${String(color.code).slice(0, 40)} ».` };
     if (seen.has(code)) return { ok: false, error: `Référence DMC en double : « ${code} ».` };
     seen.add(code);
-    palette.push({ code, symbol: color.symbol || "·" });
+    palette.push({ code, symbol: cleanSymbol(color.symbol) || "·" });
   }
   const cells = new Int16Array(width * height);
   let used = 0;
@@ -161,13 +237,13 @@ export function fromImport(grid: ImportedGrid, textile: WorkTextile = DEFAULT_IM
     ok: true,
     work: {
       origin: {
-        kind: grid.kind ?? "pdf",
-        provenance: grid.provenance,
-        montage: grid.montage,
-        lost: grid.lost,
+        kind: IMPORT_KINDS.find((candidate) => candidate === grid.kind) ?? "pdf",
+        provenance: cleanProvenance(grid.provenance),
+        montage: cleanMontage(grid.montage),
+        lost: cleanLosses(grid.lost),
         importedAt: new Date().toISOString(),
-        declaredSize: grid.declaredSize,
-        text: grid.text,
+        declaredSize: cleanDeclaredSize(grid.declaredSize),
+        text: typeof grid.text === "string" ? cleanLabel(grid.text) : undefined,
       },
       width,
       height,
@@ -251,11 +327,13 @@ export function restoreImportedWork(record: unknown): ImportOutcome {
   }
   const cells = decodeCells(source.cells, width * height);
   if (!cells) return { ok: false, error: "La matrice de l'ouvrage importé est corrompue." };
+  const wasteRaw = Number(source.textile?.wastePercent ?? DEFAULT_IMPORT_TEXTILE.wastePercent);
   const textile: WorkTextile = {
     fabric: ["naturel", "craie", "brume"].includes(source.textile?.fabric ?? "") ? source.textile!.fabric : DEFAULT_IMPORT_TEXTILE.fabric,
     aida: [14, 16, 18].includes(Number(source.textile?.aida)) ? (Number(source.textile!.aida) as AidaCount) : DEFAULT_IMPORT_TEXTILE.aida,
     strands: Math.max(1, Math.min(6, Math.round(Number(source.textile?.strands) || DEFAULT_IMPORT_TEXTILE.strands))),
-    wastePercent: Math.max(0, Math.min(50, Math.round(Number(source.textile?.wastePercent ?? DEFAULT_IMPORT_TEXTILE.wastePercent)))),
+    // « abc » donnerait NaN, puis des mètres et des pelotes « NaN » partout.
+    wastePercent: Number.isFinite(wasteRaw) ? Math.max(0, Math.min(50, Math.round(wasteRaw))) : DEFAULT_IMPORT_TEXTILE.wastePercent,
   };
   const outcome = fromImport({
     kind: source.kind === "text" ? "text" : source.kind === "photo" ? "photo" : "pdf",
@@ -270,7 +348,9 @@ export function restoreImportedWork(record: unknown): ImportOutcome {
     declaredSize: source.declaredSize,
   }, textile);
   if (!outcome.ok) return outcome;
-  if (outcome.work.origin.kind !== "rosace" && typeof source.importedAt === "string") outcome.work.origin.importedAt = source.importedAt;
+  if (outcome.work.origin.kind !== "rosace" && typeof source.importedAt === "string" && source.importedAt.length <= 64 && Number.isFinite(Date.parse(source.importedAt))) {
+    outcome.work.origin.importedAt = source.importedAt;
+  }
   return outcome;
 }
 

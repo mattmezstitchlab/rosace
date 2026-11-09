@@ -146,7 +146,15 @@ export function SettingsPanel() {
   const api = useRosaceApi();
   const { config, pattern } = api;
   const [theme, setTheme] = useState<ThemeChoice>(readThemeChoice);
+  const [seedDraft, setSeedDraft] = useState<string | null>(null);
 
+  // La signature se tape librement (on peut vider le champ) ; elle n'est bornée à 1–9999 et appliquée qu'en quittant le champ ou à Entrée.
+  const commitSeed = () => {
+    if (seedDraft === null) return;
+    setSeedDraft(null);
+    const seed = Math.round(Number(seedDraft));
+    if (seedDraft.trim() && Number.isFinite(seed)) api.setSeed(Math.min(9999, Math.max(1, seed)));
+  };
   useEffect(() => {
     const media = matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => setTheme(readThemeChoice());
@@ -166,7 +174,7 @@ export function SettingsPanel() {
         <div className="panneau-rangee">
           <label className="champ-graine">
             <span className="sr-only">Signature, de 1 à 9999</span>
-            <input type="number" min="1" max="9999" inputMode="numeric" value={config.seed} onChange={(event) => api.setSeed(Number(event.target.value))} />
+            <input type="number" min="1" max="9999" inputMode="numeric" value={seedDraft ?? config.seed} onChange={(event) => setSeedDraft(event.target.value)} onBlur={commitSeed} onKeyDown={(event) => { if (event.key === "Enter") commitSeed(); }} />
           </label>
           <button className="bouton bouton-petit" onClick={api.generateVariation}><Dices size={15} aria-hidden="true" /> Tirer une signature</button>
         </div>
@@ -249,7 +257,7 @@ export function SettingsPanel() {
           <button className="bouton bouton-petit" onClick={api.reset} disabled={api.isDefault}><RotateCcw size={15} aria-hidden="true" /> Réinitialiser la rosace</button>
         </div>
         <p className="panneau-aide panneau-raccourcis">
-          Raccourcis : Ctrl Z annuler · Ctrl Maj Z rétablir · 1 à 6 catégories · Échap fermer. En mode Broder : Ctrl Z / Ctrl Y pour les croix, flèches, Espace, + / −, 0.
+          Raccourcis : Ctrl Z annuler · Ctrl Maj Z rétablir · 1 à 7 catégories · Échap fermer. En mode Broder : Ctrl Z / Ctrl Y pour les croix, flèches, Espace, + / −, 0.
           Vos recettes restent sur cet appareil ; les couleurs écran sont indicatives.
         </p>
       </div>
