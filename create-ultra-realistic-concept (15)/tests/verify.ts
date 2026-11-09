@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { DMC_ADDED_THREADS, DMC_ALL_THREADS, DMC_THREADS, getThread, resolveThreadCode } from "../src/data/dmc";
 import { CROWN_THREADS } from "../src/data/crown";
 import { computeMaterials, estimateTime, perStitchNeedleMeters, SKEIN_STRAND_METERS } from "../src/lib/materials";
+import { TEXT_MAX_CHARS, normalizeText, textGrid, unsupportedChars } from "../src/lib/text";
 import { chartRegions, countRegionStitches } from "../src/lib/chart";
 import { readFileSync } from "node:fs";
 import { patternFingerprint, workFingerprint } from "../src/lib/pattern-id";
@@ -46,7 +47,7 @@ test("catalogue : 489 références, codes uniques, 161 historiques intactes", ()
   }
 });
 
-test("métrage : faisceau et brins sont deux grandeurs distinctes", () => {
+test("métrage : le faisceau ne dépend pas des brins, les mètres de brins et les échevettes si", () => {
   const two = computeMaterials(500, { aida: 14, strands: 2, wastePercent: 15 });
   assert.equal(two.needleMeters, 14.4);
   assert.equal(two.strandMeters, 28.8);
@@ -54,11 +55,43 @@ test("métrage : faisceau et brins sont deux grandeurs distinctes", () => {
   assert.equal(two.skeinUsableNeedleMeters, 24);
   const one = computeMaterials(500, { aida: 14, strands: 1, wastePercent: 15 });
   const six = computeMaterials(500, { aida: 14, strands: 6, wastePercent: 15 });
-  assert.equal(one.needleMeters, 7.2);
-  assert.equal(six.needleMeters, 43.1);
-  assert.equal(six.strandMeters, 258.8);
-  assert.ok(six.skeins > two.skeins);
-  assert.ok(two.needleMeters > one.needleMeters);
+  assert.equal(one.needleMeters, 14.4);
+  assert.equal(six.needleMeters, 14.4);
+  assert.equal(one.strandMeters, 14.4);
+  assert.equal(six.strandMeters, 86.3);
+  assert.equal(one.skeinUsableNeedleMeters, 48);
+  assert.equal(six.skeinUsableNeedleMeters, 8);
+  assert.equal(one.skeins, 1);
+  assert.equal(six.skeins, 2);
+  assert.ok(one.strandMeters < two.strandMeters && two.strandMeters < six.strandMeters);
+});
+
+test("métrage : un total exact de 48 m de brins ne réclame pas une échevette de plus", () => {
+  // 768 croix × 2,5 cm × 1,25 × 2 brins = 48 m ; en flottants, le produit vaut 48,00000000000001.
+  const exact = computeMaterials(768, { aida: 14, strands: 2, wastePercent: 25 });
+  assert.equal(exact.strandMeters, 48);
+  assert.equal(exact.skeins, 1);
+  assert.equal(computeMaterials(1536, { aida: 14, strands: 1, wastePercent: 25 }).skeins, 1);
+  assert.equal(computeMaterials(1537, { aida: 14, strands: 1, wastePercent: 25 }).skeins, 2);
+  assert.equal(computeMaterials(0, { aida: 14, strands: 2, wastePercent: 25 }).skeins, 0);
+});
+
+test("métrage : patron livré (3 381 croix), 2 brins = valeurs historiques, les autres brins multiplient seulement les mètres de brins", () => {
+  const expected = [
+    { strands: 1, strandMeters: 97.3, skeins: 5 },
+    { strands: 2, strandMeters: 194.4, skeins: 7 },
+    { strands: 3, strandMeters: 291.7, skeins: 9 },
+    { strands: 4, strandMeters: 388.8, skeins: 10 },
+    { strands: 5, strandMeters: 486.1, skeins: 14 },
+    { strands: 6, strandMeters: 583.1, skeins: 15 },
+  ];
+  for (const { strands, strandMeters, skeins } of expected) {
+    const generated = generateRosace({ ...DEFAULT_CONFIG, strands });
+    assert.equal(generated.stitches.length, 3381);
+    assert.equal(generated.totalNeedleMeters, 97.3);
+    assert.equal(generated.totalStrandMeters, strandMeters);
+    assert.equal(generated.totalSkeins, skeins);
+  }
 });
 
 test("conversions Aïda : le métrage baisse quand le comptage augmente", () => {
@@ -68,7 +101,8 @@ test("conversions Aïda : le métrage baisse quand le comptage augmente", () => 
   assert.ok(a14.needleMeters > a16.needleMeters && a16.needleMeters > a18.needleMeters);
   assert.equal(perStitchNeedleMeters(14, 2), 0.025);
   assert.ok(Math.abs(perStitchNeedleMeters(18, 2) - 0.025 * 14 / 18) < 1e-9);
-  assert.equal(perStitchNeedleMeters(14, 6), 0.025 * 3);
+  assert.equal(perStitchNeedleMeters(14, 6), perStitchNeedleMeters(14, 2));
+  assert.equal(perStitchNeedleMeters(14, 1), 0.025);
   assert.equal(estimateTime(0).low <= estimateTime(0).median, true);
 });
 
@@ -76,6 +110,53 @@ test("temps : estimation en plage et non en vitesse irréaliste", () => {
   const estimate = estimateTime(3381);
   assert.ok(estimate.low > 1000 && estimate.high > estimate.median && estimate.median > estimate.low);
   assert.match(estimate.assumedRate, /100–200/);
+});
+
+function textKey(text: string) {
+  const grid = textGrid({ text, code: "310", margin: 0 });
+  assert.ok(!("error" in grid), `texte « ${text} » refusé`);
+  return `${grid.width}x${grid.height}:${Array.from(grid.cells).join(",")}`;
+}
+
+test("texte : tous les glyphes de la police sont distincts (« Û » n'est plus un « O »)", () => {
+  const chars = [..."ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,'-&!?+/:()\"♥ÉÈÊÀÂÇÔÎÛÙËÏ"];
+  assert.deepEqual(unsupportedChars(chars.join("")), []);
+  const seen = new Map<string, string>();
+  for (const char of chars) {
+    const key = textKey(char);
+    assert.ok(!seen.has(key), `« ${char} » est identique à « ${seen.get(key)} »`);
+    seen.set(key, char);
+  }
+  assert.notEqual(textKey("AOÛT"), textKey("AOOT"));
+});
+
+test("texte : phrase tapée sur téléphone — apostrophes et guillemets courbes, œ, Û, NFD, espaces spéciaux", () => {
+  assert.deepEqual(unsupportedChars("L'été, c'est l\u2019été !"), []);
+  assert.equal(textKey("L\u2019été, c\u2018est"), textKey("L'été, c'est"));
+  assert.equal(textKey("cœur"), textKey("COEUR"));
+  assert.equal(textKey("Œ æ"), textKey("OE AE"));
+  assert.deepEqual(unsupportedChars("COÛT"), []);
+  assert.equal(textKey("e\u0301te\u0301"), textKey("\u00E9t\u00E9"));
+  assert.equal(textKey("«Bonjour» – “ok”… 1\u20132"), textKey('"BONJOUR" - "OK"... 1-2'));
+  assert.equal(textKey("A\u00A0B\tC\u202FD"), textKey("A B C D"));
+  assert.equal(textKey("A\r\nB"), textKey("A\nB"));
+  assert.deepEqual(unsupportedChars("A\u00A0B\tC\u202FD\r\nE"), []);
+  assert.equal(textKey("\u2764\uFE0F"), textKey("♥"));
+  assert.deepEqual(unsupportedChars("Ü ; @"), ["Ü", ";", "@"]);
+});
+
+test("texte : lignes vides ignorées en tête et en queue, largeur comptée en points de code, limites sans paire coupée", () => {
+  assert.equal(textKey("A\n\n"), textKey("A"));
+  assert.equal(textKey("\n\nA"), textKey("A"));
+  assert.equal(textKey("A").split(":")[0], "5x7");
+  assert.equal(textKey("A\n\nB").split(":")[0], "5x25");
+  assert.equal(textKey("A😀").split(":")[0], "11x7");
+  assert.deepEqual(unsupportedChars("A😀"), ["😀"]);
+  assert.equal(normalizeText("😀".repeat(TEXT_MAX_CHARS + 12))[0], "😀".repeat(TEXT_MAX_CHARS));
+  assert.deepEqual(normalizeText("\n\n\n\nBONJOUR"), ["BONJOUR"]);
+  assert.deepEqual(normalizeText(" \n\t\u00A0\n"), []);
+  const blank = textGrid({ text: " \u200B\n ", code: "310" });
+  assert.ok("error" in blank && blank.error === "Écrivez au moins une lettre.");
 });
 
 test("moteur : mêmes réglages + même graine = même patron, empreinte stable", () => {

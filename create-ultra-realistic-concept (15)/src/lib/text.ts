@@ -8,6 +8,11 @@ import type { ImportedGrid } from "./work";
  *
  * La police est dessinée ici, libre de droits ; chaque glyphe est 5 colonnes × 7 rangées,
  * lu ligne par ligne, « # » = croix.
+ *
+ * Le texte est d'abord normalisé (`normalizeText`) : composition Unicode NFC, espaces insécables et
+ * tabulations ramenés à l'espace, apostrophes, guillemets, tirets et points de suspension
+ * typographiques ramenés à leur équivalent de la police, « œ » et « æ » développés en « OE » et « AE ».
+ * Ce que la police ne connaît toujours pas est remplacé par un espace et annoncé par `unsupportedChars`.
  */
 export const TEXT_MAX_CHARS = 48;
 export const TEXT_MAX_LINES = 4;
@@ -58,6 +63,11 @@ const GLYPHS: Record<string, string[]> = {
   "!": ["..#..", "..#..", "..#..", "..#..", "..#..", ".....", "..#.."],
   "?": [".###.", "#...#", "....#", "...#.", "..#..", ".....", "..#.."],
   "+": [".....", "..#..", "..#..", "#####", "..#..", "..#..", "....."],
+  "/": ["....#", "....#", "...#.", "..#..", ".#...", "#....", "#...."],
+  ":": [".....", ".##..", ".##..", ".....", ".##..", ".##..", "....."],
+  "(": ["...#.", "..#..", ".#...", ".#...", ".#...", "..#..", "...#."],
+  ")": [".#...", "..#..", "...#.", "...#.", "...#.", "..#..", ".#..."],
+  '"': [".#.#.", ".#.#.", ".#.#.", ".....", ".....", ".....", "....."],
   "♥": [".....", ".#.#.", "#####", "#####", ".###.", "..#..", "....."],
   "É": ["..#..", "#####", "#....", "####.", "#....", "#....", "#####"],
   "È": [".#...", "#####", "#....", "####.", "#....", "#....", "#####"],
@@ -67,7 +77,7 @@ const GLYPHS: Record<string, string[]> = {
   "Ç": [".###.", "#...#", "#....", "#....", "#...#", ".###.", "..##."],
   "Ô": [".###.", ".###.", "#...#", "#...#", "#...#", "#...#", ".###."],
   "Î": [".###.", "#####", "..#..", "..#..", "..#..", "..#..", "#####"],
-  "Û": [".###.", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
+  "Û": ["..#..", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
   "Ù": [".#...", "#...#", "#...#", "#...#", "#...#", "#...#", ".###."],
   "Ë": ["#...#", "#####", "#....", "####.", "#....", "#....", "#####"],
   "Ï": ["#...#", "#####", "..#..", "..#..", "..#..", "..#..", "#####"],
@@ -92,8 +102,36 @@ export function supportedTextChar(char: string) {
   return char.toUpperCase() in GLYPHS;
 }
 
+/** Variantes typographiques (clavier de téléphone, copier-coller) ramenées à un caractère de la police. */
+const TEXT_SUBSTITUTIONS: Array<[RegExp, string]> = [
+  [/[\u2018\u2019\u201B\u02BC\u2032]/g, "'"],
+  [/[\u00AB\u00BB\u201C\u201D\u201E\u201F\u2033]/g, '"'],
+  [/[\u2010-\u2015\u2212]/g, "-"],
+  [/\u2026/g, "..."],
+  [/\u0152/g, "OE"],
+  [/\u00C6/g, "AE"],
+  [/\u2764/g, "\u2665"],
+];
+
+/**
+ * Texte prêt à dessiner : une chaîne par ligne, sans ligne vide en tête ni en queue, au plus
+ * `TEXT_MAX_LINES` lignes de `TEXT_MAX_CHARS` caractères (comptés en points de code, jamais
+ * coupés au milieu d'une paire de substitution).
+ */
 export function normalizeText(text: string) {
-  return text.toUpperCase().split("\n").slice(0, TEXT_MAX_LINES).map((line) => line.slice(0, TEXT_MAX_CHARS));
+  let clean = text
+    .normalize("NFC")
+    .replace(/[\u00AD\u200B-\u200F\u2060\uFEFF\uFE0E\uFE0F]/g, "")
+    .replace(/\r\n?|[\u2028\u2029]/g, "\n")
+    .replace(/[^\S\n]/g, " ")
+    .toUpperCase();
+  for (const [pattern, replacement] of TEXT_SUBSTITUTIONS) clean = clean.replace(pattern, replacement);
+  const lines = clean.split("\n");
+  const first = lines.findIndex((line) => line.trim());
+  if (first < 0) return [];
+  const kept = lines.slice(first, first + TEXT_MAX_LINES);
+  while (!kept[kept.length - 1].trim()) kept.pop();
+  return kept.map((line) => Array.from(line).slice(0, TEXT_MAX_CHARS).join(""));
 }
 
 /** Caractères que la police ne connaît pas : remplacés par un espace, mais annoncés. */
@@ -112,7 +150,7 @@ export function textGrid(options: TextOptions): ImportedGrid | { error: string }
   if (options.shadowCode && !shadow) return { error: `Référence DMC inconnue pour l'ombre : « ${options.shadowCode} ».` };
   if (shadow === code) return { error: "L'ombre doit être d'un autre fil que le texte." };
   const margin = Math.max(0, Math.min(10, Math.round(options.margin ?? 2)));
-  const lineWidths = lines.map((line) => Math.max(0, line.length * (GLYPH_W + GAP) - GAP));
+  const lineWidths = lines.map((line) => Math.max(0, [...line].length * (GLYPH_W + GAP) - GAP));
   const textWidth = Math.max(...lineWidths, 1);
   const textHeight = lines.length * GLYPH_H + (lines.length - 1) * LINE_GAP;
   const extra = shadow ? 1 : 0;
