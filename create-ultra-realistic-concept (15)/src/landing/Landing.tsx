@@ -10,8 +10,8 @@ const LIENS = [
 ];
 
 /**
- * La présentation de ROSACE : elle vend le résultat (une rosace devenue patron),
- * pas l'interface. L'atelier s'ouvre par le bouton, jamais par défaut.
+ * La présentation de ROSACE : une page de vente composée avec le moteur du produit
+ * (mêmes rendus, mêmes fils DMC). L'atelier s'ouvre par un bouton, jamais par défaut.
  */
 export function Landing() {
   const [barre, setBarre] = useState(false);

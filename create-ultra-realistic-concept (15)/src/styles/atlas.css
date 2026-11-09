@@ -28,11 +28,30 @@ html[data-mode="nuit"] .outil-icone.is-saved { color: #d98aa4; }
 .modal-header h2 { margin: 0; font-size: 32px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.05; }
 .modal-content { padding: 22px 24px 26px; overflow: auto; overscroll-behavior: contain; }
 
-.toast-stack { position: fixed; z-index: 200; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); display: flex; width: min(360px, calc(100vw - 32px)); flex-direction: column; gap: 8px; pointer-events: none; }
+/* Au-dessus de toutes les couches plein écran (fenêtres 100, importeur 240, Broder 250, loupe 300) : une confirmation ne doit jamais être masquée. */
+.toast-stack { position: fixed; z-index: 400; right: 16px; bottom: calc(86px + env(safe-area-inset-bottom)); display: flex; width: min(360px, calc(100vw - 32px)); flex-direction: column; gap: 8px; pointer-events: none; }
 .toast { display: flex; align-items: flex-start; gap: 12px; padding: 13px 15px; border: 1px solid #2a2a2e; border-radius: 14px; background: #0b0b0c; color: #fff; box-shadow: var(--ombre-menu); }
 .toast-check { display: grid; width: 22px; height: 22px; flex: none; place-items: center; border-radius: 50%; background: #fff; color: #0b0b0c; }
 .toast strong { display: block; font-size: 14px; font-weight: 600; }
 .toast p { margin: 4px 0 0; font-size: 13px; line-height: 1.45; color: rgba(255,255,255,.72); }
+
+/* ---------- Écran d'erreur (ErrorBoundary) : il remplace toute l'interface, il défile donc lui-même ---------- */
+.erreur-app { position: fixed; inset: 0; display: flex; overflow: auto; padding: calc(24px + env(safe-area-inset-top)) 16px calc(24px + env(safe-area-inset-bottom)); background: var(--fond); color: var(--encre); }
+.erreur-carte { width: min(100%, 560px); margin: auto; padding: 28px; border: 1px solid var(--trait); border-radius: var(--rayon-xl); background: var(--carte); box-shadow: var(--ombre-menu); }
+.erreur-carte h1 { margin: 0 0 12px; font-size: 30px; font-weight: 600; letter-spacing: -0.035em; line-height: 1.1; }
+.erreur-carte h1:focus-visible { outline: none; }
+.erreur-carte p { margin: 0 0 14px; font-size: 16px; line-height: 1.5; color: var(--encre-2); }
+.erreur-carte .surtitre { margin-bottom: 10px; font-size: 13px; color: var(--encre-3); }
+.erreur-carte .erreur-aide { margin: 22px 0 10px; font-size: 14px; color: var(--encre-3); }
+.erreur-actions { display: flex; flex-wrap: wrap; gap: 10px; margin: 0 0 10px; }
+.erreur-actions .bouton { height: auto; min-height: 44px; padding: 10px 16px; line-height: 1.25; white-space: normal; text-align: center; }
+.erreur-confirmation { flex: 1 1 100%; padding: 14px 16px 6px; border: 1px solid var(--erreur); border-radius: var(--rayon-champ); background: var(--doux); }
+.erreur-confirmation p { color: var(--encre); }
+.erreur-actions .erreur-danger { border-color: var(--erreur); background: var(--erreur); color: #fff; }
+.erreur-actions .erreur-danger:hover:not(:disabled) { background: var(--erreur); opacity: .9; }
+.erreur-details { margin-top: 8px; font-size: 13px; color: var(--encre-3); }
+.erreur-details summary { display: flex; align-items: center; min-height: 32px; cursor: pointer; }
+.erreur-details p { margin: 6px 0 0; font-size: 13px; color: var(--encre-3); overflow-wrap: anywhere; }
 
 @media (max-width: 760px) {
   .modal-backdrop { padding: 10px; }

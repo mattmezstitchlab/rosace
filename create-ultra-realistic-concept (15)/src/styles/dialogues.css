@@ -4,7 +4,8 @@
 .champ-recherche { display: flex; flex: 1; align-items: center; gap: 10px; padding: 0 14px; border: 1px solid var(--trait-champ); border-radius: var(--rayon-champ); background: var(--carte); color: var(--encre-3); }
 .champ-recherche:focus-within { border-color: var(--encre); }
 .champ-recherche input { width: 100%; height: 52px; border: 0; outline: 0; background: transparent; color: var(--encre); font-size: 17px; }
-.champ-recherche button { display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 50%; background: none; }
+.champ-recherche button { position: relative; display: grid; width: 32px; height: 32px; place-items: center; border: 0; border-radius: 50%; background: none; }
+.champ-recherche button::after, .boite-liste .icone::after { content: ""; position: absolute; inset: -6px; border-radius: 50%; }
 .familles-filtres { display: flex; gap: 6px; margin: 14px 0 20px; padding-bottom: 4px; overflow-x: auto; }
 .familles-filtres button { flex: none; min-height: 44px; padding: 0 16px; border: 1px solid var(--trait-2); border-radius: 999px; background: var(--carte); font-size: 14px; font-weight: 500; white-space: nowrap; }
 .familles-filtres button.is-active { background: var(--encre); color: var(--fond); border-color: var(--encre); }
@@ -63,6 +64,6 @@
 .boite-liste { display: flex; flex-wrap: wrap; gap: 6px; margin: 10px 0 0; padding: 0; list-style: none; }
 .boite-liste li { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 4px 0 8px; border: 1px solid var(--trait); border-radius: var(--rayon-pilule); background: var(--carte); font-size: 12.5px; font-weight: 600; }
 .boite-liste i { width: 14px; height: 14px; border-radius: 50%; border: 1px solid rgba(11,11,12,.15); }
-.boite-liste .icone { width: 28px; height: 28px; }
+.boite-liste .icone { position: relative; width: 28px; height: 28px; }
 .boite-vide { color: var(--encre-3); font-weight: 500; border: 0 !important; }
 .panneau-aide .lien-souligne { padding: 0; border: 0; background: none; color: var(--plum); font: inherit; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; cursor: pointer; }

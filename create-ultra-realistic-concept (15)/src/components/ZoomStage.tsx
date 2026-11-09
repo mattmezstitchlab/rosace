@@ -34,15 +34,37 @@ export function ZoomStage({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      const target = event.target as HTMLElement;
-      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA") return;
-      if (event.key === "+" || event.key === "=") { event.preventDefault(); zoomBy(1.25); }
-      else if (event.key === "-") { event.preventDefault(); zoomBy(0.8); }
-      else if (event.key === "0") { event.preventDefault(); reset(); }
+      // Ctrl/⌘ + « + », « - », « 0 » sont les raccourcis de zoom du navigateur (Alt/⌘ servent aussi à d'autres commandes) : on ne les détourne pas.
+      if (event.defaultPrevented || event.ctrlKey || event.metaKey || event.altKey) return;
+      const { key } = event;
+      if (key !== "+" && key !== "=" && key !== "-" && key !== "0") return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName))) return;
+      // Broder, import, loupe, catalogue : une fenêtre modale couvre l'atelier, ses touches ne le concernent pas.
+      if (document.querySelector('[aria-modal="true"]')) return;
+      event.preventDefault();
+      if (key === "-") zoomBy(0.8);
+      else if (key === "0") reset();
+      else zoomBy(1.25);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [zoomBy, reset]);
+
+  useEffect(() => {
+    const node = frame.current;
+    if (!node) return;
+    // React enregistre `wheel` en mode passif : preventDefault y est sans effet et le navigateur zoomerait toute la page en plus de la scène.
+    const onWheel = (event: WheelEvent) => {
+      if (!event.ctrlKey && !event.metaKey) return;
+      event.preventDefault();
+      // Un cran de molette (≈ 100 px, ou 3 lignes) vaut ≈ ×1,12 ; un pincement de pavé tactile envoie beaucoup de petits deltas.
+      const unit = event.deltaMode === 0 ? 0.0012 : 0.04;
+      zoomBy(Math.min(1.25, Math.max(0.8, Math.exp(-event.deltaY * unit))));
+    };
+    node.addEventListener("wheel", onWheel, { passive: false });
+    return () => node.removeEventListener("wheel", onWheel);
+  }, [zoomBy]);
 
   const onPointerDown = (event: React.PointerEvent) => {
     pointers.current.set(event.pointerId, { x: event.clientX, y: event.clientY });
@@ -80,12 +102,6 @@ export function ZoomStage({ children }: { children: ReactNode }) {
     if (pointers.current.size < 2) gesture.current = null;
   };
 
-  const onWheel = (event: React.WheelEvent) => {
-    if (!event.ctrlKey && !event.metaKey) return;
-    event.preventDefault();
-    zoomBy(event.deltaY < 0 ? 1.12 : 0.89);
-  };
-
   return (
     <div
       ref={frame}
@@ -94,7 +110,6 @@ export function ZoomStage({ children }: { children: ReactNode }) {
       onPointerMove={onPointerMove}
       onPointerUp={endPointer}
       onPointerCancel={endPointer}
-      onWheel={onWheel}
       onDoubleClick={reset}
       onClickCapture={(event) => {
         if (Date.now() < suppressClick.current) {
