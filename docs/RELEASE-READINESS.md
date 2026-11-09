@@ -23,7 +23,30 @@
 
 **À conserver** : quatre entrées de création (rosace, photo, texte, PDF), atelier de composition, couleurs DMC, conversion en patron, exports, bibliothèque locale, progression de broderie.
 
-**À ne pas ajouter immédiatement** : comptes utilisateur, boutique multifournisseur, réseau social, paiement intégré, abonnements, IA payante, nouveaux moteurs de géométrie, collaboration temps réel. Un parcours de vente nécessitera une décision commerciale et la validation de la sécurité et des obligations réglementaires.
+**À ne pas ajouter immédiatement** : comptes utilisateur, boutique multifournisseur, réseau social, paiement intégré, abonnements, IA payante, nouveaux moteurs de géométrie, collaboration temps réel entre appareils (elle demande un serveur ; « Broder ensemble » ne relie aujourd'hui que les onglets d'un même navigateur). Un parcours de vente nécessitera une décision commerciale et la validation de la sécurité et des obligations réglementaires.
+
+## Audit avant publication (8 novembre 2026)
+
+Balayages navigateur et trois relectures de code (moteur, import/export, interface). **Corrigé** :
+
+- **Landing** : survol des boutons (texte blanc sur fond clair), focus visible sur les fonds sombres, code mort retiré.
+- **Broder ensemble** : la session ne voyait personne (identifiant partagé entre onglets). Chaque page a son identifiant, les messages reçus sont validés, les curseurs sont nommés et lisibles à tout zoom, « Quitter » est immédiat. Tests : `tests/live.ts`, `tests/broder-navigateur.ts` (Chromium, Firefox 157 et WebKit 27.2).
+- **Fichiers hostiles** : une liste de croix `1e21` figeait l'onglet ; un projet v3 piégé injectait du HTML dans la fiche imprimable ou provoquait un écran blanc ; les cellules CSV commençant par `=`, `+`, `-` ou `@` sont neutralisées. Tests : `tests/robustesse.ts`.
+- **Données** : ouvrir un lien `#r=` ne supprime plus le patron importé, le retirer demande une confirmation, une progression non enregistrée est annoncée à la fermeture.
+- **Import PDF** : pdf.js compatible avec les navigateurs plus anciens, abandon possible pendant l'analyse, 100 pages au plus, champs numériques sans saisie bloquée.
+- **Moteur** : « Û » n'est plus un « O » ; apostrophes, guillemets et « œ » des claviers mobiles sont reconnus ; le métrage « aiguille » ne dépend plus du nombre de brins (le réglage par défaut, 2 brins, donne exactement les mêmes chiffres) ; un total exact de 48 m ne réclame plus une échevette de plus.
+- **Interface** : écran de secours et rechargement unique après un déploiement, lien d'évitement, notifications au-dessus de tout, molette sans zoom de page, libellés mobiles lisibles, titre par vue, métadonnées de partage.
+
+**Reste à décider ou à faire** :
+
+- **Teintes DMC** : 11 des 161 références historiques s'écartent de `dmc-reference.json` de plus de ΔE 10 ; catalogue non modifié.
+- **Empreinte** (32 bits effectifs) et rare asymétrie miroir : invariants conservés, non modifiés.
+- **Collaboration entre appareils** : à ce jour, passer par « Projet » puis « Importer calque ». Une vraie session distante demande un serveur (Cloudflare Worker et Durable Object).
+- **Licence du code**, mentions légales et confidentialité : aucun fichier `LICENSE`.
+- **En-têtes de sécurité** (CSP) : non ajoutés, à tester avec le worker pdf.js avant activation.
+- **Dépendances de développement** : `vite` 7.3.2 → 7.3.7 corrige des avis qui ne touchent pas le site publié (`npm audit --omit=dev` : 0 vulnérabilité).
+- **Accessibilité** : axe signale encore, dans la vue Broder (hors du périmètre de `test:a11y`) et sur l'étape « Analyser » de l'import, des libellés qui ne reprennent pas le texte visible, et un second repère `banner`.
+- **Non traité (priorité basse)** : pièges de focus des boîtes de dialogue, messages d'erreur PDF encore en partie en anglais, ressources de la conversion photo, bornes de la rectification d'image.
 
 ## Commandes
 

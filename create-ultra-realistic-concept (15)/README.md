@@ -156,7 +156,9 @@ Les projets **version 1** sont migrés explicitement vers v2 lorsque leur forme 
 - **Affichage** : symboles, couleurs, les deux, ou toile (`aime-rosace-broder-affichage-v1`), même grille, même progression.
 - **Fil conducteur** : le fil choisi est conservé entre deux ouvertures ; à défaut, c'est celui de la dernière croix cochée. « Suivante » va à la zone la plus proche du même fil.
 - **Séances** (`src/lib/sessions.ts`) : les croix cochées s'agrègent en séances (écart > 20 min = nouvelle séance), rangées dans la progression et le projet. Le rythme n'est annoncé qu'à partir de 30 croix sur 10 minutes ; la prévision est une **fourchette** (±30 %) et une date probable, jamais une promesse.
-- **Broder ensemble** : un projet ROSACE de la même empreinte s'affiche en calque (`PEER_KEY`), sans jamais écrire dans la progression locale ; un autre ouvrage est refusé.
+- **Broder ensemble**, bouton dédié de l'en-tête du mode Broder, en deux volets :
+  - **Session en direct** (`src/lib/live.ts`, `BroadcastChannel`) : les onglets et fenêtres d'**un même navigateur, sur un même appareil**, qui ouvrent ce patron avec le même code, voient chacun le curseur nommé et les croix des autres brodeuses. Chaque page a son propre identifiant ; le nom est assaini, les couleurs sont attribuées localement et chaque message reçu est validé (expéditeur, case dans la grille, croix bornées) avant d'être pris en compte. Les onglets partagent le même stockage : les croix de l'un apparaissent aussi dans la progression de l'autre. **Ce n'est pas une collaboration entre appareils** : celle-ci demanderait un serveur (WebSocket), absent de ce dépôt.
+  - **Calque d'une amie** (`PEER_KEY`) : un projet ROSACE de la même empreinte s'affiche en contour vert, sans jamais écrire dans la progression locale ; un autre ouvrage est refusé. C'est le moyen d'échanger avec une amie sur un autre appareil (« Projet », puis « Importer calque »).
 - **Boîte à fils** (`src/lib/threadbox.ts`, `aime-rosace-boite-a-fils-v1`) : codes DMC possédés, liste de courses des manquants en échevettes, export CSV.
 - **Tambour** (`src/lib/hoop.ts`) : pour un diamètre donné, la plus grande échelle qui tient avec 1,5 cm de marge ; sinon un aïda plus fin est suggéré.
 - **Fiche réimportable** : la couverture de la fiche PDF porte `ROSACE-FICHE <empreinte> r=<recette> FIN-FICHE` ; l'import la reconnaît, régénère la recette et **compare l'empreinte** avant d'accepter (`src/lib/import-pdf/worksheet.ts`).
@@ -166,7 +168,7 @@ Les projets **version 1** sont migrés explicitement vers v2 lorsque leur forme 
 ## Limites connues
 
 - Validation terrain humaine (5 brodeuses, 3 recettes) encore à organiser ; les six familles géométriques sont vérifiées en Chromium headless, pas sur appareil réel.
-- Couverture navigateur automatisée exécutée : Chromium 156 headless. Safari/WebKit et Firefox sont **préparés** via `BROWSER=webkit|firefox`, mais non exécutés ; appareils réels et gestes tactiles matériels restent à valider.
+- Couverture navigateur automatisée : Chromium 156 headless pour tous les parcours. Le parcours Broder (`tests/broder-navigateur.ts`) a aussi été exécuté sous Firefox 157 et WebKit 27.2 (`BROWSER=firefox`, ou `BROWSER=webkit BROWSER_ARGS=""`) ; les autres parcours n'ont pas été validés hors Chromium. Appareils réels et gestes tactiles matériels restent à valider.
 - La CI GitHub distante est active via `.github/workflows/rosace.yml` ; la dernière exécution observée sur `main` a réussi. Le changement de découpage décrit plus haut doit encore passer dans une nouvelle exécution CI.
 - Couleurs écran indicatives ; métrages et temps sont des estimations.
 - Le lien de partage ne transporte pas la progression.
